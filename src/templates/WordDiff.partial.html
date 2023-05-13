@@ -1,0 +1,20 @@
+<div class="cell-word" style="font-feature-settings: {% for f in word.ot_features %} '{{ f }}' 1 {% endfor %}" lang="{{ word.lang }}">
+    <div class="tooltip">
+        {{ word.word }}<br>
+        <span class="tooltiptext">
+        <div class="tooltipleft">
+            Before:<br>
+            {{ word.buffer_a }}
+            feats={{ word.ot_features }}
+        </div>
+        <div class="tooltipright">
+            After:<br>
+            {{ word.buffer_b }}
+            feats={{ word.ot_features }}
+        </div>
+        <div>
+            changed pixels: {{ word.percent }}%
+        </div>
+        </span>
+    </div>
+</div>

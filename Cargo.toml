@@ -1,0 +1,23 @@
+[package]
+name = "diffenator3"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+read-fonts = { path = "/Users/simon/others-repos/fontations/read-fonts", features=["traversal"] }
+font-types = { path = "/Users/simon/others-repos/fontations/font-types" }
+skrifa = { path = "/Users/simon/others-repos/fontations/skrifa" }
+serde_json = { version = "1.0.96", features = ["preserve_order"] }
+serde = { version = "*", features = ["derive"] }
+indexmap = "1.9.3"
+ab_glyph = "0.2.21"
+image = "0.24.6"
+harfbuzz_rs = { git = "https://github.com/simoncozens/harfbuzz_rs.git", branch = "harfbuzz-draw" }
+rayon = "*"
+thread_local = "1.1"
+indicatif = { version="*", features = ["with_rayon"] }
+tera = "1"
+ucd = "0.1.1"
+unicode_names2 = "0.6.0"
