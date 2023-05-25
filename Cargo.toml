@@ -3,9 +3,31 @@ name = "diffenator3"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+opt-level = "z"
+lto = true
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+rayon = { version = "*" }
+indicatif = {version = "*", features = ["rayon"] }
+thread_local = "1.1"
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wasm-bindgen = { version = "0.2.63" }
+console_error_panic_hook = { version = "0.1.6" }
+wee_alloc = { version = "0.4.5" }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[[bin]]
+name = "diffenator3"
+path = "src/bin.rs"
 
 [dependencies]
+cfg-if = "1.0.0"
 read-fonts = { path = "/Users/simon/others-repos/fontations/read-fonts", features=["traversal"] }
 font-types = { path = "/Users/simon/others-repos/fontations/font-types" }
 skrifa = { path = "/Users/simon/others-repos/fontations/skrifa" }
@@ -14,10 +36,8 @@ serde = { version = "*", features = ["derive"] }
 indexmap = "1.9.3"
 ab_glyph = "0.2.21"
 image = "0.24.6"
-harfbuzz_rs = { git = "https://github.com/simoncozens/harfbuzz_rs.git", branch = "harfbuzz-draw" }
-rayon = "*"
-thread_local = "1.1"
-indicatif = { version="*", features = ["with_rayon"] }
+rustybuzz = "*"
 tera = "1"
 ucd = "0.1.1"
 unicode_names2 = "0.6.0"
+

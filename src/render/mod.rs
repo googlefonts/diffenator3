@@ -4,26 +4,33 @@ use renderer::Renderer;
 use std::{fs::File, io::BufReader};
 
 use image::{GenericImage, GrayImage, ImageBuffer};
-use indicatif::ParallelProgressIterator;
-use rayon::{iter::ParallelIterator, prelude::IntoParallelRefIterator};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{cell::RefCell, collections::HashSet};
-use thread_local::ThreadLocal;
-use ucd::Codepoint;
+
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(not(target_family = "wasm"))] {
+        use indicatif::ParallelProgressIterator;
+        use rayon::{iter::ParallelIterator, prelude::IntoParallelRefIterator};
+        use thread_local::ThreadLocal;
+    }
+}
 
 use crate::dfont::DFont;
 
 const FUZZ: u8 = 10;
 
 pub(crate) fn test_fonts(font_a: &DFont, font_b: &DFont) -> Value {
-    let words = test_font_words(font_a, font_b);
+    // let words = test_font_words(font_a, font_b);
     // eprintln!("{}", serde_json::to_string_pretty(&words).unwrap());
 
-    json!({
-        "glyphs": test_font_glyphs(font_a, font_b),
-        "words": words
-    })
+    // json!({
+    //     "glyphs": test_font_glyphs(font_a, font_b),
+    // "words": words
+    // })
+    json!(test_font_glyphs(font_a, font_b))
 }
 
 fn chars_to_json_array<'a>(chars: impl Iterator<Item = &'a u32>) -> Value {
@@ -46,8 +53,6 @@ fn chars_to_json_array<'a>(chars: impl Iterator<Item = &'a u32>) -> Value {
 fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
     let cmap_a = font_a.codepoints();
     let cmap_b = font_b.codepoints();
-    assert!(cmap_a.contains(&65019));
-    assert!(cmap_b.contains(&65019));
     let missing_glyphs = cmap_a.difference(&cmap_b);
     let new_glyphs = cmap_b.difference(&cmap_a);
     let same_glyphs = cmap_a.intersection(&cmap_b);
@@ -57,11 +62,10 @@ fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
         .filter(|x| x.is_some())
         .map(|c| c.unwrap().to_string())
         .collect();
-    let mut result: Vec<GlyphDiff> =
-        diff_many_words_parallel(font_a, font_b, 40.0, word_list, threshold)
-            .into_iter()
-            .map(|x| x.into())
-            .collect();
+    let mut result: Vec<GlyphDiff> = diff_many_words(font_a, font_b, 40.0, word_list, threshold)
+        .into_iter()
+        .map(|x| x.into())
+        .collect();
     result.sort_by_key(|x| (-x.percent * 10_000.0) as i32);
 
     json!({
@@ -80,7 +84,7 @@ fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
         .collect();
 
     json!({
-        "Arabic": diff_many_words_parallel(
+        "Arabic": diff_many_words(
         font_a, font_b, 40.0, wordlist, 0.2
     )})
 }
@@ -148,7 +152,9 @@ pub struct Difference {
     pub lang: String,
 }
 
-pub(crate) fn diff_many_words_parallel(
+// A fast but complicated version
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
     font_size: f32,
@@ -201,7 +207,9 @@ pub(crate) fn diff_many_words_parallel(
     diffs
 }
 
-fn _diff_many_words_serial(
+// A slow and simple version
+#[cfg(target_family = "wasm")]
+pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
     font_size: f32,

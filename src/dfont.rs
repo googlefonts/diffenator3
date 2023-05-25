@@ -6,15 +6,13 @@ use std::{collections::HashSet, path::Path};
 pub struct DFont {
     pub backing: Vec<u8>,
     variations: String,
-    suffix: String,
 }
 
 impl DFont {
-    pub fn new<P: AsRef<Path>>(path: P, suffix: &str) -> Self {
-        let backing: Vec<u8> = std::fs::read(path).expect("Couldn't open file");
+    pub fn new(string: &[u8]) -> Self {
+        let backing: Vec<u8> = string.to_vec();
         DFont {
             backing,
-            suffix: suffix.to_string(),
             variations: "".to_string(),
         }
     }
