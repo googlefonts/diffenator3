@@ -12,6 +12,7 @@ lto = true
 rayon = { version = "*" }
 indicatif = {version = "*", features = ["rayon"] }
 thread_local = "1.1"
+tera = "1"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen = { version = "0.2.63" }
@@ -37,7 +38,6 @@ indexmap = "1.9.3"
 ab_glyph = "0.2.21"
 image = "0.24.6"
 rustybuzz = "*"
-tera = "1"
 ucd = "0.1.1"
 unicode_names2 = "0.6.0"
-
+unicode-character-database = "0.1.0"

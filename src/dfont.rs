@@ -2,6 +2,7 @@ use font_types::NameId;
 use read_fonts::{tables::cmap::CmapSubtable, FontRef, TableProvider};
 use skrifa::MetadataProvider;
 use std::{collections::HashSet, path::Path};
+use ucd::Codepoint;
 
 pub struct DFont {
     pub backing: Vec<u8>,
@@ -53,5 +54,16 @@ impl DFont {
             points.insert(codepoint);
         }
         points
+    }
+
+    pub fn supported_scripts(&self) -> HashSet<String> {
+        let cmap = self.fontref().charmap();
+        let mut strings = HashSet::new();
+        for (codepoint, _glyphid) in cmap.mappings() {
+            if let Some(script) = char::from_u32(codepoint).and_then(|c| c.script()) {
+                strings.insert(format!("{:?}", script));
+            }
+        }
+        strings
     }
 }

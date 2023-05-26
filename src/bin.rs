@@ -1,4 +1,3 @@
-use cfg_if::cfg_if;
 use dfont::DFont;
 use render::test_fonts;
 use serde_json::json;
@@ -20,4 +19,5 @@ fn main() {
         "tables": table_diff(&font_a.fontref(), &font_b.fontref())
     });
     println!("{}", serde_json::to_string_pretty(&diff).expect("foo"));
+    println!("{:?}", font_a.supported_scripts());
 }

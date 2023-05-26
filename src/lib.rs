@@ -34,7 +34,24 @@ cfg_if! {
             });
             serde_json::to_string(&val)
                 .unwrap_or("Couldn't do it".to_string())
-                .to_string()
         }
+
+        #[wasm_bindgen]
+        pub fn supported_scripts(font_a: &[u8]) -> String {
+            let scripts: Vec<String> = DFont::new(font_a).supported_scripts().into_iter().collect();
+            serde_json::to_string(&scripts)
+                .unwrap_or("Couldn't do it".to_string())
+        }
+
+        #[wasm_bindgen]
+        pub fn word_diff(font_a: &[u8], font_b: &[u8], wordlist: String) -> String {
+            let f_a = DFont::new(font_a);
+            let f_b = DFont::new(font_b);
+            let lines: Vec<String> = wordlist.lines().map(|x| x.to_string()).collect();
+            let diff = render::diff_many_words(&f_a, &f_b, 40.0, lines, 0.2);
+            serde_json::to_string(&json!(diff))
+                .unwrap_or("Couldn't do it".to_string())
+        }
+
     }
 }

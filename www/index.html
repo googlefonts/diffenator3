@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title></title>
+  <style>
+        @font-face {
+            font-family: "Font Before";
+            src: url();
+        }
+        @font-face {
+            font-family: "Font After";
+            src: url();
+        }
+        .font-before { font-family: "Font Before" }
+        .font-after { font-family: "Font After" }
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct" crossorigin="anonymous"></script>
+  <style>
+    .modal-dialog {
+    max-width: 100%;
+    margin: 0;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100vh;
+    display: flex;
+  }
+  .fontdrop {
+    padding: 30px;
+    border-radius: 20px;
+    outline: 3px dashed #ffffffff;
+    outline-offset: -20px;
+  }
+  #fontbefore {
+    background-color: #ddffdddd;
+  }
+  #fontafter {
+    background-color: #ffdddddd;
+  }
+  .dragging {
+    background-image: linear-gradient(rgb(0 0 0/5%) 0 0);
+    outline: 5px dashed #ffffffff;
+  }
+
+  /* Toggle button */
+  #font-nav{
+    position: fixed;
+    right: 20px;
+    z-index: 100;
+  }
+  #font-toggle{
+  }
+  .nav-item{
+    display: block;
+    cursor: pointer;
+    -webkit-user-select: none; /* Safari */        
+    -moz-user-select: none; /* Firefox */
+      -ms-user-select: none; /* IE10+/Edge */
+    user-select: none; /* Standard */
+    text-align: center;
+    color: white;
+    background-color: black;
+    display: block;
+    font-size: 9pt;
+    padding: 5px;
+    margin: 2px;
+  }
+
+.glyphgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    grid-column-gap: 10px;
+    grid-row-gap: 10px;
+}
+
+.wordgrid {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 20px;
+  column-gap: 20px;
+}
+
+.cell-word {
+    font-size: 50px;
+}
+  /* Table differ */
+
+            .node {
+                font-family: courier;
+                cursor: pointer;
+                position: relative;
+                left: 30px;
+                padding: 5px;
+                display: block;
+                border: 1px dashed grey;
+            }
+            .header {
+            font-weight: bold;
+            }
+            .attrib-old{
+                color: red;
+                cursor: text;
+            }
+            .attrib-new{
+                color: green;
+                cursor: text;
+            }
+            .leaf {
+            font-weight: bold;
+            }
+            .old .cell .new {
+              display:  none;
+            }
+            .new .cell .old {
+              display:  none;
+            }
+            .both .cell .old {
+              opacity: 0.75;
+              color:  red;
+            }
+            .both .cell .new {
+              opacity: 0.75;
+              position: absolute;
+              top: 0;
+              color:  green;
+            }
+      .spacer {
+        display:block;
+        float:left;
+        width:100%;
+      }
+      .attr-before { color: green; }
+      .attr-after { color: red; }
+}
+}
+</style>
+<script src="index.js">
+</script>
+</head>
+<body>
+  <div class="modal" tabindex="-1" id="startModal" >
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-body">
+        <div class="container h-100">
+            <div class="row h-100 justify-content-between">
+                <div id="fontbefore" class="h-100 col-5 p-4 d-flex fontdrop">
+                  <div class="align-self-center mx-auto">
+                    <h2>Font before</h2>
+                  </div>
+                </div>
+                <div id="fontafter" class="h-100 col-5 d-flex p-4  fontdrop">
+                  <div class="align-self-center mx-auto">
+                    <h2>Font after</h2>
+                  </div>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div class="container">
+
+    <div id="font-nav">
+      <div class="nav-item" id="fonttoggle">Old</div>
+    </div>
+
+    <h1> Table diff</h1>
+    <div id="difftable"> </div>
+    <div id="glyphdiff"> </div>
+    <div id="worddiff">
+      <div class="nav-item" id="worddiffbutton">Diff words</div>
+    </div>
+  </div>
+</body>
+    <script src="./bootstrap.js"></script>
+</html>
+</html>
