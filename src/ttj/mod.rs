@@ -28,7 +28,7 @@ fn serialize_name_table<'a>(font: &impl MetadataProvider<'a>) -> Value {
     Value::Object(map)
 }
 
-fn font_to_json(font: &FontRef) -> Value {
+pub fn font_to_json(font: &FontRef) -> Value {
     let mut map = Map::new();
     for table in font.table_directory.table_records() {
         let key = table.tag().to_string();

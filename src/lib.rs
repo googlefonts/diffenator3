@@ -1,5 +1,9 @@
 use cfg_if::cfg_if;
 
+pub mod dfont;
+pub mod render;
+pub mod ttj;
+
 cfg_if! {
     if #[cfg(target_family = "wasm")] {
         extern crate wee_alloc;
@@ -10,10 +14,6 @@ cfg_if! {
         use render::test_fonts;
         use serde_json::json;
         use ttj::table_diff;
-
-        mod dfont;
-        mod render;
-        mod ttj;
 
         use wasm_bindgen::prelude::*;
         extern crate console_error_panic_hook;

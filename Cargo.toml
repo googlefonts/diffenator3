@@ -25,13 +25,18 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "diffenator3"
-path = "src/bin.rs"
+path = "src/bin/diffenator3.rs"
+
+[[bin]]
+name = "ttj"
+path = "src/bin/ttj.rs"
 
 [dependencies]
 cfg-if = "1.0.0"
-read-fonts = { path = "/Users/simon/others-repos/fontations/read-fonts", features=["traversal"] }
-font-types = { path = "/Users/simon/others-repos/fontations/font-types" }
-skrifa = { path = "/Users/simon/others-repos/fontations/skrifa" }
+clap = "4.4.7"
+read-fonts = "0.13.0"
+font-types = "0.4.0"
+skrifa = "0.12.0"
 serde_json = { version = "1.0.96", features = ["preserve_order"] }
 serde = { version = "*", features = ["derive"] }
 indexmap = "1.9.3"

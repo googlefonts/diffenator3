@@ -1,11 +1,6 @@
-use dfont::DFont;
-use render::test_fonts;
+use diffenator3::{dfont::DFont, render::test_fonts, ttj::table_diff};
 use serde_json::json;
-use ttj::table_diff;
 
-mod dfont;
-mod render;
-mod ttj;
 fn main() {
     let font_binary_a = std::fs::read("NotoSansArabic-OldRegular.ttf").expect("Couldn't open file");
     let font_binary_b = std::fs::read("NotoSansArabic-NewRegular.ttf").expect("Couldn't open file");

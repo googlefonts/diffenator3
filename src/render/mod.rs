@@ -22,7 +22,7 @@ use crate::dfont::DFont;
 
 const FUZZ: u8 = 10;
 
-pub(crate) fn test_fonts(font_a: &DFont, font_b: &DFont) -> Value {
+pub fn test_fonts(font_a: &DFont, font_b: &DFont) -> Value {
     // let words = test_font_words(font_a, font_b);
     // eprintln!("{}", serde_json::to_string_pretty(&words).unwrap());
 
