@@ -33,7 +33,7 @@ path = "src/bin/ttj.rs"
 
 [dependencies]
 cfg-if = "1.0.0"
-clap = "4.4.7"
+clap = { version = "4.4.7", features=["derive"]}
 read-fonts = "0.13.0"
 font-types = "0.4.0"
 skrifa = "0.12.0"
