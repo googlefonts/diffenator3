@@ -1,7 +1,7 @@
 use indexmap::IndexSet;
 use serde_json::{json, Map, Value};
 
-trait Substantial {
+pub trait Substantial {
     fn is_something(&self) -> bool;
 }
 impl Substantial for Value {

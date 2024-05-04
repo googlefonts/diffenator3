@@ -1,9 +1,9 @@
 use crate::ttj::{jsondiff::diff, serializefont::ToValue};
 use read_fonts::{traversal::SomeTable, FontRef, TableProvider};
 use serde_json::{Map, Value};
-use skrifa::{string::StringId, MetadataProvider};
+use skrifa::{charmap::Charmap, string::StringId, GlyphId, MetadataProvider};
 
-mod jsondiff;
+pub mod jsondiff;
 mod serializefont;
 
 fn serialize_name_table<'a>(font: &impl MetadataProvider<'a>) -> Value {
@@ -24,6 +24,27 @@ fn serialize_name_table<'a>(font: &impl MetadataProvider<'a>) -> Value {
                 map.insert(id.to_string(), Value::Object(localized));
             }
         }
+    }
+    Value::Object(map)
+}
+
+fn gid_to_name<'a>(font: &impl TableProvider<'a>, gid: GlyphId) -> String {
+    if let Ok(Some(name)) = font
+        .post()
+        .map(|post| post.glyph_name(gid).map(|x| x.to_string()))
+    {
+        name
+    } else {
+        format!("gid{:}", gid)
+    }
+}
+
+fn serialize_cmap_table<'a>(font: &impl TableProvider<'a>) -> Value {
+    let charmap = Charmap::new(font);
+    let mut map = Map::new();
+    for (codepoint, glyph_id) in charmap.mappings() {
+        let name = gid_to_name(font, glyph_id);
+        map.insert(format!("U+{:04X}", codepoint), Value::String(name));
     }
     Value::Object(map)
 }
@@ -50,7 +71,7 @@ pub fn font_to_json(font: &FontRef) -> Value {
             b"loca" => font.loca(None).map(|t| <dyn SomeTable>::serialize(&t)),
             b"glyf" => font.glyf().map(|t| <dyn SomeTable>::serialize(&t)),
             b"gvar" => font.gvar().map(|t| <dyn SomeTable>::serialize(&t)),
-            b"cmap" => font.cmap().map(|t| <dyn SomeTable>::serialize(&t)),
+            // b"cmap" => font.cmap().map(|t| <dyn SomeTable>::serialize(&t)),
             b"GDEF" => font.gdef().map(|t| <dyn SomeTable>::serialize(&t)),
             b"GPOS" => font.gpos().map(|t| <dyn SomeTable>::serialize(&t)),
             b"GSUB" => font.gsub().map(|t| <dyn SomeTable>::serialize(&t)),
@@ -74,6 +95,7 @@ pub fn font_to_json(font: &FontRef) -> Value {
         // }
     }
     map.insert("name".to_string(), serialize_name_table(font));
+    map.insert("cmap".to_string(), serialize_cmap_table(font));
     Value::Object(map)
 }
 
