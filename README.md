@@ -5,10 +5,7 @@ This is a Rust port of
 comparing two font files. It comes in two flavours, command line and
 WASM.
 
-The command line version is still in very early development, and doesn't
-do very much at the moment; it compares two fonts (with burned-in path
-names) and outputs a JSON dictionary showing the differences between
-them. 
+The command line version compares two fonts and either outputs a JSON dictionary showing the differences between them or a textual report.
 
 The WASM version is a bit more interesting; it can take two font files
 over the web and display a HTML report similar to diffenator2. It
