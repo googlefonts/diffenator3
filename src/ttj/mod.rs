@@ -49,6 +49,39 @@ fn serialize_cmap_table<'a>(font: &impl TableProvider<'a>) -> Value {
     Value::Object(map)
 }
 
+fn serialize_hmtx_table<'a>(font: &impl TableProvider<'a>) -> Value {
+    let mut map = Map::new();
+    if let Ok(hmtx) = font.hmtx() {
+        let widths = hmtx.h_metrics();
+        let lsbs = hmtx.left_side_bearings();
+        let long_metrics = widths.len();
+        for gid in 0..font.maxp().unwrap().num_glyphs() {
+            let name = gid_to_name(font, GlyphId::new(gid));
+            if gid < (long_metrics as u16) {
+                if let Some((width, lsb)) = widths
+                    .get(gid as usize)
+                    .map(|lm| (lm.advance(), lm.side_bearing()))
+                {
+                    map.insert(
+                        name,
+                        Value::Object(
+                            vec![
+                                ("width".to_string(), Value::Number(width.into())),
+                                ("lsb".to_string(), Value::Number(lsb.into())),
+                            ]
+                            .into_iter()
+                            .collect(),
+                        ),
+                    );
+                }
+            } else {
+                // XXX
+            }
+        }
+    }
+    Value::Object(map)
+}
+
 pub fn font_to_json(font: &FontRef) -> Value {
     let mut map = Map::new();
     for table in font.table_directory.table_records() {
@@ -58,7 +91,7 @@ pub fn font_to_json(font: &FontRef) -> Value {
             // b"name" => font.name().map(|t| serialize_name_table(&t)),
             b"hhea" => font.hhea().map(|t| <dyn SomeTable>::serialize(&t)),
             b"vhea" => font.vhea().map(|t| <dyn SomeTable>::serialize(&t)),
-            b"hmtx" => font.hmtx().map(|t| <dyn SomeTable>::serialize(&t)),
+            // b"hmtx" => font.hmtx().map(|t| <dyn SomeTable>::serialize(&t)),
             b"vmtx" => font.vmtx().map(|t| <dyn SomeTable>::serialize(&t)),
             b"fvar" => font.fvar().map(|t| <dyn SomeTable>::serialize(&t)),
             b"avar" => font.avar().map(|t| <dyn SomeTable>::serialize(&t)),
@@ -96,6 +129,7 @@ pub fn font_to_json(font: &FontRef) -> Value {
     }
     map.insert("name".to_string(), serialize_name_table(font));
     map.insert("cmap".to_string(), serialize_cmap_table(font));
+    map.insert("hmtx".to_string(), serialize_hmtx_table(font));
     Value::Object(map)
 }
 
