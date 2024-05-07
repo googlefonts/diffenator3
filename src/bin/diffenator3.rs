@@ -5,7 +5,7 @@ use diffenator3::{
     render::test_fonts,
     ttj::{jsondiff::Substantial, table_diff},
 };
-use serde_json::{json, Map};
+use serde_json::Map;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]

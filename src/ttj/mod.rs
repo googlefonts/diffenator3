@@ -53,7 +53,6 @@ fn serialize_hmtx_table<'a>(font: &impl TableProvider<'a>) -> Value {
     let mut map = Map::new();
     if let Ok(hmtx) = font.hmtx() {
         let widths = hmtx.h_metrics();
-        let lsbs = hmtx.left_side_bearings();
         let long_metrics = widths.len();
         for gid in 0..font.maxp().unwrap().num_glyphs() {
             let name = gid_to_name(font, GlyphId::new(gid));
@@ -84,7 +83,8 @@ fn serialize_hmtx_table<'a>(font: &impl TableProvider<'a>) -> Value {
 
 pub fn font_to_json(font: &FontRef) -> Value {
     let mut map = Map::new();
-    for table in font.table_directory.table_records() {
+
+    for table in font.table_directory.table_records().iter() {
         let key = table.tag().to_string();
         let value = match table.tag().into_bytes().as_ref() {
             b"head" => font.head().map(|t| <dyn SomeTable>::serialize(&t)),

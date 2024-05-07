@@ -1,6 +1,6 @@
 use crate::render::DFont;
 use ab_glyph::{point, Font, FontRef, Glyph, GlyphId, Outline, OutlinedGlyph, ScaleFont};
-use image::{DynamicImage, GenericImage, GrayImage, Luma};
+use image::{DynamicImage, GrayImage, Luma};
 use rustybuzz::{shape, Face, UnicodeBuffer};
 use std::collections::BTreeMap;
 
@@ -47,7 +47,7 @@ impl<'a> Renderer<'a> {
         let mut serialized_buffer = String::new();
         let infos = output.glyph_infos();
         let mut glyphs: Vec<Glyph> = vec![];
-        let factor = self.scale / (self.font.height_unscaled() as f32);
+        let factor = self.scale / self.font.height_unscaled();
         // LSB is LSB of first base glyph
         let mut cursor = positions
             .iter()

@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, io::BufRead};
+use std::io::BufRead;
 mod renderer;
 use renderer::Renderer;
 use std::{fs::File, io::BufReader};
@@ -35,7 +35,7 @@ pub fn test_fonts(font_a: &DFont, font_b: &DFont) -> Value {
 
 fn chars_to_json_array<'a>(chars: impl Iterator<Item = &'a u32>) -> Value {
     let array: Vec<Value> = chars
-        .map(|i| char::from_u32(*i as u32))
+        .map(|i| char::from_u32(*i))
         .filter(|x| x.is_some())
         .map(|c| {
             json!({
@@ -58,7 +58,7 @@ fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
     let same_glyphs = cmap_a.intersection(&cmap_b);
     let threshold = 0.1;
     let word_list: Vec<String> = same_glyphs
-        .map(|i| char::from_u32(*i as u32))
+        .map(|i| char::from_u32(*i))
         .filter(|x| x.is_some())
         .map(|c| c.unwrap().to_string())
         .collect();
@@ -185,7 +185,7 @@ pub(crate) fn diff_many_words(
                 seen_glyphs.borrow_mut().insert(glyph.to_string());
             }
             let (buffer_b, img_b) = renderer_b.borrow_mut().render_string(word)?;
-            let percent = count_differences(img_a, img_b) as f32;
+            let percent = count_differences(img_a, img_b);
 
             Some(Difference {
                 word: word.to_string(),

@@ -1,7 +1,7 @@
 use font_types::NameId;
-use read_fonts::{tables::cmap::CmapSubtable, FontRef, TableProvider};
+use read_fonts::{FontRef};
 use skrifa::MetadataProvider;
-use std::{collections::HashSet, path::Path};
+use std::{collections::HashSet};
 use ucd::Codepoint;
 
 pub struct DFont {
