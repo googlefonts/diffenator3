@@ -1,15 +1,19 @@
-use std::io::BufRead;
 mod renderer;
+mod wordlists;
 mod zenorender;
 
 use renderer::Renderer;
-use std::{fs::File, io::BufReader};
+use wordlists::LATIN;
 // use zenorender::Renderer;
 
 use image::{GenericImage, GrayImage, ImageBuffer};
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::{cell::RefCell, collections::HashSet};
+use std::{
+    cell::RefCell,
+    collections::HashSet,
+    io::{BufRead, BufReader},
+};
 
 use cfg_if::cfg_if;
 
@@ -78,16 +82,15 @@ fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
     })
 }
 
-fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
-    let file = File::open("test-data/Arabic.txt").expect("no such file");
-    let buf = BufReader::new(file);
+pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
+    let buf = BufReader::new(LATIN.as_slice());
     let wordlist: Vec<String> = buf
         .lines()
         .map(|l| l.expect("Could not parse line"))
         .collect();
 
     json!({
-        "Arabic": diff_many_words(
+        "Latin": diff_many_words(
         font_a, font_b, 40.0, wordlist, 0.2
     )})
 }
