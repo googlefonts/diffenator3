@@ -1,7 +1,10 @@
 use std::io::BufRead;
 mod renderer;
+mod zenorender;
+
 use renderer::Renderer;
 use std::{fs::File, io::BufReader};
+// use zenorender::Renderer;
 
 use image::{GenericImage, GrayImage, ImageBuffer};
 use serde::Serialize;
