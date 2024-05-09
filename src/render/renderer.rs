@@ -1,18 +1,20 @@
 use crate::render::DFont;
 use ab_glyph::{point, Font, FontRef, Glyph, GlyphId, Outline, OutlinedGlyph, ScaleFont};
 use image::{DynamicImage, GrayImage, Luma};
-use rustybuzz::{shape, Face, UnicodeBuffer};
+use rustybuzz::{shape_with_plan, Direction, Face, ShapePlan, UnicodeBuffer};
 use std::collections::BTreeMap;
 
 pub struct Renderer<'a> {
     face: Face<'a>,
     scale: f32,
     font: FontRef<'a>,
+    plan: ShapePlan,
+    factor: f32,
     outline_cache: BTreeMap<GlyphId, Option<Outline>>,
 }
 
 impl<'a> Renderer<'a> {
-    pub fn new(font: &'a DFont, font_size: f32) -> Self {
+    pub fn new(font: &'a DFont, font_size: f32, direction: Direction) -> Self {
         let face = Face::from_slice(&font.backing, 0).expect("Foo");
         let font = FontRef::try_from_slice(&font.backing).unwrap_or_else(|_| {
             panic!(
@@ -20,10 +22,14 @@ impl<'a> Renderer<'a> {
                 font.family_name()
             );
         });
+        let plan = ShapePlan::new(&face, direction, None, None, &[]);
+        let factor = font_size / font.height_unscaled();
 
         Self {
             face,
             font,
+            plan,
+            factor,
             scale: font_size,
             outline_cache: BTreeMap::new(),
         }
@@ -39,15 +45,15 @@ impl<'a> Renderer<'a> {
     pub fn render_string(&mut self, string: &str) -> Option<(String, GrayImage)> {
         let mut buffer = UnicodeBuffer::new();
         buffer.push_str(string);
-        let output = shape(&self.face, &[], buffer);
+        let output = shape_with_plan(&self.face, &self.plan, buffer);
         let scaled_font = self.font.as_scaled(self.scale);
+        let ascender = self.face.ascender() as f32;
 
         // The results of the shaping operation are stored in the `output` buffer.
         let positions = output.glyph_positions();
         let mut serialized_buffer = String::new();
         let infos = output.glyph_infos();
         let mut glyphs: Vec<Glyph> = vec![];
-        let factor = self.scale / self.font.height_unscaled();
         // LSB is LSB of first base glyph
         let mut cursor = positions
             .iter()
@@ -60,18 +66,18 @@ impl<'a> Renderer<'a> {
             if info.glyph_id == 0 {
                 return None;
             }
-            let x = cursor + (position.x_offset as f32 * factor);
-            let y = -position.y_offset as f32 * factor;
+            let x = cursor + (position.x_offset as f32 * self.factor);
+            let y = -position.y_offset as f32 * self.factor;
             glyphs.push(Glyph {
                 id: GlyphId(info.glyph_id as u16),
                 scale: scaled_font.scale(),
-                position: point(x, y + factor * self.face.ascender() as f32),
+                position: point(x, y + self.factor * ascender),
             });
             serialized_buffer.push_str(&format!(
                 "gid={},position={},{}|",
                 info.glyph_id, position.x_offset, position.y_offset
             ));
-            cursor += position.x_advance as f32 * factor;
+            cursor += position.x_advance as f32 * self.factor;
         }
         if glyphs.is_empty() {
             return None;

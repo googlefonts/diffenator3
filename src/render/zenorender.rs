@@ -1,12 +1,11 @@
-use image::{GrayImage, ImageBuffer};
-use read_fonts::{FontRef, TableProvider};
-use rustybuzz::{shape, Face, UnicodeBuffer};
+use image::GrayImage;
+use rustybuzz::{shape_with_plan, Direction, Face, ShapePlan, UnicodeBuffer};
 use skrifa::{
-    instance::Size,
-    scale::{Context, Pen, Scaler},
-    GlyphId,
+    instance::{LocationRef, Size},
+    outline::{DrawSettings, OutlinePen},
+    raw::TableProvider,
+    GlyphId, MetadataProvider, OutlineGlyphCollection,
 };
-use std::collections::BTreeMap;
 use zeno::{Command, Mask, PathBuilder};
 
 use crate::dfont::DFont;
@@ -20,7 +19,7 @@ struct RecordingPen {
 
 // Implement the Pen trait for this type. This emits the appropriate
 // SVG path commands for each element type.
-impl Pen for RecordingPen {
+impl OutlinePen for RecordingPen {
     fn move_to(&mut self, x: f32, y: f32) {
         self.buffer.move_to([self.offset_x + x, self.offset_y + y]);
     }
@@ -52,41 +51,43 @@ impl Pen for RecordingPen {
 pub struct Renderer<'a> {
     face: Face<'a>,
     scale: f32,
-    font: FontRef<'a>,
-    context: Context,
+    font: skrifa::FontRef<'a>,
+    plan: ShapePlan,
+    outlines: OutlineGlyphCollection<'a>,
 }
 
 impl<'a> Renderer<'a> {
-    pub fn new(font: &'a DFont, font_size: f32) -> Self {
-        let mut context = Context::new();
-
+    pub fn new(
+        font: &'a DFont,
+        font_size: f32,
+        direction: Direction,
+        script: Option<rustybuzz::Script>,
+    ) -> Self {
         let face = Face::from_slice(&font.backing, 0).expect("Foo");
-        let font = FontRef::new(&font.backing).unwrap_or_else(|_| {
+        let font = skrifa::FontRef::new(&font.backing).unwrap_or_else(|_| {
             panic!(
                 "error constructing a Font from data for {:}",
                 font.family_name()
             );
         });
+        let plan = ShapePlan::new(&face, direction, script, None, &[]);
+        let outlines = font.outline_glyphs();
 
         Self {
             face,
             font,
-            context,
+            plan,
             scale: font_size,
+            outlines,
         }
     }
 
     pub fn render_string(&mut self, string: &str) -> Option<(String, GrayImage)> {
-        let mut scaler = self
-            .context
-            .new_scaler()
-            .size(Size::new(self.scale))
-            .build(&self.font);
         let mut pen = RecordingPen::default();
 
         let mut buffer = UnicodeBuffer::new();
         buffer.push_str(string);
-        let output = shape(&self.face, &[], buffer);
+        let output = shape_with_plan(&self.face, &self.plan, buffer);
         let upem = self.font.head().unwrap().units_per_em();
 
         // The results of the shaping operation are stored in the `output` buffer.
@@ -101,7 +102,13 @@ impl<'a> Renderer<'a> {
             }
             pen.offset_x = cursor + (position.x_offset as f32 * factor);
             pen.offset_y = -position.y_offset as f32 * factor;
-            scaler.outline(GlyphId::new(info.glyph_id as u16), &mut pen);
+            let settings = DrawSettings::unhinted(Size::new(self.scale), LocationRef::default());
+
+            let _ = self
+                .outlines
+                .get(GlyphId::new(info.glyph_id as u16))
+                .unwrap()
+                .draw(settings, &mut pen);
             serialized_buffer.push_str(&format!(
                 "gid={},position={},{}|",
                 info.glyph_id, position.x_offset, position.y_offset
@@ -115,7 +122,7 @@ impl<'a> Renderer<'a> {
         let (mask, placement) = Mask::new(&pen.buffer)
             .origin(zeno::Origin::BottomLeft)
             .render();
-        let mut image = GrayImage::from_raw(placement.width, placement.height, mask).unwrap();
+        let image = GrayImage::from_raw(placement.width, placement.height, mask).unwrap();
         Some((serialized_buffer, image))
     }
 }
@@ -123,17 +130,18 @@ impl<'a> Renderer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use read_fonts::FontRef;
-    use skrifa::{instance::Size, scale::Context, GlyphId};
+    use rustybuzz::{script, Direction};
 
     #[test]
     fn test_zeno_path() {
         let path = "NotoSansArabic-NewRegular.ttf";
         let data = std::fs::read(path).unwrap();
         let font = DFont::new(&data);
-        let mut renderer = Renderer::new(&font, 40.0);
-        if let Some((buffer, image)) = renderer.render_string("پپر") {
+        let mut renderer = Renderer::new(&font, 40.0, Direction::RightToLeft, Some(script::ARABIC));
+        if let Some((_buffer, image)) = renderer.render_string("پپر") {
             image.save("zeno.png").unwrap();
+        } else {
+            panic!("Rendering failed");
         }
     }
 }

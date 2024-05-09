@@ -2,9 +2,10 @@ mod renderer;
 mod wordlists;
 mod zenorender;
 
-use renderer::Renderer;
+// use renderer::Renderer;
+use rustybuzz::Direction;
 use wordlists::LATIN;
-// use zenorender::Renderer;
+use zenorender::Renderer;
 
 use image::{GenericImage, GrayImage, ImageBuffer};
 use serde::Serialize;
@@ -88,7 +89,7 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
 
     json!({
         "Latin": diff_many_words(
-        font_a, font_b, 40.0, wordlist, 0.2
+        font_a, font_b, 20.0, wordlist, 0.2
     )})
 }
 
@@ -161,19 +162,32 @@ pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
     font_size: f32,
-    mut wordlist: Vec<String>,
+    wordlist: Vec<String>,
     threshold: f32,
 ) -> Vec<Difference> {
     let tl_a = ThreadLocal::new();
     let tl_b = ThreadLocal::new();
     let tl_cache = ThreadLocal::new();
-    wordlist.sort_by_key(|w| -(w.len() as i32));
     let differences: Vec<Option<Difference>> = wordlist
         .par_iter()
         .progress()
         .map(|word| {
-            let renderer_a = tl_a.get_or(|| RefCell::new(Renderer::new(font_a, font_size)));
-            let renderer_b = tl_b.get_or(|| RefCell::new(Renderer::new(font_b, font_size)));
+            let renderer_a = tl_a.get_or(|| {
+                RefCell::new(Renderer::new(
+                    font_a,
+                    font_size,
+                    Direction::LeftToRight,
+                    None,
+                ))
+            });
+            let renderer_b = tl_b.get_or(|| {
+                RefCell::new(Renderer::new(
+                    font_b,
+                    font_size,
+                    Direction::LeftToRight,
+                    None,
+                ))
+            });
             let seen_glyphs: &RefCell<HashSet<String>> =
                 tl_cache.get_or(|| RefCell::new(HashSet::new()));
 
@@ -216,12 +230,11 @@ pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
     font_size: f32,
-    mut wordlist: Vec<String>,
+    wordlist: Vec<String>,
     threshold: f32,
 ) -> Vec<Difference> {
-    wordlist.sort_by_key(|w| -(w.len() as i32));
-    let mut renderer_a = Renderer::new(font_a, font_size);
-    let mut renderer_b = Renderer::new(font_b, font_size);
+    let mut renderer_a = Renderer::new(font_a, font_size, Direction::LeftToRight, None);
+    let mut renderer_b = Renderer::new(font_b, font_size, Direction::LeftToRight, None);
     let mut seen_glyphs: HashSet<String> = HashSet::new();
 
     let mut differences: Vec<Difference> = vec![];
@@ -242,7 +255,7 @@ pub(crate) fn diff_many_words(
             continue;
         }
         let (buffer_b, img_b) = result_b.unwrap();
-        let percent = count_differences(img_a, img_b) as f32;
+        let percent = count_differences(img_a, img_b);
         if percent > threshold {
             differences.push(Difference {
                 word: word.to_string(),
