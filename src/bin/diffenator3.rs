@@ -2,7 +2,7 @@ use clap::{builder::ArgAction, Parser};
 use colored::Colorize;
 use diffenator3::{
     dfont::DFont,
-    render::test_fonts,
+    render::{test_font_glyphs, test_font_words},
     ttj::{jsondiff::Substantial, table_diff},
 };
 use serde_json::Map;
@@ -34,6 +34,14 @@ struct Cli {
     /// Show diffs in glyph images [default]
     #[clap(long = "glyphs", overrides_with = "glyphs")]
     _no_glyphs: bool,
+
+    /// Don't show diffs in word images
+    #[clap(long = "no-words", action = ArgAction::SetFalse)]
+    words: bool,
+
+    /// Show diffs in word images [default]
+    #[clap(long = "words", overrides_with = "words")]
+    _no_words: bool,
 
     /// Show diffs as JSON
     #[clap(long = "json")]
@@ -95,12 +103,17 @@ fn main() {
         }
     }
     if cli.glyphs {
-        let glyph_diff = test_fonts(&font_a, &font_b);
+        let glyph_diff = test_font_glyphs(&font_a, &font_b);
         if glyph_diff.is_something() {
             diff.insert("glyphs".into(), glyph_diff);
         }
     }
-    // Handle strings here later
+    if cli.words {
+        let word_diff = test_font_words(&font_a, &font_b);
+        if word_diff.is_something() {
+            diff.insert("words".into(), word_diff);
+        }
+    }
     if cli.json {
         println!("{}", serde_json::to_string_pretty(&diff).expect("foo"));
         std::process::exit(0);
@@ -143,6 +156,20 @@ fn main() {
             println!("\nModified glyphs:");
             for glyph in map["modified"].as_array().unwrap() {
                 println!("  {}", glyph);
+            }
+        }
+    }
+    if diff.contains_key("words") {
+        println!("# Words");
+        let map = diff["words"].as_object().unwrap();
+        for (script, script_diff) in map.iter() {
+            println!("\n## {}", script);
+            for difference in script_diff.as_array().unwrap().iter() {
+                println!(
+                    "  - {} ({}%)",
+                    difference["word"].as_str().unwrap(),
+                    difference["percent"].as_f64().unwrap()
+                );
             }
         }
     }

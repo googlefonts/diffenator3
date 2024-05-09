@@ -30,14 +30,11 @@ use crate::dfont::DFont;
 const FUZZ: u8 = 10;
 
 pub fn test_fonts(font_a: &DFont, font_b: &DFont) -> Value {
-    // let words = test_font_words(font_a, font_b);
-    // eprintln!("{}", serde_json::to_string_pretty(&words).unwrap());
-
-    // json!({
-    //     "glyphs": test_font_glyphs(font_a, font_b),
-    // "words": words
-    // })
-    json!(test_font_glyphs(font_a, font_b))
+    let words = test_font_words(font_a, font_b);
+    json!({
+        "glyphs": test_font_glyphs(font_a, font_b),
+        "words": words
+    })
 }
 
 fn chars_to_json_array<'a>(chars: impl Iterator<Item = &'a u32>) -> Value {
@@ -57,7 +54,7 @@ fn chars_to_json_array<'a>(chars: impl Iterator<Item = &'a u32>) -> Value {
     Value::Array(array)
 }
 
-fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
+pub fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
     let cmap_a = font_a.codepoints();
     let cmap_b = font_b.codepoints();
     let missing_glyphs = cmap_a.difference(&cmap_b);
