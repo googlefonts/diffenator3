@@ -1,4 +1,6 @@
-use image::GrayImage;
+use std::sync::Arc;
+
+use rasterize::{ActiveEdgeRasterizer, FillRule, Image, Layer, LinColor, Path, Scene, Transform};
 use rustybuzz::{shape_with_plan, Direction, Face, ShapePlan, UnicodeBuffer};
 use skrifa::{
     instance::{LocationRef, Size},
@@ -6,9 +8,14 @@ use skrifa::{
     raw::TableProvider,
     GlyphId, MetadataProvider, OutlineGlyphCollection,
 };
+
 use zeno::{Command, Mask, PathBuilder};
 
 use crate::dfont::DFont;
+
+fn pt(v: &zeno::Vector) -> rasterize::Point {
+    rasterize::Point::new(v.x as f64, v.y as f64)
+}
 
 #[derive(Default)]
 struct RecordingPen {
@@ -81,8 +88,7 @@ impl<'a> Renderer<'a> {
             outlines,
         }
     }
-
-    pub fn render_string(&mut self, string: &str) -> Option<(String, GrayImage)> {
+    pub fn string_to_positioned_glyphs(&mut self, string: &str) -> Option<(String, Vec<Command>)> {
         let mut pen = RecordingPen::default();
 
         let mut buffer = UnicodeBuffer::new();
@@ -118,17 +124,45 @@ impl<'a> Renderer<'a> {
         if serialized_buffer.is_empty() {
             return None;
         }
+        Some((serialized_buffer, pen.buffer))
+    }
 
-        let (mask, placement) = Mask::new(&pen.buffer)
-            .origin(zeno::Origin::BottomLeft)
-            .render();
-        let image = GrayImage::from_raw(placement.width, placement.height, mask).unwrap();
-        Some((serialized_buffer, image))
+    pub fn render_positioned_glyphs(&mut self, pen_buffer: &[Command]) -> Layer<LinColor> {
+        let mut builder = Path::builder();
+        for command in pen_buffer {
+            match command {
+                Command::MoveTo(to) => builder.move_to(pt(to)),
+                Command::LineTo(to) => builder.line_to(pt(to)),
+                Command::QuadTo(ctrl, to) => builder.quad_to(pt(ctrl), pt(to)),
+                Command::CurveTo(ctrl0, ctrl1, to) => {
+                    builder.cubic_to(pt(ctrl0), pt(ctrl1), pt(to))
+                }
+                Command::Close => builder.close(),
+            };
+        }
+        let path = builder.build();
+        let bbox = path
+            .bbox(Transform::identity())
+            .ok_or("Empty path")
+            .unwrap();
+        let scene = Scene::group(vec![Scene::fill(
+            path.into(),
+            Arc::new("#000000".parse::<LinColor>().unwrap()),
+            FillRule::NonZero,
+        )]);
+        scene.render(
+            &ActiveEdgeRasterizer::default(),
+            Transform::identity(),
+            None,
+            None,
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, io::BufWriter, sync::Arc};
+
     use super::*;
     use rustybuzz::{script, Direction};
 
@@ -138,10 +172,12 @@ mod tests {
         let data = std::fs::read(path).unwrap();
         let font = DFont::new(&data);
         let mut renderer = Renderer::new(&font, 40.0, Direction::RightToLeft, Some(script::ARABIC));
-        if let Some((_buffer, image)) = renderer.render_string("پپر") {
-            image.save("zeno.png").unwrap();
-        } else {
-            panic!("Rendering failed");
-        }
+        let (serialized_buffer, commands) = renderer
+            .string_to_positioned_glyphs("السلام عليكم")
+            .unwrap();
+        static IMAGE_NAME: &str = "test.png";
+        let mut output = BufWriter::new(File::create(IMAGE_NAME).unwrap());
+        let image = renderer.render_positioned_glyphs(&commands);
+        image.write_png(&mut output).unwrap();
     }
 }
