@@ -56,11 +56,11 @@ fn chars_to_json_array<'a>(chars: impl Iterator<Item = &'a u32>) -> Value {
 }
 
 pub fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
-    let cmap_a = font_a.codepoints();
-    let cmap_b = font_b.codepoints();
-    let missing_glyphs = cmap_a.difference(&cmap_b);
-    let new_glyphs = cmap_b.difference(&cmap_a);
-    let same_glyphs = cmap_a.intersection(&cmap_b);
+    let cmap_a = &font_a.codepoints;
+    let cmap_b = &font_b.codepoints;
+    let missing_glyphs = cmap_a.difference(cmap_b);
+    let new_glyphs = cmap_b.difference(cmap_a);
+    let same_glyphs = cmap_a.intersection(cmap_b);
     let threshold = 0.1;
     let word_list: Vec<String> = same_glyphs
         .map(|i| char::from_u32(*i))

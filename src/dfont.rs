@@ -7,15 +7,21 @@ use ucd::Codepoint;
 pub struct DFont {
     pub backing: Vec<u8>,
     variations: String,
+    pub codepoints: HashSet<u32>,
 }
 
 impl DFont {
     pub fn new(string: &[u8]) -> Self {
         let backing: Vec<u8> = string.to_vec();
-        DFont {
+
+        let mut fnt = DFont {
             backing,
             variations: "".to_string(),
-        }
+            codepoints: HashSet::new(),
+        };
+        let cmap = fnt.fontref().charmap();
+        fnt.codepoints = cmap.mappings().map(|(cp, _)| cp).collect();
+        fnt
     }
 
     pub fn fontref(&self) -> FontRef {
@@ -45,15 +51,6 @@ impl DFont {
             .table_records()
             .iter()
             .any(|tr| tr.tag() == "fvar")
-    }
-
-    pub fn codepoints(&self) -> HashSet<u32> {
-        let cmap = self.fontref().charmap();
-        let mut points = HashSet::new();
-        for (codepoint, _glyphid) in cmap.mappings() {
-            points.insert(codepoint);
-        }
-        points
     }
 
     pub fn supported_scripts(&self) -> HashSet<String> {
