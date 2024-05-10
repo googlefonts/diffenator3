@@ -15,5 +15,7 @@ You can use the WASM version at https://simoncozens.github.io/diffenator3
 
 ## To rebuild the WASM version
 
-* cargo build --target wasm32-unknown-unknown 
+* wasm-pack build
 * cd www; npm run build
+
+The results appear in docs/
