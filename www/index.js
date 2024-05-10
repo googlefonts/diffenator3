@@ -3,7 +3,7 @@ wasm.debugging();
 
 
 
-jQuery.fn.shake = function(interval, distance, times) {
+jQuery.fn.shake = function (interval, distance, times) {
 	interval = typeof interval == "undefined" ? 100 : interval;
 	distance = typeof distance == "undefined" ? 10 : distance;
 	times = typeof times == "undefined" ? 3 : times;
@@ -50,7 +50,7 @@ class Diffenator {
 		style.setProperty("src", "url(" + URL.createObjectURL(files[0]) + ")")
 		var reader = new FileReader();
 		let that = this;
-		reader.onload = function(e) {
+		reader.onload = function (e) {
 			let u8 = new Uint8Array(this.result);
 			if (element.id == "fontbefore") {
 				that.beforeFont = u8;
@@ -67,7 +67,7 @@ class Diffenator {
 
 	renderTableDiff(node, toplevel) {
 		var wrapper = $("<div> </div>");
-		if (!node) { 
+		if (!node) {
 			return wrapper
 		}
 		if (Array.isArray(node)) {
@@ -101,48 +101,25 @@ class Diffenator {
 
 	}
 
-	async wordlists() {
-		let scripts_before = new Set(JSON.parse(wasm.supported_scripts(this.beforeFont)));
-		let scripts_after = new Set(JSON.parse(wasm.supported_scripts(this.afterFont)));
-		console.log("Scripts before", scripts_before);
-		console.log("Scripts after", scripts_after);
-		// intersection
-		let scripts = [...scripts_before].filter(x => scripts_after.has(x));
-		return await Promise.all(
-			scripts.map(async script => {
-				let url = `${document.URL}/wordlists/${script}.txt`;
-			  const resp = await fetch(url);
-			  return [script, await resp.text()];
-		}))
-	}
-
-
 	letsDoThis() {
 		$("#startModal").hide()
-			let diffs = JSON.parse(wasm.diff(this.beforeFont, this.afterFont));
-			let table_diff = diffs["tables"];
-			let glyph_diff = diffs["glyphs"];
-			$("#difftable").append(this.renderTableDiff(table_diff, true).children())
-			$(".node").on("click", function(event){ $(this).children().toggle(); event.stopPropagation() })
-			this.renderGlyphDiff(glyph_diff);
-		$("#worddiffbutton").click( () => {
-			this.wordlists().then( (wl) => {
-				$("#worddiff").empty()
-				for (let [script, words] of wl) {
-					let diffs = JSON.parse(wasm.word_diff(this.beforeFont, this.afterFont, words));
-					if (diffs.length > 0) {
-						this.renderWordDiff(script, diffs)
-					}
-				}
-			})
-		});
+		let diffs = JSON.parse(wasm.diff(this.beforeFont, this.afterFont));
+		console.log(diffs);
+		let table_diff = diffs["tables"];
+		let glyph_diff = diffs["glyphs"];
+		$("#difftable").append(this.renderTableDiff(table_diff, true).children())
+		$(".node").on("click", function (event) { $(this).children().toggle(); event.stopPropagation() })
+		this.renderGlyphDiff(glyph_diff);
+		for (var [script, words] of Object.entries(diffs["words"])) {
+			this.renderWordDiff(script, words);
+		}
 	}
 
 	addAGlyph(glyph, where) {
 		where.append(`
 			<div class="cell-word font-before">
-		    <span data-toggle="tooltip" data-html="true" data-title="name: ${ glyph.name }<br>unicode: ${ glyph.unicode }">
-	        ${ glyph.string }
+		    <span data-toggle="tooltip" data-html="true" data-title="name: ${glyph.name}<br>unicode: ${glyph.unicode}">
+	        ${glyph.string}
 	        </span>
 			</div>
 		`);
@@ -152,8 +129,8 @@ class Diffenator {
 	addAWord(diff, where) {
 		where.append(`
 			<div class="cell-word font-before">
-		    <span data-toggle="tooltip" data-html="true" data-title="before: <pre>${ diff.buffer_a }</pre><br>after: <pre>${ diff.buffer_b }</pre><br>percent: ${ diff.percent }">
-	        ${ diff.word }
+		    <span data-toggle="tooltip" data-html="true" data-title="before: <pre>${diff.buffer_a}</pre><br>after: <pre>${diff.buffer_b}</pre><br>percent: ${diff.percent}">
+	        ${diff.word}
 	        </span>
 			</div>
 		`);
@@ -167,7 +144,7 @@ class Diffenator {
 				$("#glyphdiff").append($(`<h2>${title} glyphs</h2>`));
 				let place = $('<div class="glyphgrid"/>')
 				$("#glyphdiff").append(place);
-				glyphs.forEach( (glyph) => {
+				glyphs.forEach((glyph) => {
 					that.addAGlyph(glyph, place)
 				})
 			}
@@ -180,22 +157,22 @@ class Diffenator {
 		$("#worddiff").append($(`<h2>${script} words</h2>`));
 		let place = $('<div class="wordgrid"/>')
 		$("#worddiff").append(place);
-		diffs.forEach( (glyph) => {
-					this.addAWord(glyph, place)
+		diffs.forEach((glyph) => {
+			this.addAWord(glyph, place)
 		})
 		$('[data-toggle="tooltip"]').tooltip()
 	}
 
 }
 
-$(function() {
+$(function () {
 	window.diffenator = new Diffenator();
 
 	$("#startModal").show()
 
 	$('.fontdrop').on(
 		'dragover dragenter',
-		function(e) {
+		function (e) {
 			e.preventDefault();
 			e.stopPropagation();
 			$(this).addClass("dragging");
@@ -203,14 +180,14 @@ $(function() {
 	)
 	$('.fontdrop').on(
 		'dragleave dragend',
-		function(e) {
+		function (e) {
 			$(this).removeClass("dragging");
 		}
 	);
 
 	$('.fontdrop').on(
 		'drop',
-		function(e) {
+		function (e) {
 			$(this).removeClass("dragging");
 			if (e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length) {
 				e.preventDefault();
@@ -220,7 +197,7 @@ $(function() {
 		}
 	);
 
-	$("#fonttoggle").click(function() {
+	$("#fonttoggle").click(function () {
 		if ($(this).text() == "Old") {
 			$(this).text("New");
 			$(".font-before").removeClass("font-before").addClass("font-after");
