@@ -2,10 +2,11 @@ use crate::render::DFont;
 use ab_glyph::{point, Font, FontRef, Glyph, GlyphId, Outline, OutlinedGlyph, ScaleFont};
 use image::{DynamicImage, GrayImage, Luma};
 use rustybuzz::{shape_with_plan, Direction, Face, ShapePlan, UnicodeBuffer};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 pub struct Renderer<'a> {
     face: Face<'a>,
+    codepoints: HashSet<u32>,
     scale: f32,
     font: FontRef<'a>,
     plan: ShapePlan,
@@ -14,15 +15,20 @@ pub struct Renderer<'a> {
 }
 
 impl<'a> Renderer<'a> {
-    pub fn new(font: &'a DFont, font_size: f32, direction: Direction) -> Self {
-        let face = Face::from_slice(&font.backing, 0).expect("Foo");
-        let font = FontRef::try_from_slice(&font.backing).unwrap_or_else(|_| {
+    pub fn new(
+        dfont: &'a DFont,
+        font_size: f32,
+        direction: Direction,
+        script: Option<rustybuzz::Script>,
+    ) -> Self {
+        let face = Face::from_slice(&dfont.backing, 0).expect("Foo");
+        let font = FontRef::try_from_slice(&dfont.backing).unwrap_or_else(|_| {
             panic!(
                 "error constructing a Font from data for {:}",
-                font.family_name()
+                dfont.family_name()
             );
         });
-        let plan = ShapePlan::new(&face, direction, None, None, &[]);
+        let plan = ShapePlan::new(&face, direction, script, None, &[]);
         let factor = font_size / font.height_unscaled();
 
         Self {
@@ -30,6 +36,7 @@ impl<'a> Renderer<'a> {
             font,
             plan,
             factor,
+            codepoints: dfont.codepoints.clone(),
             scale: font_size,
             outline_cache: BTreeMap::new(),
         }
@@ -43,6 +50,13 @@ impl<'a> Renderer<'a> {
     }
 
     pub fn render_string(&mut self, string: &str) -> Option<(String, GrayImage)> {
+        // Do a cmap test first
+        if string
+            .chars()
+            .any(|c| !self.codepoints.contains(&(c as u32)))
+        {
+            return None;
+        }
         let mut buffer = UnicodeBuffer::new();
         buffer.push_str(string);
         let output = shape_with_plan(&self.face, &self.plan, buffer);
