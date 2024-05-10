@@ -11,7 +11,6 @@ module.exports = {
   plugins: [
     new CopyWebpackPlugin([
         'index.html',
-        { from: 'wordlists', to: 'wordlists'},
        ]
     )
   ],
