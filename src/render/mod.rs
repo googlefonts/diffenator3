@@ -1,13 +1,11 @@
-// mod renderer;
+mod renderer;
 mod utils;
 mod wordlists;
-mod zenorender;
 
 use image::{GenericImage, GrayImage, ImageBuffer};
-// use renderer::Renderer;
+use renderer::Renderer;
 use rustybuzz::Direction;
 use wordlists::LATIN;
-use zenorender::Renderer;
 
 use serde::Serialize;
 use serde_json::{json, Value};

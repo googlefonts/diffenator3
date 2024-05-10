@@ -51,4 +51,3 @@ unicode-character-database = "0.1.0"
 brotli = "6.0.0"
 lazy_static = "1.4.0"
 zeno = "0.3.1"
-rasterize = { version = "0.4.0", features=["png"]}
