@@ -1,7 +1,9 @@
 // mod renderer;
+mod utils;
 mod wordlists;
 mod zenorender;
 
+use image::{GenericImage, GrayImage, ImageBuffer};
 use rasterize::{Color, Image, Layer, LinColor};
 // use renderer::Renderer;
 use rustybuzz::Direction;
@@ -29,7 +31,7 @@ cfg_if! {
 
 use crate::dfont::DFont;
 
-const FUZZ: f32 = 0.05;
+const FUZZ: u8 = 20;
 
 pub fn test_fonts(font_a: &DFont, font_b: &DFont) -> Value {
     let words = test_font_words(font_a, font_b);
@@ -94,21 +96,25 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
     )})
 }
 
-fn count_differences(image_a: &Layer<LinColor>, image_b: &Layer<LinColor>) -> f32 {
+fn make_same_size(image_a: GrayImage, image_b: GrayImage) -> (GrayImage, GrayImage) {
     let max_width = image_a.width().max(image_b.width());
     let max_height = image_a.height().max(image_b.height());
-    let mut differing_pixels = 0;
-    for x in 0..max_width {
-        for y in 0..max_height {
-            let pixel_a = image_a.get(x, y).map(|x| x.alpha()).unwrap_or(0.0);
-            let pixel_b = image_b.get(x, y).map(|x| x.alpha()).unwrap_or(0.0);
+    let mut a = ImageBuffer::new(max_width, max_height);
+    let mut b = ImageBuffer::new(max_width, max_height);
+    a.copy_from(&image_a, 0, 0).unwrap();
+    b.copy_from(&image_b, 0, 0).unwrap();
+    (a, b)
+}
 
-            if (pixel_a - pixel_b).abs() > FUZZ {
-                differing_pixels += 1;
-            }
-        }
-    }
-    differing_pixels as f32 / (max_width as f32 * max_height as f32) * 100.0
+fn count_differences(img_a: GrayImage, img_b: GrayImage) -> f32 {
+    let (img_a, img_b) = make_same_size(img_a, img_b);
+    let img_a_vec = img_a.to_vec();
+    let differing_pixels = img_a_vec
+        .iter()
+        .zip(img_b.to_vec())
+        .filter(|(&cha, chb)| cha.abs_diff(*chb) > FUZZ)
+        .count();
+    differing_pixels as f32 / (img_a.width() as f32 * img_a.height() as f32) * 100.0
 }
 
 #[derive(Debug, Serialize)]
@@ -152,87 +158,87 @@ pub struct Difference {
     pub lang: String,
 }
 
-// // A fast but complicated version
-// #[cfg(not(target_family = "wasm"))]
-// pub(crate) fn diff_many_words(
-//     font_a: &DFont,
-//     font_b: &DFont,
-//     font_size: f32,
-//     wordlist: Vec<String>,
-//     threshold: f32,
-// ) -> Vec<Difference> {
-//     let tl_a = ThreadLocal::new();
-//     let tl_b = ThreadLocal::new();
-//     let tl_cache = ThreadLocal::new();
-//     let differences: Vec<Option<Difference>> = wordlist
-//         .par_iter()
-//         .progress()
-//         .map(|word| {
-//             let renderer_a = tl_a.get_or(|| {
-//                 RefCell::new(Renderer::new(
-//                     font_a,
-//                     font_size,
-//                     Direction::LeftToRight,
-//                     None,
-//                 ))
-//             });
-//             let renderer_b = tl_b.get_or(|| {
-//                 RefCell::new(Renderer::new(
-//                     font_b,
-//                     font_size,
-//                     Direction::LeftToRight,
-//                     None,
-//                 ))
-//             });
-//             let seen_glyphs: &RefCell<HashSet<String>> =
-//                 tl_cache.get_or(|| RefCell::new(HashSet::new()));
+// A fast but complicated version
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn diff_many_words(
+    font_a: &DFont,
+    font_b: &DFont,
+    font_size: f32,
+    wordlist: Vec<String>,
+    threshold: f32,
+) -> Vec<Difference> {
+    let tl_a = ThreadLocal::new();
+    let tl_b = ThreadLocal::new();
+    let tl_cache = ThreadLocal::new();
+    let differences: Vec<Option<Difference>> = wordlist
+        .par_iter()
+        .progress()
+        .map(|word| {
+            let renderer_a = tl_a.get_or(|| {
+                RefCell::new(Renderer::new(
+                    font_a,
+                    font_size,
+                    Direction::LeftToRight,
+                    None,
+                ))
+            });
+            let renderer_b = tl_b.get_or(|| {
+                RefCell::new(Renderer::new(
+                    font_b,
+                    font_size,
+                    Direction::LeftToRight,
+                    None,
+                ))
+            });
+            let seen_glyphs: &RefCell<HashSet<String>> =
+                tl_cache.get_or(|| RefCell::new(HashSet::new()));
 
-//             let (buffer_a, commands_a) =
-//                 renderer_a.borrow_mut().string_to_positioned_glyphs(word)?;
-//             if buffer_a
-//                 .split('|')
-//                 .all(|glyph| seen_glyphs.borrow().contains(glyph))
-//             {
-//                 return None;
-//             }
-//             for glyph in buffer_a.split('|') {
-//                 seen_glyphs.borrow_mut().insert(glyph.to_string());
-//             }
-//             let (buffer_b, commands_b) =
-//                 renderer_b.borrow_mut().string_to_positioned_glyphs(word)?;
-//             if commands_a == commands_b {
-//                 return None;
-//             }
-//             let img_a = renderer_a
-//                 .borrow_mut()
-//                 .render_positioned_glyphs(&commands_a);
-//             let img_b = renderer_b
-//                 .borrow_mut()
-//                 .render_positioned_glyphs(&commands_b);
-//             let percent = count_differences(&img_a, &img_b);
+            let (buffer_a, commands_a) =
+                renderer_a.borrow_mut().string_to_positioned_glyphs(word)?;
+            if buffer_a
+                .split('|')
+                .all(|glyph| seen_glyphs.borrow().contains(glyph))
+            {
+                return None;
+            }
+            for glyph in buffer_a.split('|') {
+                seen_glyphs.borrow_mut().insert(glyph.to_string());
+            }
+            let (buffer_b, commands_b) =
+                renderer_b.borrow_mut().string_to_positioned_glyphs(word)?;
+            if commands_a == commands_b {
+                return None;
+            }
+            let img_a = renderer_a
+                .borrow_mut()
+                .render_positioned_glyphs(&commands_a);
+            let img_b = renderer_b
+                .borrow_mut()
+                .render_positioned_glyphs(&commands_b);
+            let percent = count_differences(img_a, img_b);
 
-//             Some(Difference {
-//                 word: word.to_string(),
-//                 buffer_a,
-//                 buffer_b,
-//                 // diff_map,
-//                 percent,
-//                 ot_features: "".to_string(),
-//                 lang: "".to_string(),
-//             })
-//         })
-//         .collect();
-//     let mut diffs: Vec<Difference> = differences
-//         .into_iter()
-//         .flatten()
-//         .filter(|diff| diff.percent > threshold)
-//         .collect();
-//     diffs.sort_by_key(|x| (-x.percent * 10_000.0) as i32);
-//     diffs
-// }
+            Some(Difference {
+                word: word.to_string(),
+                buffer_a,
+                buffer_b,
+                // diff_map,
+                percent,
+                ot_features: "".to_string(),
+                lang: "".to_string(),
+            })
+        })
+        .collect();
+    let mut diffs: Vec<Difference> = differences
+        .into_iter()
+        .flatten()
+        .filter(|diff| diff.percent > threshold)
+        .collect();
+    diffs.sort_by_key(|x| (-x.percent * 10_000.0) as i32);
+    diffs
+}
 
-// // A slow and simple version
-// #[cfg(target_family = "wasm")]
+// A slow and simple version
+#[cfg(target_family = "wasm")]
 pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
@@ -267,11 +273,7 @@ pub(crate) fn diff_many_words(
         }
         let img_a = renderer_a.render_positioned_glyphs(&commands_a);
         let img_b = renderer_b.render_positioned_glyphs(&commands_b);
-        let percent = count_differences(&img_a, &img_b);
-        let output_a = BufWriter::new(File::create("image_a.png").unwrap());
-        let output_b = BufWriter::new(File::create("image_b.png").unwrap());
-        img_a.write_png(output_a).unwrap();
-        img_b.write_png(output_b).unwrap();
+        let percent = count_differences(img_a, img_b);
         if percent > threshold {
             differences.push(Difference {
                 word: word.to_string(),

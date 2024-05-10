@@ -42,6 +42,7 @@ serde_json = { version = "1.0.96", features = ["preserve_order"] }
 serde = { version = "*", features = ["derive"] }
 indexmap = "1.9.3"
 ab_glyph = "0.2.21"
+ab_glyph_rasterizer = "0.1.8"
 image = "0.24.6"
 rustybuzz = "*"
 ucd = "0.1.1"

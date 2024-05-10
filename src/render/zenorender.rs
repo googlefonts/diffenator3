@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use image::{DynamicImage, GrayImage, Luma};
 use rasterize::{ActiveEdgeRasterizer, FillRule, Image, Layer, LinColor, Path, Scene, Transform};
 use rustybuzz::{shape_with_plan, Direction, Face, ShapePlan, UnicodeBuffer};
 use skrifa::{
@@ -12,6 +13,8 @@ use skrifa::{
 use zeno::{Command, Mask, PathBuilder};
 
 use crate::dfont::DFont;
+
+use super::utils::terrible_bounding_box;
 
 fn pt(v: &zeno::Vector) -> rasterize::Point {
     rasterize::Point::new(v.x as f64, v.y as f64)
@@ -127,35 +130,62 @@ impl<'a> Renderer<'a> {
         Some((serialized_buffer, pen.buffer))
     }
 
-    pub fn render_positioned_glyphs(&mut self, pen_buffer: &[Command]) -> Layer<LinColor> {
-        let mut builder = Path::builder();
+    pub fn render_positioned_glyphs(&mut self, pen_buffer: &[Command]) -> GrayImage {
+        let (min_x, min_y, max_x, max_y) = terrible_bounding_box(pen_buffer);
+        let x_origin = min_x.min(0.0);
+        let y_origin = min_y.min(0.0);
+        let x_size = (max_x - x_origin).ceil() as usize;
+        let y_size = (max_y - y_origin).ceil() as usize;
+
+        let mut rasterizer = ab_glyph_rasterizer::Rasterizer::new(x_size, y_size);
+
+        let origin = ab_glyph::Point {
+            x: x_origin,
+            y: y_origin,
+        };
+
+        let mut cursor = ab_glyph::Point { x: 0.0, y: 0.0 };
+        let v2p = |v: &zeno::Vector| ab_glyph::Point {
+            x: v.x - x_origin.ceil(),
+            y: v.y - y_origin.ceil(),
+        };
+        let mut home = v2p(&zeno::Vector::new(0.0, 0.0));
         for command in pen_buffer {
             match command {
-                Command::MoveTo(to) => builder.move_to(pt(to)),
-                Command::LineTo(to) => builder.line_to(pt(to)),
-                Command::QuadTo(ctrl, to) => builder.quad_to(pt(ctrl), pt(to)),
-                Command::CurveTo(ctrl0, ctrl1, to) => {
-                    builder.cubic_to(pt(ctrl0), pt(ctrl1), pt(to))
+                Command::MoveTo(to) => {
+                    cursor = v2p(to);
+                    home = cursor;
                 }
-                Command::Close => builder.close(),
+                Command::LineTo(to) => {
+                    let newpt = v2p(to);
+                    rasterizer.draw_line(cursor, newpt);
+                    cursor = newpt;
+                }
+                Command::QuadTo(ctrl, to) => {
+                    let ctrlpt = v2p(ctrl);
+                    let newpt = v2p(to);
+                    rasterizer.draw_quad(cursor, ctrlpt, newpt);
+                    cursor = newpt;
+                }
+                Command::CurveTo(ctrl0, ctrl1, to) => {
+                    let ctrl0pt = v2p(ctrl0);
+                    let ctrl1pt = v2p(ctrl1);
+                    let newpt = v2p(to);
+                    rasterizer.draw_cubic(cursor, ctrl0pt, ctrl1pt, newpt);
+                    cursor = newpt;
+                }
+                Command::Close => {
+                    if cursor != home {
+                        rasterizer.draw_line(cursor, home);
+                    }
+                }
             };
         }
-        let path = builder.build();
-        let bbox = path
-            .bbox(Transform::identity())
-            .ok_or("Empty path")
-            .unwrap();
-        let scene = Scene::group(vec![Scene::fill(
-            path.into(),
-            Arc::new("#000000".parse::<LinColor>().unwrap()),
-            FillRule::NonZero,
-        )]);
-        scene.render(
-            &ActiveEdgeRasterizer::default(),
-            Transform::identity(),
-            None,
-            None,
-        )
+        let mut image = DynamicImage::new_luma8(x_size as u32, y_size as u32).into_luma8();
+        rasterizer.for_each_pixel_2d(|x, y, alpha| {
+            image.put_pixel(x, y, Luma([(alpha * 255.0) as u8]));
+        });
+        image
     }
 }
 
@@ -175,9 +205,7 @@ mod tests {
         let (serialized_buffer, commands) = renderer
             .string_to_positioned_glyphs("السلام عليكم")
             .unwrap();
-        static IMAGE_NAME: &str = "test.png";
-        let mut output = BufWriter::new(File::create(IMAGE_NAME).unwrap());
         let image = renderer.render_positioned_glyphs(&commands);
-        image.write_png(&mut output).unwrap();
+        image.save("test.png").unwrap();
     }
 }

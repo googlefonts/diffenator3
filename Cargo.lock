@@ -420,6 +420,7 @@ name = "diffenator3"
 version = "0.1.0"
 dependencies = [
  "ab_glyph",
+ "ab_glyph_rasterizer",
  "brotli",
  "cfg-if 1.0.0",
  "clap",
