@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use image::{DynamicImage, GrayImage, Luma};
-use rasterize::{ActiveEdgeRasterizer, FillRule, Image, Layer, LinColor, Path, Scene, Transform};
 use rustybuzz::{shape_with_plan, Direction, Face, ShapePlan, UnicodeBuffer};
 use skrifa::{
     instance::{LocationRef, Size},
@@ -10,15 +7,11 @@ use skrifa::{
     GlyphId, MetadataProvider, OutlineGlyphCollection,
 };
 
-use zeno::{Command, Mask, PathBuilder};
+use zeno::{Command, PathBuilder};
 
 use crate::dfont::DFont;
 
 use super::utils::terrible_bounding_box;
-
-fn pt(v: &zeno::Vector) -> rasterize::Point {
-    rasterize::Point::new(v.x as f64, v.y as f64)
-}
 
 #[derive(Default)]
 struct RecordingPen {
@@ -139,11 +132,6 @@ impl<'a> Renderer<'a> {
 
         let mut rasterizer = ab_glyph_rasterizer::Rasterizer::new(x_size, y_size);
 
-        let origin = ab_glyph::Point {
-            x: x_origin,
-            y: y_origin,
-        };
-
         let mut cursor = ab_glyph::Point { x: 0.0, y: 0.0 };
         let v2p = |v: &zeno::Vector| ab_glyph::Point {
             x: v.x - x_origin.ceil(),
@@ -191,8 +179,6 @@ impl<'a> Renderer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, io::BufWriter, sync::Arc};
-
     use super::*;
     use rustybuzz::{script, Direction};
 
@@ -202,7 +188,7 @@ mod tests {
         let data = std::fs::read(path).unwrap();
         let font = DFont::new(&data);
         let mut renderer = Renderer::new(&font, 40.0, Direction::RightToLeft, Some(script::ARABIC));
-        let (serialized_buffer, commands) = renderer
+        let (_serialized_buffer, commands) = renderer
             .string_to_positioned_glyphs("السلام عليكم")
             .unwrap();
         let image = renderer.render_positioned_glyphs(&commands);

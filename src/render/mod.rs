@@ -4,7 +4,6 @@ mod wordlists;
 mod zenorender;
 
 use image::{GenericImage, GrayImage, ImageBuffer};
-use rasterize::{Color, Image, Layer, LinColor};
 // use renderer::Renderer;
 use rustybuzz::Direction;
 use wordlists::LATIN;
@@ -15,8 +14,7 @@ use serde_json::{json, Value};
 use std::{
     cell::RefCell,
     collections::HashSet,
-    fs::File,
-    io::{BufRead, BufReader, BufWriter},
+    io::{BufRead, BufReader},
 };
 
 use cfg_if::cfg_if;
