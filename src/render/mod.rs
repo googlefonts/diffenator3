@@ -5,15 +5,10 @@ mod wordlists;
 use image::{GenericImage, GrayImage, ImageBuffer};
 use renderer::Renderer;
 use rustybuzz::Direction;
-use wordlists::LATIN;
 
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::{
-    cell::RefCell,
-    collections::HashSet,
-    io::{BufRead, BufReader},
-};
+use std::{cell::RefCell, collections::HashSet};
 
 use cfg_if::cfg_if;
 
@@ -80,16 +75,19 @@ pub fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
 }
 
 pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
-    let buf = BufReader::new(LATIN.as_slice());
-    let wordlist: Vec<String> = buf
-        .lines()
-        .map(|l| l.expect("Could not parse line"))
-        .collect();
-
-    json!({
-        "Latin": diff_many_words(
-        font_a, font_b, 20.0, wordlist, 0.2
-    )})
+    let mut map = serde_json::Map::new();
+    for script in font_a
+        .supported_scripts()
+        .intersection(&font_b.supported_scripts())
+    {
+        if let Some(wordlist) = wordlists::get_wordlist(script) {
+            let results = diff_many_words(font_a, font_b, 20.0, wordlist, 0.2);
+            if !results.is_empty() {
+                map.insert(script.to_string(), serde_json::to_value(results).unwrap());
+            }
+        }
+    }
+    json!(map)
 }
 
 fn make_same_size(image_a: GrayImage, image_b: GrayImage) -> (GrayImage, GrayImage) {
