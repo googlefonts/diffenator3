@@ -5,7 +5,6 @@ mod wordlists;
 use image::{GenericImage, GrayImage, ImageBuffer};
 use renderer::Renderer;
 use rustybuzz::Direction;
-
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{cell::RefCell, collections::HashSet};
@@ -61,7 +60,7 @@ pub fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
         .filter(|x| x.is_some())
         .map(|c| c.unwrap().to_string())
         .collect();
-    let mut result: Vec<GlyphDiff> = diff_many_words(font_a, font_b, 40.0, word_list, threshold)
+    let mut result: Vec<GlyphDiff> = diff_many_words(font_a, font_b, 40.0, word_list, threshold, Direction::LeftToRight, None)
         .into_iter()
         .map(|x| x.into())
         .collect();
@@ -81,7 +80,9 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
         .intersection(&font_b.supported_scripts())
     {
         if let Some(wordlist) = wordlists::get_wordlist(script) {
-            let results = diff_many_words(font_a, font_b, 20.0, wordlist, 0.2);
+            let direction = wordlists::get_script_direction(script);
+            let script_tag = wordlists::get_script_tag(script);
+            let results = diff_many_words(font_a, font_b, 20.0, wordlist, 0.2, direction, script_tag);
             if !results.is_empty() {
                 map.insert(script.to_string(), serde_json::to_value(results).unwrap());
             }
@@ -160,6 +161,8 @@ pub(crate) fn diff_many_words(
     font_size: f32,
     wordlist: Vec<String>,
     threshold: f32,
+    direction: Direction,
+    script: Option<rustybuzz::Script>,
 ) -> Vec<Difference> {
     let tl_a = ThreadLocal::new();
     let tl_b = ThreadLocal::new();
@@ -172,16 +175,16 @@ pub(crate) fn diff_many_words(
                 RefCell::new(Renderer::new(
                     font_a,
                     font_size,
-                    Direction::LeftToRight,
-                    None,
+                    direction,
+                    script,
                 ))
             });
             let renderer_b = tl_b.get_or(|| {
                 RefCell::new(Renderer::new(
                     font_b,
                     font_size,
-                    Direction::LeftToRight,
-                    None,
+                    direction,
+                    script,
                 ))
             });
             let seen_glyphs: &RefCell<HashSet<String>> =
@@ -239,9 +242,11 @@ pub(crate) fn diff_many_words(
     font_size: f32,
     wordlist: Vec<String>,
     threshold: f32,
+    direction: Direction,
+    script: Option<rustybuzz::Script>,
 ) -> Vec<Difference> {
-    let mut renderer_a = Renderer::new(font_a, font_size, Direction::LeftToRight, None);
-    let mut renderer_b = Renderer::new(font_b, font_size, Direction::LeftToRight, None);
+    let mut renderer_a = Renderer::new(font_a, font_size, direction, script);
+    let mut renderer_b = Renderer::new(font_b, font_size, direction, script);
     let mut seen_glyphs: HashSet<String> = HashSet::new();
 
     let mut differences: Vec<Difference> = vec![];

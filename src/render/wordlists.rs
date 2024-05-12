@@ -116,3 +116,61 @@ pub(crate) fn get_wordlist(script: &str) -> Option<Vec<String>> {
         .collect();
     Some(wordlist)
 }
+
+
+pub(crate) fn get_script_tag(script: &str) -> Option<rustybuzz::Script> {
+    match script {
+        "Adlam" => Some(rustybuzz::script::ADLAM),
+        "Arabic" => Some(rustybuzz::script::ARABIC),
+        "Armenian" => Some(rustybuzz::script::ARMENIAN),
+        "Avestan" => Some(rustybuzz::script::AVESTAN),
+        "Bengali" => Some(rustybuzz::script::BENGALI),
+        "Bopomofo" => Some(rustybuzz::script::BOPOMOFO),
+        "Canadian_Aboriginal" => Some(rustybuzz::script::CANADIAN_SYLLABICS),
+        "Chakma" => Some(rustybuzz::script::CHAKMA),
+        "Cherokee" => Some(rustybuzz::script::CHEROKEE),
+        "Common" => Some(rustybuzz::script::COMMON),
+        "Cyrillic" => Some(rustybuzz::script::CYRILLIC),
+        "Devanagari" => Some(rustybuzz::script::DEVANAGARI),
+        "Ethiopic" => Some(rustybuzz::script::ETHIOPIC),
+        "Georgian" => Some(rustybuzz::script::GEORGIAN),
+        "Grantha" => Some(rustybuzz::script::GRANTHA),
+        "Greek" => Some(rustybuzz::script::GREEK),
+        "Gujarati" => Some(rustybuzz::script::GUJARATI),
+        "Gurmukhi" => Some(rustybuzz::script::GURMUKHI),
+        "Hebrew" => Some(rustybuzz::script::HEBREW),
+        "Hiragana" => Some(rustybuzz::script::HIRAGANA),
+        "Kannada" => Some(rustybuzz::script::KANNADA),
+        "Katakana" => Some(rustybuzz::script::KATAKANA),
+        "Khmer" => Some(rustybuzz::script::KHMER),
+        "Lao" => Some(rustybuzz::script::LAO),
+        "Latin" => Some(rustybuzz::script::LATIN),
+        "Lisu" => Some(rustybuzz::script::LISU),
+        "Malayalam" => Some(rustybuzz::script::MALAYALAM),
+        "Mongolian" => Some(rustybuzz::script::MONGOLIAN),
+        "Myanmar" => Some(rustybuzz::script::MYANMAR),
+        "Ol_Chiki" => Some(rustybuzz::script::OL_CHIKI),
+        "Oriya" => Some(rustybuzz::script::ORIYA),
+        "Osage" => Some(rustybuzz::script::OSAGE),
+        "Sinhala" => Some(rustybuzz::script::SINHALA),
+        "Syriac" => Some(rustybuzz::script::SYRIAC),
+        "Tamil" => Some(rustybuzz::script::TAMIL),
+        "Telugu" => Some(rustybuzz::script::TELUGU),
+        "Thai" => Some(rustybuzz::script::THAI),
+        "Tibetan" => Some(rustybuzz::script::TIBETAN),
+        "Tifinagh" => Some(rustybuzz::script::TIFINAGH),
+        "Vai" => Some(rustybuzz::script::VAI),
+        _ =>  None,
+    }
+}
+
+pub(crate) fn get_script_direction(script: &str) -> rustybuzz::Direction {
+    match script {
+        "Arabic" => rustybuzz::Direction::RightToLeft,
+        "Avestan" => rustybuzz::Direction::RightToLeft,
+        "Hebrew" => rustybuzz::Direction::RightToLeft,
+        "Syriac" => rustybuzz::Direction::RightToLeft,
+        "Thanaa" => rustybuzz::Direction::RightToLeft,
+        _ => rustybuzz::Direction::LeftToRight,
+    }
+}
