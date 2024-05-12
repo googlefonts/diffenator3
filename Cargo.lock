@@ -441,7 +441,6 @@ dependencies = [
  "tera",
  "thread_local",
  "ucd",
- "unicode-character-database",
  "unicode_names2",
  "wasm-bindgen",
  "wee_alloc",
@@ -1374,12 +1373,6 @@ name = "unicode-ccc"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df77b101bcc4ea3d78dafc5ad7e4f58ceffe0b2b16bf446aeb50b6cb4157656"
-
-[[package]]
-name = "unicode-character-database"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d889cfe89cd76e26f0ed744dfee87eb4f5a4435980ebce58dba7df903258807"
 
 [[package]]
 name = "unicode-ident"
