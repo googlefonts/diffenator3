@@ -1,7 +1,7 @@
 use font_types::NameId;
-use read_fonts::FontRef;
+use read_fonts::{FontRef, TableProvider};
 use skrifa::{instance::Location, setting::VariationSetting, MetadataProvider};
-use std::collections::HashSet;
+use std::{borrow::Cow, collections::HashSet};
 use ucd::Codepoint;
 
 pub struct DFont {
@@ -11,7 +11,7 @@ pub struct DFont {
 }
 
 impl DFont {
-    pub fn new(string: &[u8], variations: Option<&str>) -> Self {
+    pub fn new(string: &[u8]) -> Self {
         let backing: Vec<u8> = string.to_vec();
 
         let mut fnt = DFont {
@@ -21,10 +21,28 @@ impl DFont {
         };
         let cmap = fnt.fontref().charmap();
         fnt.codepoints = cmap.mappings().map(|(cp, _)| cp).collect();
-        if let Some(variations) = variations {
-            fnt.location = fnt.parse_location(variations);
-        }
         fnt
+    }
+
+    pub fn set_location(&mut self, variations: &str) {
+        self.location = self.parse_location(variations);
+    }
+
+    pub fn set_instance(&mut self, instance: &str) -> Result<(), String> {
+        let font = self.fontref();
+        let location = font
+            .named_instances()
+            .iter()
+            .find(|ni| {
+                font.localized_strings(ni.subfamily_name_id())
+                    .any(|s| instance == s.chars().collect::<Cow<str>>())
+            })
+            .map_or_else(
+                || Err(format!("No instance named {}", instance)),
+                |ni| Ok(ni.location()),
+            );
+        self.location = location?;
+        Ok(())
     }
 
     pub fn fontref(&self) -> FontRef {

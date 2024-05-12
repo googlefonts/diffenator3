@@ -188,7 +188,7 @@ mod tests {
     fn test_zeno_path() {
         let path = "NotoSansArabic-NewRegular.ttf";
         let data = std::fs::read(path).unwrap();
-        let font = DFont::new(&data, None);
+        let font = DFont::new(&data);
         let mut renderer = Renderer::new(&font, 40.0, Direction::RightToLeft, Some(script::ARABIC));
         let (_serialized_buffer, commands) = renderer
             .string_to_positioned_glyphs("السلام عليكم")

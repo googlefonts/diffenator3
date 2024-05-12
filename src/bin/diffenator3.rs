@@ -50,7 +50,9 @@ struct Cli {
     /// Location in design space, in the form axis=123,other=456
     #[clap(long = "location")]
     location: Option<String>,
-    
+    #[clap(long = "instance", conflicts_with = "location")]
+    instance: Option<String>,
+
     /// The first font file to compare
     font1: PathBuf,
     /// The second font file to compare
@@ -97,8 +99,15 @@ fn main() {
     let font_binary_a = std::fs::read(cli.font1).expect("Couldn't open file");
     let font_binary_b = std::fs::read(cli.font2).expect("Couldn't open file");
 
-    let font_a = DFont::new(&font_binary_a, cli.location.as_deref());
-    let font_b = DFont::new(&font_binary_b, cli.location.as_deref());
+    let mut font_a = DFont::new(&font_binary_a);
+    let mut font_b = DFont::new(&font_binary_b);
+    if let Some(loc) = cli.location {
+        font_a.set_location(&loc);
+        font_b.set_location(&loc);
+    } else if let Some(inst) = cli.instance {
+        font_a.set_instance(&inst).expect("Couldn't find instance");
+        font_b.set_instance(&inst).expect("Couldn't find instance");
+    }
     let mut diff = Map::new();
     if cli.tables {
         let table_diff = table_diff(&font_a.fontref(), &font_b.fontref());
