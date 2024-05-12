@@ -55,22 +55,23 @@ pub struct Renderer<'a> {
     face: Face<'a>,
     scale: f32,
     font: skrifa::FontRef<'a>,
+    location: LocationRef<'a>,
     plan: ShapePlan,
     outlines: OutlineGlyphCollection<'a>,
 }
 
 impl<'a> Renderer<'a> {
     pub fn new(
-        font: &'a DFont,
+        dfont: &'a DFont,
         font_size: f32,
         direction: Direction,
         script: Option<rustybuzz::Script>,
     ) -> Self {
-        let face = Face::from_slice(&font.backing, 0).expect("Foo");
-        let font = skrifa::FontRef::new(&font.backing).unwrap_or_else(|_| {
+        let face = Face::from_slice(&dfont.backing, 0).expect("Foo");
+        let font = skrifa::FontRef::new(&dfont.backing).unwrap_or_else(|_| {
             panic!(
                 "error constructing a Font from data for {:}",
-                font.family_name()
+                dfont.family_name()
             );
         });
         let plan = ShapePlan::new(&face, direction, script, None, &[]);
@@ -81,6 +82,7 @@ impl<'a> Renderer<'a> {
             font,
             plan,
             scale: font_size,
+            location: (&dfont.location).into(),
             outlines,
         }
     }
@@ -104,7 +106,7 @@ impl<'a> Renderer<'a> {
             }
             pen.offset_x = cursor + (position.x_offset as f32 * factor);
             pen.offset_y = -position.y_offset as f32 * factor;
-            let settings = DrawSettings::unhinted(Size::new(self.scale), LocationRef::default());
+            let settings = DrawSettings::unhinted(Size::new(self.scale), self.location);
 
             let _ = self
                 .outlines
@@ -186,7 +188,7 @@ mod tests {
     fn test_zeno_path() {
         let path = "NotoSansArabic-NewRegular.ttf";
         let data = std::fs::read(path).unwrap();
-        let font = DFont::new(&data);
+        let font = DFont::new(&data, None);
         let mut renderer = Renderer::new(&font, 40.0, Direction::RightToLeft, Some(script::ARABIC));
         let (_serialized_buffer, commands) = renderer
             .string_to_positioned_glyphs("السلام عليكم")
