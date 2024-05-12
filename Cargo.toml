@@ -3,6 +3,10 @@ name = "diffenator3"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev]
+# Rustybuzz debug-asserts that the provided script is the same as
+# the text's script, *even if* you're using guess_segment_properties.
+debug-assertions=false
 
 [profile.release]
 opt-level = "z"
