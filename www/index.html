@@ -16,12 +16,17 @@
       src: url();
     }
 
+    @font-face {
+      font-family: "Adobe Notdef";
+      src: url("AND-Regular.ttf");
+    }
+
     .font-before {
-      font-family: "Font Before"
+      font-family: "Font Before", "Adobe Notdef";
     }
 
     .font-after {
-      font-family: "Font After"
+      font-family: "Font After", "Adobe Notdef";
     }
   </style>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
@@ -221,6 +226,12 @@
     <h1> Table diff</h1>
     <div id="difftable"> </div>
     <div id="glyphdiff"> </div>
+    <h2> Shaping Words</h2>
+    <div id="wordspinner">
+      <div class="spinner-border" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    </div>
     <div id="worddiff">
     </div>
   </div>

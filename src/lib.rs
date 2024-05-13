@@ -44,25 +44,25 @@ cfg_if! {
         }
 
         #[wasm_bindgen]
-        pub fn progressive_diff(font_a: &[u8], font_b: &[u8], this: &JsValue, f: &js_sys::Function) {
+        pub fn progressive_diff(font_a: &[u8], font_b: &[u8], f: &js_sys::Function) {
             let f_a = DFont::new(font_a);
             let f_b = DFont::new(font_b);
 
             let val = json!({
                 "tables": table_diff(&f_a.fontref(), &f_b.fontref())
             });
-            f.call1(this, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
+            f.call1(&JsValue::NULL, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
 
             let val = json!({
                 "glyphs": test_font_glyphs(&f_a, &f_b)
             });
-            f.call1(this, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
+            f.call1(&JsValue::NULL, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
 
 
             let val = json!({
                 "words": test_font_words(&f_a, &f_b)
             });
-            f.call1(this, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
+            f.call1(&JsValue::NULL, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
         }
 
     }

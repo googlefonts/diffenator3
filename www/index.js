@@ -1,7 +1,5 @@
-import * as wasm from "diffenator3";
-wasm.debugging();
-
-
+import Worker from "worker-loader!./webworker.js";
+const diffWorker = new Worker();
 
 jQuery.fn.shake = function (interval, distance, times) {
 	interval = typeof interval == "undefined" ? 100 : interval;
@@ -118,7 +116,7 @@ class Diffenator {
 			} else if (diffs["words"]) {
 				console.log(script)
 				for (var [script, words] of Object.entries(diffs["words"])) {
-					// this.renderWordDiff(script, words);
+					this.renderWordDiff(script, words);
 				}
 			}
 		}
@@ -131,8 +129,10 @@ class Diffenator {
 	letsDoThis() {
 		$("#startModal").hide();
 		$("#spinnerModal").show();
+		$("#wordspinner").show();
 		console.log("Showing spinner")
-		wasm.progressive_diff(this.beforeFont, this.afterFont, this, this.progress_callback);
+		diffWorker.onmessage = (e) => this.progress_callback(e.data);
+		diffWorker.postMessage({ beforeFont: this.beforeFont, afterFont: this.afterFont });
 	}
 
 	addAGlyph(glyph, where) {
@@ -174,6 +174,7 @@ class Diffenator {
 
 
 	renderWordDiff(script, diffs) {
+		$("#wordspinner").hide();
 		$("#worddiff").append($(`<h2>${script} words</h2>`));
 		let place = $('<div class="wordgrid"/>')
 		$("#worddiff").append(place);
