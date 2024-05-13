@@ -2,54 +2,14 @@ use image::{DynamicImage, GrayImage, Luma};
 use rustybuzz::{shape_with_plan, Direction, Face, ShapePlan, UnicodeBuffer};
 use skrifa::{
     instance::{LocationRef, Size},
-    outline::{DrawSettings, OutlinePen},
+    outline::DrawSettings,
     raw::TableProvider,
     GlyphId, MetadataProvider, OutlineGlyphCollection,
 };
+use zeno::Command;
 
-use zeno::{Command, PathBuilder};
-
+use super::utils::{terrible_bounding_box, RecordingPen};
 use crate::dfont::DFont;
-
-use super::utils::terrible_bounding_box;
-
-#[derive(Default)]
-struct RecordingPen {
-    buffer: Vec<Command>,
-    pub offset_x: f32,
-    pub offset_y: f32,
-}
-
-// Implement the Pen trait for this type. This emits the appropriate
-// SVG path commands for each element type.
-impl OutlinePen for RecordingPen {
-    fn move_to(&mut self, x: f32, y: f32) {
-        self.buffer.move_to([self.offset_x + x, self.offset_y + y]);
-    }
-
-    fn line_to(&mut self, x: f32, y: f32) {
-        self.buffer.line_to([self.offset_x + x, self.offset_y + y]);
-    }
-
-    fn quad_to(&mut self, cx0: f32, cy0: f32, x: f32, y: f32) {
-        self.buffer.quad_to(
-            [self.offset_x + cx0, self.offset_y + cy0],
-            [self.offset_x + x, self.offset_y + y],
-        );
-    }
-
-    fn curve_to(&mut self, cx0: f32, cy0: f32, cx1: f32, cy1: f32, x: f32, y: f32) {
-        self.buffer.curve_to(
-            [self.offset_x + cx0, self.offset_y + cy0],
-            [self.offset_x + cx1, self.offset_y + cy1],
-            [self.offset_x + x, self.offset_y + y],
-        );
-    }
-
-    fn close(&mut self) {
-        self.buffer.close();
-    }
-}
 
 pub struct Renderer<'a> {
     face: Face<'a>,
