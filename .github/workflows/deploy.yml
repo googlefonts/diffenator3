@@ -19,7 +19,20 @@ jobs:
           cd www
           npm install
           npm run build
-      - name: Deploy
+      - name: Upload
         uses: actions/upload-pages-artifact@v3.0.1
         with:
           path: docs
+  deploy:
+    needs: build
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
