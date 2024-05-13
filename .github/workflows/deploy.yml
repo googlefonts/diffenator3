@@ -1,0 +1,25 @@
+name: Build GH Pages
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+      - name: Build
+        run: wasm-pack build --target web
+      - name: Build web site
+        run: |
+          cd www
+          npm install
+          npm run build
+      - name: Deploy
+        uses: actions/upload-pages-artifact
+        with:
+          path: docs
