@@ -12,10 +12,6 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(target_family = "wasm")] {
-        extern crate wee_alloc;
-        #[global_allocator]
-        static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
         use dfont::DFont;
         use render::{test_font_glyphs, test_font_words};
         use serde_json::json;
