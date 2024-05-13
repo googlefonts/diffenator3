@@ -431,6 +431,7 @@ dependencies = [
  "image",
  "indexmap 1.9.3",
  "indicatif",
+ "js-sys",
  "lazy_static",
  "rayon",
  "read-fonts",

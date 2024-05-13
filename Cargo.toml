@@ -23,6 +23,7 @@ colored = "2.1.0"
 wasm-bindgen = { version = "0.2.63" }
 console_error_panic_hook = { version = "0.1.6" }
 wee_alloc = { version = "0.4.5" }
+js-sys = { version = "0.3.68" }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
