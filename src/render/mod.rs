@@ -7,7 +7,7 @@ use renderer::Renderer;
 use rustybuzz::Direction;
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::{cell::RefCell, collections::HashSet};
+use std::collections::HashSet;
 
 use cfg_if::cfg_if;
 
@@ -16,6 +16,7 @@ cfg_if! {
         use indicatif::ParallelProgressIterator;
         use rayon::{iter::ParallelIterator, prelude::IntoParallelRefIterator};
         use thread_local::ThreadLocal;
+        use std::cell::RefCell;
     }
 }
 
@@ -60,10 +61,18 @@ pub fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
         .filter(|x| x.is_some())
         .map(|c| c.unwrap().to_string())
         .collect();
-    let mut result: Vec<GlyphDiff> = diff_many_words(font_a, font_b, 40.0, word_list, threshold, Direction::LeftToRight, None)
-        .into_iter()
-        .map(|x| x.into())
-        .collect();
+    let mut result: Vec<GlyphDiff> = diff_many_words(
+        font_a,
+        font_b,
+        40.0,
+        word_list,
+        threshold,
+        Direction::LeftToRight,
+        None,
+    )
+    .into_iter()
+    .map(|x| x.into())
+    .collect();
     result.sort_by_key(|x| (-x.percent * 10_000.0) as i32);
 
     json!({
@@ -82,7 +91,8 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
         if let Some(wordlist) = wordlists::get_wordlist(script) {
             let direction = wordlists::get_script_direction(script);
             let script_tag = wordlists::get_script_tag(script);
-            let results = diff_many_words(font_a, font_b, 20.0, wordlist, 0.2, direction, script_tag);
+            let results =
+                diff_many_words(font_a, font_b, 20.0, wordlist, 0.2, direction, script_tag);
             if !results.is_empty() {
                 map.insert(script.to_string(), serde_json::to_value(results).unwrap());
             }
@@ -171,22 +181,10 @@ pub(crate) fn diff_many_words(
         .par_iter()
         .progress()
         .map(|word| {
-            let renderer_a = tl_a.get_or(|| {
-                RefCell::new(Renderer::new(
-                    font_a,
-                    font_size,
-                    direction,
-                    script,
-                ))
-            });
-            let renderer_b = tl_b.get_or(|| {
-                RefCell::new(Renderer::new(
-                    font_b,
-                    font_size,
-                    direction,
-                    script,
-                ))
-            });
+            let renderer_a =
+                tl_a.get_or(|| RefCell::new(Renderer::new(font_a, font_size, direction, script)));
+            let renderer_b =
+                tl_b.get_or(|| RefCell::new(Renderer::new(font_b, font_size, direction, script)));
             let seen_glyphs: &RefCell<HashSet<String>> =
                 tl_cache.get_or(|| RefCell::new(HashSet::new()));
 
