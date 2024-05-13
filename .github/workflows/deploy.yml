@@ -20,6 +20,6 @@ jobs:
           npm install
           npm run build
       - name: Deploy
-        uses: actions/upload-pages-artifact
+        uses: actions/upload-pages-artifact@v3.0.1
         with:
           path: docs
