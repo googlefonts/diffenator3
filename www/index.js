@@ -101,18 +101,38 @@ class Diffenator {
 
 	}
 
-	letsDoThis() {
-		$("#startModal").hide()
-		let diffs = JSON.parse(wasm.diff(this.beforeFont, this.afterFont));
-		console.log(diffs);
-		let table_diff = diffs["tables"];
-		let glyph_diff = diffs["glyphs"];
-		$("#difftable").append(this.renderTableDiff(table_diff, true).children())
-		$(".node").on("click", function (event) { $(this).children().toggle(); event.stopPropagation() })
-		this.renderGlyphDiff(glyph_diff);
-		for (var [script, words] of Object.entries(diffs["words"])) {
-			this.renderWordDiff(script, words);
+	progress_callback(progress) {
+		try {
+			let diffs = JSON.parse(progress);
+			console.log("Hiding spinner")
+			$("#spinnerModal").hide(0);
+			console.log(diffs);
+			if (diffs["tables"]) {
+				let table_diff = diffs["tables"];
+				$("#difftable").empty();
+				$("#difftable").append(this.renderTableDiff(table_diff, true).children())
+			} else if (diffs["glyphs"]) {
+				let glyph_diff = diffs["glyphs"];
+				this.renderGlyphDiff(glyph_diff);
+				$(".node").on("click", function (event) { $(this).children().toggle(); event.stopPropagation() })
+			} else if (diffs["words"]) {
+				console.log(script)
+				for (var [script, words] of Object.entries(diffs["words"])) {
+					// this.renderWordDiff(script, words);
+				}
+			}
 		}
+		catch (e) {
+			console.error(e);
+		}
+	}
+
+
+	letsDoThis() {
+		$("#startModal").hide();
+		$("#spinnerModal").show();
+		console.log("Showing spinner")
+		wasm.progressive_diff(this.beforeFont, this.afterFont, this, this.progress_callback);
 	}
 
 	addAGlyph(glyph, where) {
