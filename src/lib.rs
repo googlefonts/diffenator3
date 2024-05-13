@@ -5,6 +5,12 @@ pub mod render;
 pub mod ttj;
 
 cfg_if! {
+    if #[cfg(not(target_family = "wasm"))] {
+        pub mod html;
+    }
+}
+
+cfg_if! {
     if #[cfg(target_family = "wasm")] {
         extern crate wee_alloc;
         #[global_allocator]

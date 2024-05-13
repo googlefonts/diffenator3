@@ -2,6 +2,7 @@ use clap::{builder::ArgAction, Parser};
 use colored::Colorize;
 use diffenator3::{
     dfont::DFont,
+    html::render_output,
     render::{test_font_glyphs, test_font_words},
     ttj::{jsondiff::Substantial, table_diff},
 };
@@ -46,6 +47,9 @@ struct Cli {
     /// Show diffs as JSON
     #[clap(long = "json")]
     json: bool,
+    /// Show diffs as HTML
+    #[clap(long = "html")]
+    html: bool,
 
     /// Location in design space, in the form axis=123,other=456
     #[clap(long = "location")]
@@ -126,6 +130,11 @@ fn main() {
         if word_diff.is_something() {
             diff.insert("words".into(), word_diff);
         }
+    }
+    if cli.html {
+        let html = render_output(&serde_json::to_value(&diff).expect("foo")).expect("foo");
+        println!("{}", html);
+        std::process::exit(0);
     }
     if cli.json {
         println!("{}", serde_json::to_string_pretty(&diff).expect("foo"));
