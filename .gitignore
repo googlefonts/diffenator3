@@ -1,1 +1,5 @@
+*.ttf
+*.png
+*.svg
+foo*
 /target
