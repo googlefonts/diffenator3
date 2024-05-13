@@ -1,7 +1,10 @@
 use font_types::NameId;
 use read_fonts::{FontRef, TableProvider};
 use skrifa::{instance::Location, setting::VariationSetting, MetadataProvider};
-use std::{borrow::Cow, collections::HashSet};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 use ucd::Codepoint;
 
 pub struct DFont {
@@ -24,8 +27,9 @@ impl DFont {
         fnt
     }
 
-    pub fn set_location(&mut self, variations: &str) {
-        self.location = self.parse_location(variations);
+    pub fn set_location(&mut self, variations: &str) -> Result<(), String> {
+        self.location = self.parse_location(variations)?;
+        Ok(())
     }
 
     pub fn set_instance(&mut self, instance: &str) -> Result<(), String> {
@@ -74,16 +78,31 @@ impl DFont {
             .any(|tr| tr.tag() == "fvar")
     }
 
-    fn parse_location(&self, variations: &str) -> Location {
+    pub fn axis_info(&self) -> HashMap<String, (f32, f32, f32)> {
+        self.fontref()
+            .axes()
+            .iter()
+            .map(|axis| {
+                (
+                    axis.tag().to_string(),
+                    (axis.min_value(), axis.default_value(), axis.max_value()),
+                )
+            })
+            .collect()
+    }
+
+    fn parse_location(&self, variations: &str) -> Result<Location, String> {
         let mut settings: Vec<VariationSetting> = vec![];
         for variation in variations.split(',') {
             let mut parts = variation.split('=');
-            let axis = parts.next().expect("No axis");
-            let value = parts.next().expect("No value");
-            let value = value.parse::<f32>().expect("Couldn't parse value");
+            let axis = parts.next().ok_or("Couldn't parse axis".to_string())?;
+            let value = parts.next().ok_or("Couldn't parse value".to_string())?;
+            let value = value
+                .parse::<f32>()
+                .map_err(|e| "Couldn't parse value".to_string())?;
             settings.push((axis, value).into());
         }
-        self.fontref().axes().location(&settings)
+        Ok(self.fontref().axes().location(&settings))
     }
 
     pub fn supported_scripts(&self) -> HashSet<String> {

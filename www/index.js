@@ -30,6 +30,12 @@ class Diffenator {
 		return document.styleSheets[0].cssRules[1].style
 	}
 
+	setVariationStyle(variations) {
+		let rule = document.styleSheets[0].cssRules[2].style
+		rule.setProperty("font-variation-settings", variations)
+	}
+
+
 	dropFile(files, element) {
 		if (!files[0].name.match(/\.[ot]tf$/i)) {
 			$(element).shake()
@@ -99,40 +105,86 @@ class Diffenator {
 
 	}
 
-	progress_callback(progress) {
-		try {
-			let diffs = JSON.parse(progress);
+	setVariations() {
+		let cssSetting = $("#axes input").map(function () {
+			return `"${this.id.replace("axis-", "")}" ${this.value}`
+		}).get().join(", ");
+		this.setVariationStyle(cssSetting);
+		this.updateGlyphs();
+	}
+
+	setupAxes(axes) {
+		$("#axes").empty();
+		for (var [tag, limits] of Object.entries(axes)) {
+			console.log(tag,limits)
+			let [axis_min, axis_def, axis_max] = limits;
+			let axis = $(`<div class="axis">
+				${tag}
+				<input type="range" min="${axis_min}" max="${axis_max}" value="${axis_def}" class="slider" id="axis-${tag}">
+			`);
+			$("#axes").append(axis);
+			axis.on("input", this.setVariations.bind(this))
+			axis.on("change", this.updateWords.bind(this))
+		}
+	}
+
+	progress_callback(message) {
+		console.log("Got json ", message)
+		if ("type" in message && message.type == "ready") {
+			$("#bigLoadingModal").hide()
+			$("#startModal").show()
+		} else if (message.type == "axes") {
+			this.setupAxes(message.axes)
+		} else if (message.type == "tables") {
 			console.log("Hiding spinner")
-			$("#spinnerModal").hide(0);
-			console.log(diffs);
-			if (diffs["tables"]) {
-				let table_diff = diffs["tables"];
-				$("#difftable").empty();
-				$("#difftable").append(this.renderTableDiff(table_diff, true).children())
-			} else if (diffs["glyphs"]) {
-				let glyph_diff = diffs["glyphs"];
-				this.renderGlyphDiff(glyph_diff);
-				$(".node").on("click", function (event) { $(this).children().toggle(); event.stopPropagation() })
-			} else if (diffs["words"]) {
-				console.log(script)
-				for (var [script, words] of Object.entries(diffs["words"])) {
-					this.renderWordDiff(script, words);
-				}
+			$("#spinnerModal").hide();
+			let table_diff = message.tables;
+			$("#difftable").empty();
+			$("#difftable").append(this.renderTableDiff({"tables":table_diff}, true).children())
+		} else if (message.type == "glyphs") {
+			$("#spinnerModal").hide();
+			let glyph_diff = message.glyphs;
+			this.renderGlyphDiff(glyph_diff);
+			$(".node").on("click", function (event) { $(this).children().toggle(); event.stopPropagation() })
+		} else if (message.type == "words") {
+			$("#spinnerModal").hide();
+			$("#wordspinner").hide();
+			let diffs = message.words;
+			for (var [script, words] of Object.entries(diffs)) {
+				this.renderWordDiff(script, words);
 			}
 		}
-		catch (e) {
-			console.error(e);
-		}
+	}
+
+	variationLocation() {
+		// Return the current axis location as a string of the form
+		// tag=value,tag=value
+		return $("#axes input").map(function () {
+			return `${this.id.replace("axis-", "")}=${this.value}`
+		}).get().join(",")
 	}
 
 
 	letsDoThis() {
 		$("#startModal").hide();
 		$("#spinnerModal").show();
+		console.log("Current location = ", location)
+		diffWorker.postMessage({ command: "axes", beforeFont: this.beforeFont, afterFont: this.afterFont });
+		diffWorker.postMessage({ command: "tables", beforeFont: this.beforeFont, afterFont: this.afterFont });
+		this.updateGlyphs();
+		this.updateWords();
+	}
+
+	updateGlyphs() {
+		let location = this.variationLocation();
+		diffWorker.postMessage({ command: "glyphs", beforeFont: this.beforeFont, afterFont: this.afterFont, location });
+	}
+
+	updateWords() {
 		$("#wordspinner").show();
-		console.log("Showing spinner")
-		diffWorker.onmessage = (e) => this.progress_callback(e.data);
-		diffWorker.postMessage({ beforeFont: this.beforeFont, afterFont: this.afterFont });
+		$("#worddiff").empty();
+		let location = this.variationLocation();
+		diffWorker.postMessage({ command: "words", beforeFont: this.beforeFont, afterFont: this.afterFont, location });
 	}
 
 	addAGlyph(glyph, where) {
@@ -174,7 +226,6 @@ class Diffenator {
 
 
 	renderWordDiff(script, diffs) {
-		$("#wordspinner").hide();
 		$("#worddiff").append($(`<h2>${script} words</h2>`));
 		let place = $('<div class="wordgrid"/>')
 		$("#worddiff").append(place);
@@ -188,8 +239,8 @@ class Diffenator {
 
 $(function () {
 	window.diffenator = new Diffenator();
-
-	$("#startModal").show()
+	diffWorker.onmessage = (e) => window.diffenator.progress_callback(e.data);
+	$("#bigLoadingModal").show()
 
 	$('.fontdrop').on(
 		'dragover dragenter',
