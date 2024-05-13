@@ -106,8 +106,8 @@ fn main() {
     let mut font_a = DFont::new(&font_binary_a);
     let mut font_b = DFont::new(&font_binary_b);
     if let Some(loc) = cli.location {
-        font_a.set_location(&loc);
-        font_b.set_location(&loc);
+        let _hack = font_a.set_location(&loc);
+        let _hack = font_b.set_location(&loc);
     } else if let Some(inst) = cli.instance {
         font_a.set_instance(&inst).expect("Couldn't find instance");
         font_b.set_instance(&inst).expect("Couldn't find instance");

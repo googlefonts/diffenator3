@@ -76,8 +76,8 @@ cfg_if! {
         pub fn diff_glyphs(font_a: &[u8], font_b: &[u8], location: &str, f: &js_sys::Function) {
             let mut f_a = DFont::new(font_a);
             let mut f_b = DFont::new(font_b);
-            f_a.set_location(location);
-            f_b.set_location(location);
+            let _hack = f_a.set_location(location);
+            let _hack = f_b.set_location(location);
 
             let val = json!({
                 "glyphs": test_font_glyphs(&f_a, &f_b)
@@ -89,8 +89,8 @@ cfg_if! {
         pub fn diff_words(font_a: &[u8], font_b: &[u8], location: &str, f: &js_sys::Function) {
             let mut f_a = DFont::new(font_a);
             let mut f_b = DFont::new(font_b);
-            f_a.set_location(location);
-            f_b.set_location(location);
+            let _hack = f_a.set_location(location);
+            let _hack = f_b.set_location(location);
 
 
             let val = json!({

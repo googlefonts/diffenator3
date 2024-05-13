@@ -1,5 +1,5 @@
 use font_types::NameId;
-use read_fonts::{FontRef, TableProvider};
+use read_fonts::FontRef;
 use skrifa::{instance::Location, setting::VariationSetting, MetadataProvider};
 use std::{
     borrow::Cow,
@@ -99,7 +99,7 @@ impl DFont {
             let value = parts.next().ok_or("Couldn't parse value".to_string())?;
             let value = value
                 .parse::<f32>()
-                .map_err(|e| "Couldn't parse value".to_string())?;
+                .map_err(|_| "Couldn't parse value".to_string())?;
             settings.push((axis, value).into());
         }
         Ok(self.fontref().axes().location(&settings))
