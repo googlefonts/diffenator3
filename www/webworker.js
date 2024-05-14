@@ -2,17 +2,16 @@ var module = import('../pkg/diffenator3.js');
 async function init() {
     let wasm = await module;
     self.postMessage({ type: "ready" })
-    console.log("Got wasm module", wasm);
+    // console.log("Got wasm module", wasm);
     wasm.debugging();
     self.onmessage = async (event) => {
-        console.log("Worker received message");
-        console.log(event);
+        // console.log("Worker received message");
+        // console.log(event);
         const { command, beforeFont, location, afterFont } = event.data;
         if (command == "axes") {
-            self.postMessage({
-                "type": "axes",
-                "axes": JSON.parse(wasm.axes(beforeFont, afterFont))["axes"]
-            });
+            let obj = JSON.parse(wasm.axes(beforeFont, afterFont))
+            obj["type"] = "axes";
+            self.postMessage(obj);
         } else if (command == "tables") {
             wasm.diff_tables(beforeFont, afterFont, (tables) => {
                 self.postMessage({

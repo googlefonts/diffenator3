@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use cfg_if::cfg_if;
 
 pub mod dfont;
@@ -16,6 +18,7 @@ cfg_if! {
         use render::{test_font_glyphs, test_font_words};
         use serde_json::json;
         use ttj::table_diff;
+        use skrifa::MetadataProvider;
 
         use wasm_bindgen::prelude::*;
         extern crate console_error_panic_hook;
@@ -50,8 +53,29 @@ cfg_if! {
                     }
                 );
             }
+            let axis_names: Vec<String> = f_a.fontref()
+            .axes()
+            .iter()
+            .map(|axis| {
+                    axis.tag().to_string()
+            }).collect();
+            let instances = f_a
+                .fontref()
+                .named_instances()
+                .iter()
+                .map(|ni| {
+                    let name = f_a
+                        .fontref()
+                        .localized_strings(ni.subfamily_name_id())
+                        .english_or_first()
+                        .map_or_else(|| "Unknown".to_string(), |s| s.chars().collect());
+                    let location_map = axis_names.iter().cloned().zip(ni.user_coords()).collect();
+                    (name, location_map)
+                })
+                .collect::<Vec<(String, HashMap<String, f32>)>>();
             return serde_json::to_string(&json!({
-                "axes": &axes
+                "axes": &axes,
+                "instances": instances
             })).unwrap_or("Couldn't do it".to_string());
         }
 

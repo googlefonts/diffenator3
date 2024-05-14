@@ -113,8 +113,10 @@ class Diffenator {
 		this.updateGlyphs();
 	}
 
-	setupAxes(axes) {
+	setupAxes(message) {
 		$("#axes").empty();
+		console.log(message)
+		let {axes, instances} = message;
 		for (var [tag, limits] of Object.entries(axes)) {
 			console.log(tag,limits)
 			let [axis_min, axis_def, axis_max] = limits;
@@ -126,17 +128,39 @@ class Diffenator {
 			axis.on("input", this.setVariations.bind(this))
 			axis.on("change", this.updateWords.bind(this))
 		}
+		if (Object.keys(instances).length > 0) {
+			let select = $("<select id='instance-select'></select>")
+			for (var [name, location] of instances) {
+				console.log(location)
+				let location_str = Object.entries(location).map(([k,v]) => `${k}=${v}`).join(",")
+				let option = $(`<option value="${location_str}">${name}</option>`)
+				select.append(option)
+			}
+			select.on("change", function () {
+				let location = $(this).val();
+				let parts = location.split(",");
+				for (let [i, part] of parts.entries()) {
+					let [tag, value] = part.split("=");
+					console.log(tag, value)
+					$(`#axis-${tag}`).val(value)
+				}
+				$("#axes input").trigger("input");
+				$("#axes input").trigger("change");
+			})
+			$("#axes").append(select)
+		
+		}
 	}
 
 	progress_callback(message) {
-		console.log("Got json ", message)
+		// console.log("Got json ", message)
 		if ("type" in message && message.type == "ready") {
 			$("#bigLoadingModal").hide()
 			$("#startModal").show()
 		} else if (message.type == "axes") {
-			this.setupAxes(message.axes)
+			this.setupAxes(message) // Contains axes and named instances
 		} else if (message.type == "tables") {
-			console.log("Hiding spinner")
+			// console.log("Hiding spinner")
 			$("#spinnerModal").hide();
 			let table_diff = message.tables;
 			$("#difftable").empty();
@@ -168,7 +192,6 @@ class Diffenator {
 	letsDoThis() {
 		$("#startModal").hide();
 		$("#spinnerModal").show();
-		console.log("Current location = ", location)
 		diffWorker.postMessage({ command: "axes", beforeFont: this.beforeFont, afterFont: this.afterFont });
 		diffWorker.postMessage({ command: "tables", beforeFont: this.beforeFont, afterFont: this.afterFont });
 		this.updateGlyphs();
