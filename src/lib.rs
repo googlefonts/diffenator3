@@ -31,7 +31,14 @@ cfg_if! {
             let f_a = DFont::new(font_a);
             let f_b = DFont::new(font_b);
             let mut axes = f_a.axis_info();
-            for (axis_tag, values) in f_b.axis_info().iter() {
+            let b_axes = f_b.axis_info();
+            let a_axes_names: Vec<String> = axes.keys().cloned().collect();
+            for axis_tag in a_axes_names.iter() {
+                if !b_axes.contains_key(axis_tag) {
+                    axes.remove(axis_tag);
+                }
+            }
+            for (axis_tag, values) in b_axes.iter() {
                 let (our_min, _our_default, our_max) = values;
                 axes.entry(axis_tag.clone()).and_modify(
                     |(their_min, _their_default, their_max)| {
@@ -40,7 +47,7 @@ cfg_if! {
                         // two fonts.
                         *their_min = their_min.max(*our_min);
                         *their_max = their_max.min(*our_max);
-                    },
+                    }
                 );
             }
             return serde_json::to_string(&json!({
