@@ -140,27 +140,27 @@
 			}
 
 	  {% for font_face in font_faces_old %}
-	    {{ font_face.render() }}
+	    {{ font_face }}
 	  {% endfor %}
 
 	  {% for font_face in font_faces_new %}
-	    {{ font_face.render() }}
+	    {{ font_face }}
 	  {% endfor %}
 
 	  {% for font_face in font_faces %}
-	    {{ font_face.render() }}
+	    {{ font_face }}
 	  {% endfor %}
 
 	  {% for font_class in font_styles_old %}
-	    {{ font_class.render() }}
+	    {{ font_class }}
 	  {% endfor %}
 
 	  {% for font_class in font_styles_new %}
-	    {{ font_class.render() }}
+	    {{ font_class }}
 	  {% endfor %}
 
 	  {% for font_class in font_styles %}
-	    {{ font_class.render() }}
+	    {{ font_class }}
 	  {% endfor %}
 	{% endblock %}
 

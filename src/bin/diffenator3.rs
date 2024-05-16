@@ -2,7 +2,7 @@ use clap::{builder::ArgAction, Parser};
 use colored::Colorize;
 use diffenator3::{
     dfont::DFont,
-    html::render_output,
+    html::{render_output, CSSFontFace},
     render::{test_font_glyphs, test_font_words},
     ttj::{jsondiff::Substantial, table_diff},
 };
@@ -100,8 +100,8 @@ fn show_map_diff(fields: &Map<String, serde_json::Value>, indent: usize, succinc
 fn main() {
     let cli = Cli::parse();
 
-    let font_binary_a = std::fs::read(cli.font1).expect("Couldn't open file");
-    let font_binary_b = std::fs::read(cli.font2).expect("Couldn't open file");
+    let font_binary_a = std::fs::read(&cli.font1).expect("Couldn't open file");
+    let font_binary_b = std::fs::read(&cli.font2).expect("Couldn't open file");
 
     let mut font_a = DFont::new(&font_binary_a);
     let mut font_b = DFont::new(&font_binary_b);
@@ -132,7 +132,14 @@ fn main() {
         }
     }
     if cli.html {
-        let html = render_output(&serde_json::to_value(&diff).expect("foo")).expect("foo");
+        let font_face_old = CSSFontFace::new(cli.font1.to_str().unwrap(), "old", &font_a);
+        let font_face_new = CSSFontFace::new(cli.font2.to_str().unwrap(), "new", &font_b);
+        let html = render_output(
+            &serde_json::to_value(&diff).expect("foo"),
+            font_face_old,
+            font_face_new,
+        )
+        .expect("foo");
         println!("{}", html);
         std::process::exit(0);
     }
