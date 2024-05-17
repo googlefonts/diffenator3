@@ -7,7 +7,10 @@ use diffenator3::{
     ttj::{jsondiff::Substantial, table_diff},
 };
 use serde_json::Map;
-use std::{error::Error, path::PathBuf};
+use std::{
+    error::Error,
+    path::{Path, PathBuf},
+};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -50,6 +53,10 @@ struct Cli {
     /// Show diffs as HTML
     #[clap(long = "html")]
     html: bool,
+
+    /// Output directory for HTML
+    #[clap(long = "output", default_value = "out", requires = "html")]
+    output: String,
 
     /// Location in design space, in the form axis=123,other=456
     #[clap(long = "location")]
@@ -117,12 +124,12 @@ fn main() {
 
     let mut font_a = DFont::new(&font_binary_a);
     let mut font_b = DFont::new(&font_binary_b);
-    if let Some(loc) = cli.location {
-        let _hack = font_a.set_location(&loc);
-        let _hack = font_b.set_location(&loc);
-    } else if let Some(inst) = cli.instance {
-        font_a.set_instance(&inst).expect("Couldn't find instance");
-        font_b.set_instance(&inst).expect("Couldn't find instance");
+    if let Some(ref loc) = cli.location {
+        let _hack = font_a.set_location(loc);
+        let _hack = font_b.set_location(loc);
+    } else if let Some(ref inst) = cli.instance {
+        font_a.set_instance(inst).expect("Couldn't find instance");
+        font_b.set_instance(inst).expect("Couldn't find instance");
     }
     let mut diff = Map::new();
     if cli.tables {
@@ -142,23 +149,7 @@ fn main() {
         diff.insert("words".into(), word_diff);
     }
     if cli.html {
-        let font_face_old = CSSFontFace::new(cli.font1.to_str().unwrap(), "old", &font_a);
-        let font_face_new = CSSFontFace::new(cli.font2.to_str().unwrap(), "new", &font_b);
-        let font_style_old = CSSFontStyle::new(&font_a, Some("old"));
-        let font_style_new = CSSFontStyle::new(&font_b, Some("new"));
-        let value = serde_json::to_value(&diff).unwrap_or_else(|e| {
-            die("serializing diff", e);
-        });
-        let html = render_output(
-            &value,
-            font_face_old,
-            font_face_new,
-            font_style_old,
-            font_style_new,
-        )
-        .unwrap_or_else(|err| die("rendering HTML", err));
-        println!("{}", html);
-        std::process::exit(0);
+        do_html(&cli, &font_a, &font_b, diff);
     }
     if cli.json {
         println!("{}", serde_json::to_string_pretty(&diff).expect("foo"));
@@ -219,4 +210,46 @@ fn main() {
             }
         }
     }
+}
+
+fn do_html(cli: &Cli, font_a: &DFont, font_b: &DFont, diff: Map<String, serde_json::Value>) -> ! {
+    // Make output directory
+    let output_dir = Path::new(&cli.output);
+    if !output_dir.exists() {
+        std::fs::create_dir(output_dir).expect("Couldn't create output directory");
+    }
+
+    // Copy old font to output/old-<existing name>
+    let old_font = output_dir.join(format!(
+        "old-{}",
+        cli.font1.file_name().unwrap().to_str().unwrap()
+    ));
+    std::fs::copy(&cli.font1, &old_font).expect("Couldn't copy old font");
+    let new_font = output_dir.join(format!(
+        "new-{}",
+        cli.font2.file_name().unwrap().to_str().unwrap()
+    ));
+    std::fs::copy(&cli.font2, &new_font).expect("Couldn't copy new font");
+
+    let font_face_old = CSSFontFace::new(&old_font, "old", font_a);
+    let font_face_new = CSSFontFace::new(&new_font, "new", font_b);
+    let font_style_old = CSSFontStyle::new(font_a, Some("old"));
+    let font_style_new = CSSFontStyle::new(font_b, Some("new"));
+    let value = serde_json::to_value(&diff).unwrap_or_else(|e| {
+        die("serializing diff", e);
+    });
+    let html = render_output(
+        &value,
+        font_face_old,
+        font_face_new,
+        font_style_old,
+        font_style_new,
+    )
+    .unwrap_or_else(|err| die("rendering HTML", err));
+
+    // Write output
+    let output_file = output_dir.join("diffenator.html");
+    println!("Writing output to {}", output_file.to_str().unwrap());
+    std::fs::write(output_file, html).expect("Couldn't write output file");
+    std::process::exit(0);
 }

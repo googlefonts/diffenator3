@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -20,7 +20,7 @@ pub struct CSSFontFace {
 }
 
 impl CSSFontFace {
-    pub fn new(filename: &str, suffix: &str, dfont: &DFont) -> Self {
+    pub fn new(filename: &Path, suffix: &str, dfont: &DFont) -> Self {
         let familyname = suffix.to_string() + " " + &dfont.family_name();
         let cssfamilyname = familyname.clone();
         let class_name = cssfamilyname.replace(' ', "-");
@@ -30,7 +30,12 @@ impl CSSFontFace {
 
         CSSFontFace {
             suffix: suffix.to_string(),
-            filename: filename.to_string(),
+            filename: filename
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap_or_default()
+                .to_string(),
             familyname,
             cssfamilyname,
             class_name,
@@ -93,7 +98,7 @@ lazy_static! {
         match Tera::new("templates/*") {
             Ok(t) => t,
             Err(e) => {
-                println!("Parsing error(s): {}", e);
+                eprintln!("Parsing error(s): {}", e);
                 ::std::process::exit(1);
             }
         }
@@ -121,7 +126,7 @@ pub fn render_output(
             "font_styles_old": [font_style_old],
             "font_styles_new": [font_style_new],
             "font_styles": [],
-            "pt_size": 20,
+            "pt_size": 40,
             "include_ui": true,
         }))?,
     )

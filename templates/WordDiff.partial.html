@@ -1,19 +1,19 @@
-<div class="cell-word" style="font-feature-settings: {% for f in ot_features %} '{{ f }}' 1 {% endfor %}" lang="{{ lang }}">
+<div class="cell-word" style="font-feature-settings: {% for f in diff.ot_features %} '{{ f }}' 1 {% endfor %}" lang="{{ diff.lang }}">
     <div class="tooltip">
-        {{ string }}<br>
+        {{ diff.word }}<br>
         <span class="tooltiptext">
         <div class="tooltipleft">
             Before:<br>
-            {{ hb_a }}
-            feats={{ ot_features }}
+            {{ diff.buffer_a }}
+            feats={{ diff.ot_features }}
         </div>
         <div class="tooltipright">
             After:<br>
-            {{ hb_b }}
-            feats={{ ot_features }}
+            {{ diff.buffer_b }}
+            feats={{ diff.ot_features }}
         </div>
         <div>
-            changed pixels: {{ changed_pixels }}%
+            changed pixels: {{ diff.percent }}%
         </div>
         </span>
     </div>
