@@ -9,7 +9,8 @@ use ucd::Codepoint;
 
 pub struct DFont {
     pub backing: Vec<u8>,
-    pub location: Location,
+    pub location: Vec<VariationSetting>,
+    pub normalized_location: Location,
     pub codepoints: HashSet<u32>,
 }
 
@@ -20,7 +21,8 @@ impl DFont {
         let mut fnt = DFont {
             backing,
             codepoints: HashSet::new(),
-            location: Location::default(),
+            normalized_location: Location::default(),
+            location: vec![],
         };
         let cmap = fnt.fontref().charmap();
         fnt.codepoints = cmap.mappings().map(|(cp, _)| cp).collect();
@@ -29,23 +31,31 @@ impl DFont {
 
     pub fn set_location(&mut self, variations: &str) -> Result<(), String> {
         self.location = self.parse_location(variations)?;
+        self.normalized_location = self.fontref().axes().location(&self.location);
         Ok(())
     }
 
     pub fn set_instance(&mut self, instance: &str) -> Result<(), String> {
-        let font = self.fontref();
-        let location = font
+        let instance = self
+            .fontref()
             .named_instances()
             .iter()
             .find(|ni| {
-                font.localized_strings(ni.subfamily_name_id())
+                self.fontref()
+                    .localized_strings(ni.subfamily_name_id())
                     .any(|s| instance == s.chars().collect::<Cow<str>>())
             })
-            .map_or_else(
-                || Err(format!("No instance named {}", instance)),
-                |ni| Ok(ni.location()),
-            );
-        self.location = location?;
+            .ok_or_else(|| format!("No instance named {}", instance))?;
+        let user_coords = instance.user_coords();
+        let location = instance.location();
+        self.location = self
+            .fontref()
+            .axes()
+            .iter()
+            .zip(user_coords)
+            .map(|(a, v)| (a.tag(), v).into())
+            .collect();
+        self.normalized_location = location;
         Ok(())
     }
 
@@ -57,6 +67,13 @@ impl DFont {
             .localized_strings(NameId::FAMILY_NAME)
             .english_or_first()
             .map_or_else(|| "Unknown".to_string(), |s| s.chars().collect())
+    }
+
+    pub fn style_name(&self) -> String {
+        self.fontref()
+            .localized_strings(NameId::SUBFAMILY_NAME)
+            .english_or_first()
+            .map_or_else(|| "Regular".to_string(), |s| s.chars().collect())
     }
 
     pub fn is_color(&self) -> bool {
@@ -91,7 +108,7 @@ impl DFont {
             .collect()
     }
 
-    fn parse_location(&self, variations: &str) -> Result<Location, String> {
+    fn parse_location(&self, variations: &str) -> Result<Vec<VariationSetting>, String> {
         let mut settings: Vec<VariationSetting> = vec![];
         for variation in variations.split(',') {
             let mut parts = variation.split('=');
@@ -102,7 +119,7 @@ impl DFont {
                 .map_err(|_| "Couldn't parse value".to_string())?;
             settings.push((axis, value).into());
         }
-        Ok(self.fontref().axes().location(&settings))
+        Ok(settings)
     }
 
     pub fn supported_scripts(&self) -> HashSet<String> {

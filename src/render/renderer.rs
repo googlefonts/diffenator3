@@ -42,7 +42,7 @@ impl<'a> Renderer<'a> {
             font,
             plan,
             scale: font_size,
-            location: (&dfont.location).into(),
+            location: (&dfont.normalized_location).into(),
             outlines,
         }
     }

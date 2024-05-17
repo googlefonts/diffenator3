@@ -140,27 +140,27 @@
 			}
 
 	  {% for font_face in font_faces_old %}
-	    {{ font_face }}
+	    {% include "CSSFontFace.partial.html" %}
 	  {% endfor %}
 
 	  {% for font_face in font_faces_new %}
-	    {{ font_face }}
+	    {% include "CSSFontFace.partial.html" %}
 	  {% endfor %}
 
 	  {% for font_face in font_faces %}
-	    {{ font_face }}
+	    {% include "CSSFontFace.partial.html" %}
 	  {% endfor %}
 
 	  {% for font_class in font_styles_old %}
-	    {{ font_class }}
+	    {% include "CSSFontStyle.partial.html" %}
 	  {% endfor %}
 
 	  {% for font_class in font_styles_new %}
-	    {{ font_class }}
+	    {% include "CSSFontStyle.partial.html" %}
 	  {% endfor %}
 
 	  {% for font_class in font_styles %}
-	    {{ font_class }}
+	    {% include "CSSFontStyle.partial.html" %}
 	  {% endfor %}
 	{% endblock %}
 
@@ -188,7 +188,7 @@
 	{% block content %}
 	{% endblock %}
     </div>
-</body>
+
 	<script>
 
 	POSITION = "old"
@@ -301,5 +301,7 @@ for (i=0; i<checkboxes.length; i++) {
 	{% endblock %}
 
     </script>
+</body>
+
 </html>
 

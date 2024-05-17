@@ -36,10 +36,12 @@
 {% endblock %}
 {% block content %}
   {% for font_class in font_styles_old %}
+    {% if diff["tables"] %}
     <div class="box">
-    <div class="box-title">Tables</div>
+      <div class="box-title">Tables</div>
       <div data-path="root" data-open="0" id="difftable"></div>
     </div>
+    {% endif %}
     
     {% if diff["glyphs"].new %}
       <div class="box">
@@ -47,7 +49,7 @@
         <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
           {% for glyph in diff["glyphs"].new %}
             <div class="cell">
-              {{ glyph }}
+              {% include "Glyph.partial.html" %}
             </div>
           {% endfor %}
           </div>
@@ -61,7 +63,7 @@
         <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
           {% for glyph in diff["glyphs"].missing %}
             <div class="cell">
-              {{ glyph }}
+              {% include "Glyph.partial.html" %}
             </div>
           {% endfor %}
           </div>
@@ -74,24 +76,27 @@
         <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
           {% for glyph in diff["glyphs"].modified %}
             <div class="cell">
-              {{ glyph }}
+              {% include "Glyph.partial.html" %}
             </div>
           {% endfor %}
           </div>
       </div>
     {% endif %}
 
-    {% for script in diff["words"] %}
+    {% if diff["words"] %}
+    {% for script, words in diff["words"] %}
       <div class="box">
         <div class="box-title">Misshapen {{ script }} words</div>
         <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
-          {% for word in diff["words"][script] %}
+          {% for word in words %}
               {{ word }}
           {% endfor %}
         </div>
       </div>
     {% endfor %}
+    {% endif %}
     
+    {% if diff["strings"] %}
     <div class="box">
       <div class="box-title">Misshapen user strings</div>
       <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
@@ -100,18 +105,19 @@
         {% endfor %}
       </div>
     </div>
+    {% endif %}
     
-
-    {% if diff.features %}
+    {% if diff["features"] %}
       <div class="box">
         <div class="box-title">Fea</div>
         {{ diff.features }}
       </div>
     {% endif %}
-
-    </div>
   {% endfor %}
-{{ diff.tables }}
+
+<script>
+  fontdiff={{ diff.tables | json_encode() | safe  }};
+</script>
 {% endblock %}
 {% block js %}
   class Table {

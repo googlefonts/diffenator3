@@ -2,12 +2,12 @@ use clap::{builder::ArgAction, Parser};
 use colored::Colorize;
 use diffenator3::{
     dfont::DFont,
-    html::{render_output, CSSFontFace},
+    html::{render_output, CSSFontFace, CSSFontStyle},
     render::{test_font_glyphs, test_font_words},
     ttj::{jsondiff::Substantial, table_diff},
 };
 use serde_json::Map;
-use std::path::PathBuf;
+use std::{error::Error, path::PathBuf};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -61,6 +61,18 @@ struct Cli {
     font1: PathBuf,
     /// The second font file to compare
     font2: PathBuf,
+}
+
+fn die(doing: &str, err: impl Error) -> ! {
+    eprintln!("Error {}: {}", doing, err);
+    eprintln!();
+    eprintln!("Caused by:");
+    if let Some(cause) = err.source() {
+        for (i, e) in std::iter::successors(Some(cause), |e| (*e).source()).enumerate() {
+            eprintln!("   {}: {}", i, e);
+        }
+    }
+    std::process::exit(1);
 }
 
 fn show_map_diff(fields: &Map<String, serde_json::Value>, indent: usize, succinct: bool) {
@@ -127,19 +139,24 @@ fn main() {
     }
     if cli.words {
         let word_diff = test_font_words(&font_a, &font_b);
-        if word_diff.is_something() {
-            diff.insert("words".into(), word_diff);
-        }
+        diff.insert("words".into(), word_diff);
     }
     if cli.html {
         let font_face_old = CSSFontFace::new(cli.font1.to_str().unwrap(), "old", &font_a);
         let font_face_new = CSSFontFace::new(cli.font2.to_str().unwrap(), "new", &font_b);
+        let font_style_old = CSSFontStyle::new(&font_a, Some("old"));
+        let font_style_new = CSSFontStyle::new(&font_b, Some("new"));
+        let value = serde_json::to_value(&diff).unwrap_or_else(|e| {
+            die("serializing diff", e);
+        });
         let html = render_output(
-            &serde_json::to_value(&diff).expect("foo"),
+            &value,
             font_face_old,
             font_face_new,
+            font_style_old,
+            font_style_new,
         )
-        .expect("foo");
+        .unwrap_or_else(|err| die("rendering HTML", err));
         println!("{}", html);
         std::process::exit(0);
     }
