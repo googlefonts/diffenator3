@@ -58,6 +58,10 @@ struct Cli {
     #[clap(long = "output", default_value = "out", requires = "html")]
     output: String,
 
+    /// Directory for custom templates
+    #[clap(long = "templates", requires = "html")]
+    templates: Option<String>,
+
     /// Location in design space, in the form axis=123,other=456
     #[clap(long = "location")]
     location: Option<String>,
@@ -261,6 +265,7 @@ fn do_html(cli: &Cli, font_a: &DFont, font_b: &DFont, diff: Map<String, serde_js
         font_face_new,
         font_style_old,
         font_style_new,
+        cli.templates.as_ref(),
     )
     .unwrap_or_else(|err| die("rendering HTML", err));
 
