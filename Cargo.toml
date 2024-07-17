@@ -18,6 +18,9 @@ indicatif = {version = "*", features = ["rayon"] }
 thread_local = "1.1"
 tera = "1"
 colored = "2.1.0"
+homedir = "0.3.3"
+walkdir = "2.5.0"
+
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wasm-bindgen = { version = "0.2.63" }
@@ -54,5 +57,3 @@ unicode_names2 = "0.6.0"
 brotli = "6.0.0"
 lazy_static = "1.4.0"
 zeno = "0.3.1"
-homedir = "0.3.3"
-walkdir = "2.5.0"
