@@ -2,7 +2,7 @@ use clap::{builder::ArgAction, Parser};
 use colored::Colorize;
 use diffenator3::{
     dfont::DFont,
-    html::{render_output, CSSFontFace, CSSFontStyle},
+    html::{render_output, template_engine, CSSFontFace, CSSFontStyle},
     render::{test_font_glyphs, test_font_words},
     ttj::{jsondiff::Substantial, table_diff},
 };
@@ -11,6 +11,7 @@ use std::{
     error::Error,
     path::{Path, PathBuf},
 };
+use tera::Tera;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -132,6 +133,7 @@ fn main() {
 
     let mut font_a = DFont::new(&font_binary_a);
     let mut font_b = DFont::new(&font_binary_b);
+    let tera = cli.html.then(|| template_engine(cli.templates.as_ref()));
     if let Some(ref loc) = cli.location {
         let _hack = font_a.set_location(loc);
         let _hack = font_b.set_location(loc);
@@ -157,7 +159,7 @@ fn main() {
         diff.insert("words".into(), word_diff);
     }
     if cli.html {
-        do_html(&cli, &font_a, &font_b, diff);
+        do_html(&cli, &font_a, &font_b, diff, tera.unwrap());
     }
     if cli.json {
         println!("{}", serde_json::to_string_pretty(&diff).expect("foo"));
@@ -233,7 +235,13 @@ fn main() {
     }
 }
 
-fn do_html(cli: &Cli, font_a: &DFont, font_b: &DFont, diff: Map<String, serde_json::Value>) -> ! {
+fn do_html(
+    cli: &Cli,
+    font_a: &DFont,
+    font_b: &DFont,
+    diff: Map<String, serde_json::Value>,
+    tera: Tera,
+) -> ! {
     // Make output directory
     let output_dir = Path::new(&cli.output);
     if !output_dir.exists() {
@@ -265,7 +273,7 @@ fn do_html(cli: &Cli, font_a: &DFont, font_b: &DFont, diff: Map<String, serde_js
         font_face_new,
         font_style_old,
         font_style_new,
-        cli.templates.as_ref(),
+        &tera,
     )
     .unwrap_or_else(|err| die("rendering HTML", err));
 

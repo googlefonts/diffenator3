@@ -95,12 +95,31 @@ impl CSSFontStyle {
     }
 }
 
-fn template_engine() -> Tera {
+pub fn template_engine(user_templates: Option<&String>) -> Tera {
     let homedir = create_user_home_templates_directory();
-    Tera::new(&format!("{}/*", homedir.to_str().unwrap())).unwrap_or_else(|e| {
+    let mut tera = Tera::new(&format!("{}/*", homedir.to_str().unwrap())).unwrap_or_else(|e| {
         println!("Problem parsing templates: {:?}", e);
         std::process::exit(1)
-    })
+    });
+    if let Some(template_dir) = user_templates {
+        for entry in WalkDir::new(template_dir) {
+            if entry.as_ref().is_ok_and(|e| e.file_type().is_dir()) {
+                continue;
+            }
+            let path = entry.as_ref().unwrap().path();
+            if let Err(e) =
+                tera.add_template_file(path, path.strip_prefix(template_dir).unwrap().to_str())
+            {
+                println!("Problem adding template file: {:?}", e);
+                std::process::exit(1)
+            }
+        }
+        if let Err(e) = tera.build_inheritance_chains() {
+            println!("Problem building inheritance chains: {:?}", e);
+            std::process::exit(1)
+        }
+    }
+    tera
 }
 
 pub fn create_user_home_templates_directory() -> PathBuf {
@@ -166,28 +185,8 @@ pub fn render_output(
     font_face_new: CSSFontFace,
     font_style_old: CSSFontStyle,
     font_style_new: CSSFontStyle,
-    user_templates: Option<&String>,
+    tera: &Tera,
 ) -> Result<String, tera::Error> {
-    let mut tera = template_engine();
-    if let Some(template_dir) = user_templates {
-        for entry in WalkDir::new(template_dir) {
-            if entry.as_ref().is_ok_and(|e| e.file_type().is_dir()) {
-                continue;
-            }
-            let path = entry.as_ref().unwrap().path();
-            if let Err(e) =
-                tera.add_template_file(path, path.strip_prefix(template_dir).unwrap().to_str())
-            {
-                println!("Problem adding template file: {:?}", e);
-                std::process::exit(1)
-            }
-        }
-        if let Err(e) = tera.build_inheritance_chains() {
-            println!("Problem building inheritance chains: {:?}", e);
-            std::process::exit(1)
-        }
-    }
-
     tera.render(
         "diffenator.html",
         &Context::from_serialize(json!({
