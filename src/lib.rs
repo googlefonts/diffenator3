@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use cfg_if::cfg_if;
 
 pub mod dfont;
@@ -14,6 +12,7 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(target_family = "wasm")] {
+        use std::collections::HashMap;
         use dfont::DFont;
         use render::{test_font_glyphs, test_font_words};
         use serde_json::json;

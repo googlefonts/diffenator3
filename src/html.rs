@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use lazy_static::lazy_static;
 use serde::Serialize;
@@ -95,14 +98,63 @@ impl CSSFontStyle {
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
-        match Tera::new("templates/*") {
-            Ok(t) => t,
-            Err(e) => {
-                eprintln!("Parsing error(s): {}", e);
-                ::std::process::exit(1);
-            }
-        }
+        let homedir = create_user_home_templates_directory();
+        Tera::new(&format!("{}/*", homedir.to_str().unwrap())).unwrap_or_else(|e| {
+            println!("Problem parsing templates: {:?}", e);
+            std::process::exit(1)
+        })
     };
+}
+
+pub fn create_user_home_templates_directory() -> PathBuf {
+    let home = homedir::my_home()
+        .expect("Couldn't got home directory")
+        .expect("No home directory found");
+    let templates_dir = home.join(".diffenator3/templates");
+    if !templates_dir.exists() {
+        std::fs::create_dir_all(&templates_dir)
+            .expect(format!("Couldn't create {}", templates_dir.to_str().unwrap()).as_str());
+    }
+    let all_templates = [
+        ["_base.html", include_str!("templates/_base.html")],
+        [
+            "CSSFontFace.partial.html",
+            include_str!("templates/CSSFontFace.partial.html"),
+        ],
+        [
+            "CSSFontStyle.partial.html",
+            include_str!("templates/CSSFontStyle.partial.html"),
+        ],
+        [
+            "Glyph.partial.html",
+            include_str!("templates/Glyph.partial.html"),
+        ],
+        [
+            "GlyphDiff.partial.html",
+            include_str!("templates/GlyphDiff.partial.html"),
+        ],
+        [
+            "Word.partial.html",
+            include_str!("templates/Word.partial.html"),
+        ],
+        [
+            "WordDiff.partial.html",
+            include_str!("templates/WordDiff.partial.html"),
+        ],
+        ["script.js", include_str!("templates/script.js")],
+        ["style.css", include_str!("templates/style.css")],
+        ["diffenator.html", include_str!("templates/diffenator.html")],
+    ];
+    for template in all_templates.iter() {
+        let path = templates_dir.join(template[0]);
+        if !path.exists() {
+            std::fs::write(&path, template[1]).expect(&format!(
+                "Couldn't write template file {}",
+                path.to_str().unwrap()
+            ));
+        }
+    }
+    templates_dir
 }
 
 pub fn render_output(
