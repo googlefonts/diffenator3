@@ -109,8 +109,10 @@ pub fn create_user_home_templates_directory() -> PathBuf {
         .expect("No home directory found");
     let templates_dir = home.join(".diffenator3/templates");
     if !templates_dir.exists() {
-        std::fs::create_dir_all(&templates_dir)
-            .expect(format!("Couldn't create {}", templates_dir.to_str().unwrap()).as_str());
+        std::fs::create_dir_all(&templates_dir).unwrap_or_else(|e| {
+            println!("Couldn't create {}: {}", templates_dir.to_str().unwrap(), e);
+            std::process::exit(1);
+        });
     }
     let all_templates = [
         ["_base.html", include_str!("templates/_base.html")],
@@ -145,10 +147,14 @@ pub fn create_user_home_templates_directory() -> PathBuf {
     for template in all_templates.iter() {
         let path = templates_dir.join(template[0]);
         if !path.exists() {
-            std::fs::write(&path, template[1]).expect(&format!(
-                "Couldn't write template file {}",
-                path.to_str().unwrap()
-            ));
+            std::fs::write(&path, template[1]).unwrap_or_else(|e| {
+                println!(
+                    "Couldn't write template file {}: {}",
+                    path.to_str().unwrap(),
+                    e
+                );
+                std::process::exit(1)
+            });
         }
     }
     templates_dir
