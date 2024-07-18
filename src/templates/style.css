@@ -1,0 +1,189 @@
+html {
+    font-family: sans-serif;
+}
+
+@font-face {
+    font-family: "Adobe NotDef";
+    src: url(https://cdn.jsdelivr.net/gh/adobe-fonts/adobe-notdef/AND-Regular.ttf);
+}
+
+.box-title {
+    width: 100%;
+    font-size: 8pt;
+    font-weight: 700;
+    border-top: 1px solid black;
+    padding-top: 5px;
+    margin-bottom: 10pt;
+    display: block;
+}
+
+.box {
+    margin-bottom: 20pt;
+    width: 100%;
+    float: left;
+}
+
+.box-text {}
+
+#nav {
+    position: fixed;
+    right: 20px;
+    z-index: 100;
+}
+
+#font-toggle {}
+
+.nav-item {
+    display: block;
+    cursor: pointer;
+    -webkit-user-select: none;
+    /* Safari */
+    -moz-user-select: none;
+    /* Firefox */
+    -ms-user-select: none;
+    /* IE10+/Edge */
+    user-select: none;
+    /* Standard */
+    text-align: center;
+    color: white;
+    background-color: black;
+    display: block;
+    font-size: 9pt;
+    padding: 5px;
+    margin: 2px;
+}
+
+.tooltip {
+    position: relative;
+    display: inline-block;
+    border-bottom: 1px dotted black;
+}
+
+.tooltip .tooltiptext {
+    font-family: sans-serif;
+    visibility: hidden;
+    width: 500px;
+    background-color: black;
+    color: #fff;
+    text-align: left;
+    font-size: 12pt;
+    line-height: 15pt;
+    border-radius: 6px;
+    padding: 5px 0;
+
+    /* Position the tooltip */
+    position: absolute;
+    z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+    padding: 10px;
+    visibility: visible;
+}
+
+.tooltipleft {
+    float: left;
+    width: 249px;
+}
+
+.tooltipright {
+    float: right;
+    width: 250px;
+}
+
+/* Stuff needed for the table differ */
+body {
+    font-family: Helvetica;
+}
+
+.node {
+    font-family: courier;
+    cursor: pointer;
+    position: relative;
+    left: 30px;
+    padding: 5px;
+    display: block;
+    border: 1px dashed grey;
+}
+
+.header {
+    font-weight: bold;
+}
+
+.attr-before {
+    color: red;
+    cursor: text;
+}
+
+.attr-after {
+    color: green;
+    cursor: text;
+}
+
+.leaf {
+    font-weight: bold;
+}
+
+.old .cell .new {
+    display: none;
+}
+
+.new .cell .old {
+    display: none;
+}
+
+.both .cell .old {
+    opacity: 0.75;
+    color: red;
+}
+
+.both .cell .new {
+    opacity: 0.75;
+    position: absolute;
+    top: 0;
+    color: green;
+}
+
+.spacer {
+    display: block;
+    float: left;
+    width: 100%;
+}
+
+#ot-panel {
+    max-height: 400px;
+    overflow-y: scroll;
+    background: white;
+    padding: 10px;
+    display: none;
+   }
+
+   .cell{
+    z-index: -100;
+    float: left;
+    display: block;
+    text-align: center;
+    padding: 5pt;
+    margin: 5pt;
+    width: 50pt;
+    line-height: {{ pt_size | int * 1.5}}px;
+  }
+  .cell-word{
+    z-index: -100;
+    float: left;
+    display: block;
+    text-align: center;
+    padding: 5pt;
+    margin: 5pt;
+    line-height: {{ pt_size | int * 1.5}}px;
+  }
+  .cat-strings .cell {
+    clear: both;
+    position: static;
+    float: none;
+    text-align: left;
+  }
+  .box-title {
+    clear: both;
+  }
+  
