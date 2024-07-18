@@ -1,8 +1,11 @@
+mod encodedglyphs;
 mod renderer;
 mod utils;
 mod wordlists;
 
+use crate::dfont::DFont;
 use cfg_if::cfg_if;
+pub use encodedglyphs::{modified_encoded_glyphs, new_missing_glyphs};
 use image::{GenericImage, GrayImage, ImageBuffer};
 use renderer::Renderer;
 use rustybuzz::Direction;
@@ -20,67 +23,7 @@ cfg_if! {
     }
 }
 
-use crate::dfont::DFont;
-
 const FUZZ: u8 = 20;
-
-pub fn test_fonts(font_a: &DFont, font_b: &DFont) -> Value {
-    let words = test_font_words(font_a, font_b);
-    json!({
-        "glyphs": test_font_glyphs(font_a, font_b),
-        "words": words
-    })
-}
-
-fn chars_to_json_array<'a>(chars: impl Iterator<Item = &'a u32>) -> Value {
-    let array: Vec<Value> = chars
-        .map(|i| char::from_u32(*i))
-        .filter(|x| x.is_some())
-        .map(|c| {
-            json!({
-                "string": c.unwrap().to_string(),
-                "name": unicode_names2::name(c.unwrap())
-                        .map(|n| n.to_string())
-                        .unwrap_or_default(),
-                "unicode": format!("U+{:04X}", c.unwrap() as u32),
-            })
-        })
-        .collect();
-    Value::Array(array)
-}
-
-pub fn test_font_glyphs(font_a: &DFont, font_b: &DFont) -> Value {
-    let cmap_a = &font_a.codepoints;
-    let cmap_b = &font_b.codepoints;
-    let missing_glyphs = cmap_a.difference(cmap_b);
-    let new_glyphs = cmap_b.difference(cmap_a);
-    let same_glyphs = cmap_a.intersection(cmap_b);
-    let threshold = 0.1;
-    let word_list: Vec<String> = same_glyphs
-        .map(|i| char::from_u32(*i))
-        .filter(|x| x.is_some())
-        .map(|c| c.unwrap().to_string())
-        .collect();
-    let mut result: Vec<GlyphDiff> = diff_many_words(
-        font_a,
-        font_b,
-        40.0,
-        word_list,
-        threshold,
-        Direction::LeftToRight,
-        None,
-    )
-    .into_iter()
-    .map(|x| x.into())
-    .collect();
-    result.sort_by_key(|x| (-x.percent * 10_000.0) as i32);
-
-    json!({
-        "missing": chars_to_json_array(missing_glyphs),
-        "new": chars_to_json_array(new_glyphs),
-        "modified": result
-    })
-}
 
 pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
     let mut map = serde_json::Map::new();

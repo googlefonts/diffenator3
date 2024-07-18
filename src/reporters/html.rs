@@ -1,5 +1,6 @@
+use crate::utils::die;
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{json, Map};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -8,6 +9,56 @@ use tera::{Context, Tera};
 use walkdir::WalkDir;
 
 use crate::dfont::DFont;
+
+pub fn report(
+    font1_pb: &PathBuf,
+    font2_pb: &PathBuf,
+    output_dir: &Path,
+    font_a: &DFont,
+    font_b: &DFont,
+    diff: Map<String, serde_json::Value>,
+    tera: Tera,
+) -> ! {
+    // Make output directory
+    if !output_dir.exists() {
+        std::fs::create_dir(output_dir).expect("Couldn't create output directory");
+    }
+
+    // Copy old font to output/old-<existing name>
+    let old_font = output_dir.join(format!(
+        "old-{}",
+        font2_pb.file_name().unwrap().to_str().unwrap()
+    ));
+    std::fs::copy(font1_pb, &old_font).expect("Couldn't copy old font");
+    let new_font = output_dir.join(format!(
+        "new-{}",
+        font2_pb.file_name().unwrap().to_str().unwrap()
+    ));
+    std::fs::copy(font2_pb, &new_font).expect("Couldn't copy new font");
+
+    let font_face_old = CSSFontFace::new(&old_font, "old", font_a);
+    let font_face_new = CSSFontFace::new(&new_font, "new", font_b);
+    let font_style_old = CSSFontStyle::new(font_a, Some("old"));
+    let font_style_new = CSSFontStyle::new(font_b, Some("new"));
+    let value = serde_json::to_value(&diff).unwrap_or_else(|e| {
+        die("serializing diff", e);
+    });
+    let html = render_output(
+        &value,
+        font_face_old,
+        font_face_new,
+        font_style_old,
+        font_style_new,
+        &tera,
+    )
+    .unwrap_or_else(|err| die("rendering HTML", err));
+
+    // Write output
+    let output_file = output_dir.join("diffenator.html");
+    println!("Writing output to {}", output_file.to_str().unwrap());
+    std::fs::write(output_file, html).expect("Couldn't write output file");
+    std::process::exit(0);
+}
 
 #[derive(Debug, Serialize)]
 pub struct CSSFontFace {
@@ -140,34 +191,37 @@ pub fn create_user_home_templates_directory() -> PathBuf {
         });
     }
     let all_templates = [
-        ["_base.html", include_str!("templates/_base.html")],
+        ["_base.html", include_str!("../templates/_base.html")],
         [
             "CSSFontFace.partial.html",
-            include_str!("templates/CSSFontFace.partial.html"),
+            include_str!("../templates/CSSFontFace.partial.html"),
         ],
         [
             "CSSFontStyle.partial.html",
-            include_str!("templates/CSSFontStyle.partial.html"),
+            include_str!("../templates/CSSFontStyle.partial.html"),
         ],
         [
             "Glyph.partial.html",
-            include_str!("templates/Glyph.partial.html"),
+            include_str!("../templates/Glyph.partial.html"),
         ],
         [
             "GlyphDiff.partial.html",
-            include_str!("templates/GlyphDiff.partial.html"),
+            include_str!("../templates/GlyphDiff.partial.html"),
         ],
         [
             "Word.partial.html",
-            include_str!("templates/Word.partial.html"),
+            include_str!("../templates/Word.partial.html"),
         ],
         [
             "WordDiff.partial.html",
-            include_str!("templates/WordDiff.partial.html"),
+            include_str!("../templates/WordDiff.partial.html"),
         ],
-        ["script.js", include_str!("templates/script.js")],
-        ["style.css", include_str!("templates/style.css")],
-        ["diffenator.html", include_str!("templates/diffenator.html")],
+        ["script.js", include_str!("../templates/script.js")],
+        ["style.css", include_str!("../templates/style.css")],
+        [
+            "diffenator.html",
+            include_str!("../templates/diffenator.html"),
+        ],
     ];
     for template in all_templates.iter() {
         let path = templates_dir.join(template[0]);

@@ -6,7 +6,8 @@ pub mod ttj;
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
-        pub mod html;
+        pub mod reporters;
+        pub mod utils;
     }
 }
 
