@@ -1,6 +1,6 @@
 function diffTables_statichtml() {
   $("#difftable").empty();
-  $("#difftable").append(`<h2 class="mt-2">Table Diff</h2>`);
+  $("#difftable").append(`<h4 class="mt-2 box-title">Table-level details</h4>`);
   $("#difftable").append(
     renderTableDiff({ tables: report["tables"] }, true).children()
   );
@@ -13,6 +13,7 @@ function diffTables_statichtml() {
 
 function cmapDiff_static_html() {
   if (report.cmap_diff && (report.cmap_diff.new || report.cmap_diff.missing)) {
+	$("#cmapdiff").append(`<h2 class="mt-2">Added and Removed Encoded Glyphs</h2>`);
     if (report["cmap_diff"]["new"]) {
       $("#cmapdiff").append(`<h4 class="box-title">Added Glyphs</h4>`);
       let added = $("<div>");
@@ -48,8 +49,7 @@ function buildLocation_statichtml(loc) {
 
 	$("#main").empty();
 
-	$("#main").append(`<h2 class="mt-2">${loc.location}</h2>`);
-	$("#main").append(`<h4>${textLocation}</h2>`);
+	$("#main").append(`<h4 class="mt-2">${textLocation}</h2>`);
 
 	if (loc.glyphs) {
 		$("#main").append("<h5 class='box-title'>Modified Glyphs</h5>");
@@ -80,7 +80,6 @@ $(function () {
   if (report["tables"]) {
     diffTables_statichtml();
   }
-  $("#cmapdiff").append(`<h2 class="mt-2">Added and Removed Encoded Glyphs</h2>`);
   cmapDiff_static_html();
   $('[data-toggle="tooltip"]').tooltip()
 
@@ -91,9 +90,10 @@ $(function () {
     $("#locationnav").append(loc_nav);
   }
   $("#locationnav li a").on("click", function (e) {
+	$("#locationnav li a").removeClass("active");
+	$(this).addClass("active");
     buildLocation_statichtml(report.locations[$(this).data("index")]);
   });
-  $("#locationnav li a").eq(0).addClass("active");
   $("#locationnav li a").eq(0).click();
 
   $("#fonttoggle").click(function () {

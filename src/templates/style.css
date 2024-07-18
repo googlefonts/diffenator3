@@ -138,14 +138,39 @@ body {
     text-align: center;
     padding: 5pt;
     margin: 5pt;
+    background: #fafafd;
     font-size: {{ pt_size | int}}px;
     line-height: {{ pt_size | int * 1.5}}px;
+  }
+  .cell-glyph{
+    z-index: -100;
+    float: left;
+    display: block;
+    text-align: center;
+    background: #e9e9ee;
+    border-radius: 5pt;
+    box-shadow: rgba(0, 0, 0, 0.15) 1.95px 1.95px 2.6px;
+    padding: 5pt;
+    margin: 5pt;
+    width: {{ pt_size | int * 2}}px;
+    min-height: {{ pt_size | int * 2}}px;
+    font-size: {{ pt_size | int}}px;
+  }
+  .cell-glyph:hover {
+    box-shadow: none;
+    background: #f0f0f5;
   }
   .cat-strings .cell {
     clear: both;
     position: static;
     float: none;
     text-align: left;
+  }
+  .codepoint {
+    text-align: center;
+    font-family: sans-serif;
+    font-size: 10pt;
+    line-height: 10pt;
   }
   .box-title {
     clear: both;

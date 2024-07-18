@@ -43,12 +43,13 @@ function addAGlyph(glyph, where) {
     if (glyph.name) {
         title = "name: "+glyph.name;
     }
-    title += "<br>U+"+glyph.string.charCodeAt(0).toString(16).padStart(4, '0').toUpperCase();
+    let cp = "<br>U+"+glyph.string.charCodeAt(0).toString(16).padStart(4, '0').toUpperCase();
     where.append(`
-        <div class="cell-word font-before">
-        <span data-toggle="tooltip" data-html="true" data-title="${title}">
+        <div class="cell-glyph font-before">
         ${glyph.string}
-        </span>
+        <div class="codepoint" data-toggle="tooltip" data-html="true" data-title="${title}">
+		${cp}
+        </div>
         </div>
     `);
 }
