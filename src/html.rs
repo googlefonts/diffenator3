@@ -106,16 +106,22 @@ pub fn template_engine(user_templates: Option<&String>) -> Tera {
             if entry.as_ref().is_ok_and(|e| e.file_type().is_dir()) {
                 continue;
             }
-            let path = entry.as_ref().unwrap().path();
+            let path = entry
+                .as_ref()
+                .unwrap_or_else(|e| {
+                    println!("Problem reading template path: {:}", e);
+                    std::process::exit(1)
+                })
+                .path();
             if let Err(e) =
                 tera.add_template_file(path, path.strip_prefix(template_dir).unwrap().to_str())
             {
-                println!("Problem adding template file: {:?}", e);
+                println!("Problem adding template file: {:}", e);
                 std::process::exit(1)
             }
         }
         if let Err(e) = tera.build_inheritance_chains() {
-            println!("Problem building inheritance chains: {:?}", e);
+            println!("Problem building inheritance chains: {:}", e);
             std::process::exit(1)
         }
     }
