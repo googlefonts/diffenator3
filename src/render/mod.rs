@@ -2,6 +2,7 @@ mod renderer;
 mod utils;
 mod wordlists;
 
+use cfg_if::cfg_if;
 use image::{GenericImage, GrayImage, ImageBuffer};
 use renderer::Renderer;
 use rustybuzz::Direction;
@@ -9,14 +10,13 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
-use cfg_if::cfg_if;
-
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
         use indicatif::ParallelProgressIterator;
         use rayon::{iter::ParallelIterator, prelude::IntoParallelRefIterator};
         use thread_local::ThreadLocal;
         use std::cell::RefCell;
+        use std::sync::RwLock;
     }
 }
 
@@ -176,7 +176,8 @@ pub(crate) fn diff_many_words(
 ) -> Vec<Difference> {
     let tl_a = ThreadLocal::new();
     let tl_b = ThreadLocal::new();
-    let tl_cache = ThreadLocal::new();
+    // The cache should not be thread local
+    let seen_glyphs = RwLock::new(HashSet::new());
     let differences: Vec<Option<Difference>> = wordlist
         .par_iter()
         .progress()
@@ -185,19 +186,17 @@ pub(crate) fn diff_many_words(
                 tl_a.get_or(|| RefCell::new(Renderer::new(font_a, font_size, direction, script)));
             let renderer_b =
                 tl_b.get_or(|| RefCell::new(Renderer::new(font_b, font_size, direction, script)));
-            let seen_glyphs: &RefCell<HashSet<String>> =
-                tl_cache.get_or(|| RefCell::new(HashSet::new()));
 
             let (buffer_a, commands_a) =
                 renderer_a.borrow_mut().string_to_positioned_glyphs(word)?;
             if buffer_a
                 .split('|')
-                .all(|glyph| seen_glyphs.borrow().contains(glyph))
+                .all(|glyph| seen_glyphs.read().unwrap().contains(glyph))
             {
                 return None;
             }
             for glyph in buffer_a.split('|') {
-                seen_glyphs.borrow_mut().insert(glyph.to_string());
+                seen_glyphs.write().unwrap().insert(glyph.to_string());
             }
             let (buffer_b, commands_b) =
                 renderer_b.borrow_mut().string_to_positioned_glyphs(word)?;
