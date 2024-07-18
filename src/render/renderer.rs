@@ -73,10 +73,12 @@ impl<'a> Renderer<'a> {
                 .get(GlyphId::new(info.glyph_id as u16))
                 .unwrap()
                 .draw(settings, &mut pen);
-            serialized_buffer.push_str(&format!(
-                "gid={},position={},{}|",
-                info.glyph_id, position.x_offset, position.y_offset
-            ));
+            serialized_buffer.push_str(&format!("{}", info.glyph_id,));
+            if position.x_offset != 0 || position.y_offset != 0 {
+                serialized_buffer
+                    .push_str(&format!("@{},{}", position.x_offset, position.y_offset));
+            }
+            serialized_buffer.push('|');
             cursor += position.x_advance as f32 * factor;
         }
         if serialized_buffer.is_empty() {
