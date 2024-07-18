@@ -34,7 +34,18 @@ impl DFont {
         self.normalized_location = self.fontref().axes().location(&self.location);
         Ok(())
     }
-
+    pub fn instances(&mut self) -> Vec<String> {
+        self.fontref()
+            .named_instances()
+            .iter()
+            .flat_map(|ni| {
+                self.fontref()
+                    .localized_strings(ni.subfamily_name_id())
+                    .english_or_first()
+            })
+            .map(|s| s.to_string())
+            .collect()
+    }
     pub fn set_instance(&mut self, instance: &str) -> Result<(), String> {
         let instance = self
             .fontref()

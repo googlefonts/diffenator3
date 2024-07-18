@@ -1,3 +1,5 @@
+use super::{LocationResult, Report};
+
 use crate::ttj::jsondiff::Substantial;
 use colored::Colorize;
 use serde_json::Map;
@@ -40,9 +42,9 @@ fn show_map_diff(fields: &Map<String, serde_json::Value>, indent: usize, succinc
     }
 }
 
-pub fn report(result: Map<String, tera::Value>, succinct: bool) {
-    if result.contains_key("tables") {
-        for (table_name, diff) in result["tables"].as_object().unwrap().iter() {
+pub fn report(result: Report, succinct: bool) {
+    if let Some(tables) = result.tables {
+        for (table_name, diff) in tables.as_object().unwrap().iter() {
             if diff.is_something() {
                 println!("\n# {}", table_name);
             }
@@ -64,40 +66,50 @@ pub fn report(result: Map<String, tera::Value>, succinct: bool) {
         }
     }
 
-    if result.contains_key("glyphs") {
-        println!("\n# Glyphs");
-        let display_glyph = |glyph: &serde_json::Value| {
-            println!(
-                "  - {} ({}: {}) {:.3}%",
-                glyph["string"].as_str().unwrap(),
-                glyph["unicode"].as_str().unwrap(),
-                glyph["name"].as_str().unwrap(),
-                glyph["percent"].as_f64().unwrap()
-            );
-        };
-        let map = result["glyphs"].as_object().unwrap();
-        if map["missing"].is_something() {
+    if let Some(cmap_diff) = result.cmap_diff {
+        println!("\n# Encoded Glyphs");
+        if !cmap_diff.missing.is_empty() {
             println!("\nMissing glyphs:");
-            for glyph in map["missing"].as_array().unwrap() {
-                display_glyph(glyph);
+            for glyph in cmap_diff.missing {
+                println!(" - {} ", glyph);
             }
         }
-        if map["new"].is_something() {
+        if !cmap_diff.new.is_empty() {
             println!("\nNew glyphs:");
-            for glyph in map["new"].as_array().unwrap() {
-                display_glyph(glyph);
-            }
-        }
-        if map["modified"].is_something() {
-            println!("\nModified glyphs:");
-            for glyph in map["modified"].as_array().unwrap() {
-                display_glyph(glyph);
+            for glyph in cmap_diff.new {
+                println!(" - {} ", glyph);
             }
         }
     }
-    if result.contains_key("words") {
+
+    for locationresult in result.locations {
+        if locationresult.is_some() {
+            report_location(locationresult);
+        }
+    }
+}
+
+fn report_location(locationresult: LocationResult) {
+    print!("# Differences at location {} ", locationresult.location);
+    if !locationresult.coords.is_empty() {
+        print!("( ");
+        for (k, v) in locationresult.coords.iter() {
+            print!("{}: {}, ", k, v);
+        }
+        print!(")");
+    }
+    println!();
+
+    if !locationresult.glyphs.is_empty() {
+        println!("\n## Glyphs");
+        for glyph in locationresult.glyphs {
+            println!(" - {} ({:.3}%)", glyph.string, glyph.percent);
+        }
+    }
+
+    if let Some(words) = locationresult.words {
         println!("# Words");
-        let map = result["words"].as_object().unwrap();
+        let map = words.as_object().unwrap();
         for (script, script_diff) in map.iter() {
             println!("\n## {}", script);
             for difference in script_diff.as_array().unwrap().iter() {

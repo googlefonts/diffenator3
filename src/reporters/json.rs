@@ -1,4 +1,6 @@
-pub fn report(result: serde_json::Value, pretty: bool) {
+use super::Report;
+
+pub fn report(result: Report, pretty: bool) {
     if pretty {
         println!("{}", serde_json::to_string_pretty(&result).expect("foo"));
     } else {

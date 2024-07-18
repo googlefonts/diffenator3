@@ -1,248 +1,64 @@
-{% extends "_base.html" %}
-{% block title %}Glyphs{% endblock %}
-{% block style %}
-{{ super() }}
-.cell{
-  z-index: -100;
-  float: left;
-  display: block;
-  text-align: center;
-  padding: 5pt;
-  margin: 5pt;
-  width: 50pt;
-  line-height: {{ pt_size | int * 1.5}}px;
-}
-.cell-word{
-  z-index: -100;
-  float: left;
-  display: block;
-  text-align: center;
-  padding: 5pt;
-  margin: 5pt;
-  line-height: {{ pt_size | int * 1.5}}px;
-}
-.cat-strings .cell {
-  clear: both;
-  position: static;
-  float: none;
-  text-align: left;
-}
-.box-title {
-  clear: both;
-}
-{% endblock %}
-{% block content_name %}
-<b>Diffenator3</b>
-{% endblock %}
-{% block content %}
-  {% for font_class in font_styles_old %}
-    {% if diff["tables"] %}
-    <div class="box">
-      <div class="box-title">Tables</div>
-      <div data-path="root" data-open="0" id="difftable"></div>
-    </div>
-    {% endif %}
-    
-    {% if diff["glyphs"].new %}
-      <div class="box">
-        <div class="box-title">New encoded glyphs</div>
-        <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
-          {% for glyph in diff["glyphs"].new %}
-            <div class="cell">
-              {% include "Glyph.partial.html" %}
-            </div>
-          {% endfor %}
-          </div>
-      </div>
-    {% endif %}
-    
-    
-    {% if diff["glyphs"].missing %}
-      <div class="box">
-        <div class="box-title">Missing encoded Glyphs</div>
-        <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
-          {% for glyph in diff["glyphs"].missing %}
-            <div class="cell">
-              {% include "Glyph.partial.html" %}
-            </div>
-          {% endfor %}
-          </div>
-      </div>
-    {% endif %}
-    
-    {% if diff["glyphs"].modified %}
-      <div class="box">
-        <div class="box-title">Modified encoded Glyphs</div>
-        <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
-          {% for glyph in diff["glyphs"].modified %}
-            <div class="cell">
-              {% include "Glyph.partial.html" %}
-            </div>
-          {% endfor %}
-          </div>
-      </div>
-    {% endif %}
+<!DOCTYPE html>
+<html lang="en" dir="auto">
 
-    {% if diff["words"] %}
-    {% for script, words in diff["words"] %}
-      <div class="box">
-        <div class="box-title">Misshapen {{ script }} words</div>
-        <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
-          {% for diff in words %}
-              {% include "WordDiff.partial.html" %}
-          {% endfor %}
-        </div>
-      </div>
-    {% endfor %}
-    {% endif %}
-    
-    {% if diff["strings"] %}
-    <div class="box">
-      <div class="box-title">Misshapen user strings</div>
-      <div class="box-text {{ font_class.class_name }}" style="font-size: {{ pt_size }}pt">
-        {% for diff in diff.strings %}
-          {% include "WordDiff.partial.html" %}
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-    
-    {% if diff["features"] %}
-      <div class="box">
-        <div class="box-title">Fea</div>
-        {{ diff.features }}
-      </div>
-    {% endif %}
-  {% endfor %}
-
-<script>
-  fontdiff={{ diff.tables | json_encode() | safe  }};
-</script>
-{% endblock %}
-{% block js %}
-  class Table {
-      constructor(data) {
-          this.data = {"root": data}
-          this.open("root")
-      }
-
-      createNode(key, label) {
-          let childElem = document.createElement("div")
-          let childKey = key
-          childElem.dataset.path = childKey
-          childElem.dataset.open = "0"
-          childElem.innerHTML = label
-          childElem.classList.add("node")
-          return childElem
-      }
-
-      close(key) {
-          let htmlParent = document.querySelector(`[data-path="${key}"]`)
-          let label = htmlParent.childNodes[0].nodeValue
-          htmlParent.replaceChildren()
-          htmlParent.textContent = label
-          htmlParent.dataset.open = "0"
-      }
-
-      open(key) {
-          let htmlParent = document.querySelector(`[data-path="${key}"]`)
-          htmlParent.dataset.open = "1"
-
-          // traverse to correct data level based on data-path
-          let path = key.split(".")
-          let data = this.data
-          for (var i=0; i<path.length; i++) {
-              data = data[path[i]];
-
-          }
-
-          // arrays containing two values are used as leaf nodes.
-          // The first item is the before value and the second
-          // is for after value.
-          if (Array.isArray(data)) {
-              let childElem = this.createNode("", "")
-              let before = document.createElement("span")
-              before.classList.add("attr-before")
-              before.textContent = String(data[0]) + " "
-              let after = document.createElement("span")
-              after.classList.add("attr-after")
-              after.textContent = String(data[1])
-              childElem.appendChild(before)
-              childElem.appendChild(after)
-              htmlParent.appendChild(childElem)
-              return
-          }
-          // Create next child nodes
-          for (var i in data) {
-              let childKey = key + "." + i
-              let childElem = this.createNode(childKey, i)
-              htmlParent.appendChild(childElem);
-              var that = this
-
-              // Toggle whether to open or close a node
-              childElem.addEventListener("click", function() {
-                  if (this.dataset.open === "0") {
-                      that.open(childKey)
-                      event.stopPropagation()
-                  } else {
-                      that.close(childKey)
-                      event.stopPropagation()
-                  }
-              })
-          }
-      }
-  }
-
-  let t = new Table(fontdiff, document.getElementById("difftable"))
-
-
-function wordBreaks() {
-  words = document.getElementsByClassName("cell-word")
-  res = []
-  prevTop = 0
-  for (i=0; i<words.length; i++) {
-      var word = words[i]
-      currentTop = word.getBoundingClientRect().top
-      if (currentTop > prevTop) {
-          res.push(i)
-      }
-      prevTop = currentTop
-  }
-  return res
-}
-
-async function insertBreaks() {
-  switchFonts()
-  await sleep(1)
-  breaksBefore = wordBreaks()
-  switchFonts()
-  await sleep(1)
-  breaksAfter = wordBreaks()
-
-
-  console.log(breaksBefore.length, breaksAfter.length)
-
-  if (breaksBefore.length >= breaksAfter.length) {
-    breaks = breaksBefore
-  } else {
-    breaks = breaksAfter
-  }
-
-  words = document.getElementsByClassName("cell-word")
-  breaks.forEach(function(i) {
-    if (i != 0) {
-      i = i
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<title>Diffenator3</title>
+	<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"
+		integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct"
+		crossorigin="anonymous"></script>
+	<style type="text/css">
+		@font-face {
+      font-family: "Font Before";
+      src: url();
     }
-    word = words[i]
-    spacer = document.createElement("div")
-    spacer.className = "spacer"
-    word.parentNode.insertBefore(spacer, word)
-  })
-}
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-  
-insertBreaks()
-{% endblock %}
+    @font-face {
+      font-family: "Font After";
+      src: url();
+    }
+
+    .font-before, .font-after {
+      font-variation-settings: "wght" 400, "wdth" 100;
+    }
+
+    .font-before {
+      font-family: "Font Before", "Adobe Notdef";
+    }
+
+    .font-after {
+      font-family: "Font After", "Adobe Notdef";
+    }
+
+	{% include "style.css" %}
+		</style>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+	integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+
+</head>
+
+<body>
+	<div class="container">
+
+		<div id="ui-nav">
+		  <div class="ui-nav-item" id="fonttoggle">Old</div>
+		  <div id="axes">
+		  </div>
+		</div>
+	
+		<div id="difftable"> </div>
+		<div id="cmapdiff"> </div>
+
+		<ul class="nav nav-tabs" id="locationnav">
+		</ul>
+		<div id="main"></div>
+	</div>
+	<script type="module">
+		{% include "shared.js" %}
+	var report = {{ report | json_encode | safe }};
+		{% include "script.js" %}
+	</script>
+</body>
+
+</html>

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     dfont::DFont,
     render::{diff_many_words, GlyphDiff},
@@ -12,12 +14,34 @@ pub struct EncodedGlyph {
     pub name: Option<String>,
 }
 
+impl Display for EncodedGlyph {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} (U+{:04X})",
+            self.string,
+            self.string.chars().next().unwrap() as u32
+        )?;
+        if let Some(name) = &self.name {
+            write!(f, " {}", name)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub struct CmapDiff {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub missing: Vec<EncodedGlyph>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub new: Vec<EncodedGlyph>,
+}
+
+impl CmapDiff {
+    pub fn is_some(&self) -> bool {
+        !self.missing.is_empty() || !self.new.is_empty()
+    }
 }
 
 fn chars_to_json_array(chars: impl Iterator<Item = u32>) -> impl Iterator<Item = EncodedGlyph> {

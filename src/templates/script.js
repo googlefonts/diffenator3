@@ -1,107 +1,117 @@
-
-	POSITION = "old"
-	fontToggle = document.getElementById("font-toggle")
-	function switchFonts() {
-	boxTitles = document.getElementsByClassName("box-title")
-	items = document.getElementsByClassName("box-text");
-	  
-	if (POSITION === "old") {
-	  POSITION = "new"
-	  for (item of boxTitles) {
-	    item.textContent = item.textContent.replace("old", "new")
-	    fontToggle.textContent = "new"
-	  }
-	  for (item of items) {
-		item.className = item.className.replace("old", "new")
-	  }
-
-	  } else {
-	  POSITION = "old"
-	  for (item of boxTitles) {
-	    item.textContent = item.textContent.replace("new", "old")
-	    fontToggle.textContent = "old"
-	  }
-	  for (item of items) {
-		item.className = item.className.replace("new", "old")
-	  }
-	}
-	}
-	if (fontToggle !== null) {
-		fontToggle.addEventListener("click", switchFonts);
-	}
-
-// apply optional ot feats
-
-function buildFeatureList() {
-	var features = [
-		'aalt', 'c2sc', 'calt', 'case', 'cpsp', 'dlig', 'dnom',
-		'fina', 'frac', 'init', 'kern', 'liga', 'lnum', 'numr', 'onum',
-		'ordn', 'pnum', 'salt', 'sinf', 'smcp', 'sups',
-		'swsh', 'titl', 'tnum', 'zero', 'ss01', 'ss02',
-		'ss03', 'ss04', 'ss05', 'ss06', 'ss07', 'ss08',
-		'ss09', 'ss10', 'ss11', 'ss12', 'ss13', 'ss14',
-		'ss15', 'ss16', 'ss17', 'ss18', 'ss19', 'ss20'
-	]
-	
-	var otPanel = document.getElementById("ot-panel")
-	for (i=0; i<features.length; i++) {
-		var feat = features[i]
-		
-		var row = document.createElement("div");
-
-		var item = document.createElement("input");
-		item.type = "checkbox"
-		item.value = feat
-		item.classList.add("ot-checkbox")
-		var label = document.createElement("label")
-		label.textContent = feat
-
-		row.appendChild(item)
-		row.appendChild(label)
-
-		otPanel.appendChild(row)
-	}
+function diffTables_statichtml() {
+  $("#difftable").empty();
+  $("#difftable").append(`<h2 class="mt-2">Table Diff</h2>`);
+  $("#difftable").append(
+    renderTableDiff({ tables: report["tables"] }, true).children()
+  );
+  $("#difftable .node").on("click", function (e) {
+    $(this).toggleClass("closed open");
+    $(this).children(".node").toggle();
+    e.stopPropagation();
+  });
 }
 
-buildFeatureList()
-
-
-function enableFeatures() {
-	var checkboxes = document.getElementsByClassName("ot-checkbox")
-	var res = []
-	var disableKerning = false
-	for (i=0; i<checkboxes.length; i++) {
-		if (checkboxes[i].checked === true) {
-			var checkbox = checkboxes[i]
-			res.push('"' + checkbox.value + '"')
-
-			if (checkbox.value === "kern") {
-				disableKerning = true
-			}
-		}
-	}	
-
-	var boxText = document.getElementsByClassName("box-text")
-	var otString = res.join(", ")
-	for (j=0; j<boxText.length; j++) {
-		boxText[j].style.fontFeatureSettings = otString
-		if (disableKerning === true) {
-			boxText[j].style.fontKerning = "none"
-		}
-	}
-}
-
-var otButton = document.getElementById("ot-button")
-otButton.addEventListener("click", function() {
-    otPanel = document.getElementById("ot-panel")
-    if (otPanel.style.display !== "block") {
-        otPanel.style.display = "block"
-    } else {
-        otPanel.style.display = "none"
+function cmapDiff_static_html() {
+  if (report.cmap_diff && (report.cmap_diff.new || report.cmap_diff.missing)) {
+    if (report["cmap_diff"]["new"]) {
+      $("#cmapdiff").append(`<h4 class="box-title">Added Glyphs</h4>`);
+      let added = $("<div>");
+      for (let glyph of report["cmap_diff"]["new"]) {
+        addAGlyph(glyph, added);
+      }
+      $("#cmapdiff").append(added);
     }
-})
-var checkboxes = document.getElementsByClassName("ot-checkbox")
-for (i=0; i<checkboxes.length; i++) {
-	cb = checkboxes[i]
-	cb.addEventListener("click", enableFeatures)
-}	
+
+    if (report["cmap_diff"]["missing"]) {
+      $("#cmapdiff").append(`<h4 class="box-title">Removed Glyphs</h4>`);
+      let missing = $("<div>");
+      for (let glyph of report["cmap_diff"]["missing"]) {
+        addAGlyph(glyph, missing);
+      }
+      $("#cmapdiff").append(missing);
+    }
+  } else {
+    $("#cmapdiff").append(`<p>No changes to encoded glyphs</p>`);
+  }
+}
+
+function buildLocation_statichtml(loc) {
+	// Set font styles to appropriate axis locations
+	let rule = document.styleSheets[0].cssRules[2].style
+	let cssSetting = Object.entries(loc.coords).map(function ([axis, value]) {
+		return `"${axis}" ${value}`
+	}).join(", ");
+	let textLocation = Object.entries(loc.coords).map(function ([axis, value]) {
+		return `${axis}=${value}`
+	}).join(" ");
+	rule.setProperty("font-variation-settings", cssSetting)
+
+	$("#main").empty();
+
+	$("#main").append(`<h2 class="mt-2">${loc.location}</h2>`);
+	$("#main").append(`<h4>${textLocation}</h2>`);
+
+	if (loc.glyphs) {
+		$("#main").append("<h5 class='box-title'>Modified Glyphs</h5>");
+		let glyphs = $("<div>");
+		for (let glyph of loc.glyphs) {
+			addAGlyph(glyph, glyphs);
+		}
+		$("#main").append(glyphs);
+	}
+
+	if (loc.words) {
+		$("#main").append("<h5 class='box-title'>Modified Words</h5>");
+		for (let [script, words] of Object.entries(loc.words)) {
+			let scriptTitle = $(`<h6>${script}</h6>`);
+			$("#main").append(scriptTitle);
+			let worddiv = $("<div>");
+			for (let word of words) {
+				addAWord(word, worddiv);
+			}
+			$("#main").append(worddiv);
+		}
+	}
+	$('[data-toggle="tooltip"]').tooltip()
+
+}
+
+$(function () {
+  if (report["tables"]) {
+    diffTables_statichtml();
+  }
+  $("#cmapdiff").append(`<h2 class="mt-2">Added and Removed Encoded Glyphs</h2>`);
+  cmapDiff_static_html();
+  $('[data-toggle="tooltip"]').tooltip()
+
+  for (var [index, loc] of report["locations"].entries()) {
+    var loc_nav = $(`<li class="nav-item">
+		<a class="nav-link" href="#" data-index="${index}">${loc.location}</a>
+	</li>`);
+    $("#locationnav").append(loc_nav);
+  }
+  $("#locationnav li a").on("click", function (e) {
+    buildLocation_statichtml(report.locations[$(this).data("index")]);
+  });
+  $("#locationnav li a").eq(0).addClass("active");
+  $("#locationnav li a").eq(0).click();
+
+  $("#fonttoggle").click(function () {
+    if ($(this).text() == "Old") {
+      $(this).text("New");
+      $(".font-before").removeClass("font-before").addClass("font-after");
+    } else {
+      $(this).text("Old");
+      $(".font-after").removeClass("font-after").addClass("font-before");
+    }
+  });
+
+  document.styleSheets[0].cssRules[0].style.setProperty(
+    "src",
+    "url({{ old_filename }})"
+  );
+  document.styleSheets[0].cssRules[1].style.setProperty(
+    "src",
+    "url({{ new_filename }})"
+  );
+});

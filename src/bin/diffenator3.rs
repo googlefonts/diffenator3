@@ -1,11 +1,13 @@
 use clap::{builder::ArgAction, Parser};
 use diffenator3::{
     dfont::DFont,
-    render::{modified_encoded_glyphs, new_missing_glyphs, test_font_words},
-    reporters::{self, html::template_engine},
+    render::{
+        encodedglyphs::{modified_encoded_glyphs, new_missing_glyphs},
+        test_font_words,
+    },
+    reporters::{self, html::template_engine, LocationResult, Report},
     ttj::{jsondiff::Substantial, table_diff},
 };
-use serde_json::{json, Map};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -68,8 +70,9 @@ struct Cli {
     /// Location in design space, in the form axis=123,other=456
     #[clap(long = "location")]
     location: Option<String>,
-    #[clap(long = "instance", conflicts_with = "location")]
-    instance: Option<String>,
+    /// List of instances to compare
+    #[clap(long = "instances", conflicts_with = "location")]
+    instances: Option<Vec<String>>,
 
     /// The first font file to compare
     font1: PathBuf,
@@ -88,56 +91,45 @@ fn main() {
     let mut font_a = DFont::new(&font_binary_a);
     let mut font_b = DFont::new(&font_binary_b);
 
-    let mut result = Map::new();
+    let mut result = Report::default();
 
     // Location-independent tests
     if cli.tables {
         let table_diff = table_diff(&font_a.fontref(), &font_b.fontref());
         if table_diff.is_something() {
-            result.insert("tables".into(), table_diff);
+            result.tables = Some(table_diff);
         }
     }
     if cli.glyphs {
-        let cmap_diff = new_missing_glyphs(&font_a, &font_b);
-        result.insert("cmap_diff".into(), json!(cmap_diff));
+        result.cmap_diff = Some(new_missing_glyphs(&font_a, &font_b));
     }
 
     // Location-specific tests
-    let mut location_results = vec![];
-    let mut this_location_value = Map::new();
 
-    let loc_name: String = if let Some(ref loc) = cli.location {
-        let _hack = font_a.set_location(loc);
-        let _hack = font_b.set_location(loc);
-        loc.clone()
-    } else if let Some(ref inst) = cli.instance {
-        font_a.set_instance(inst).expect("Couldn't find instance");
-        font_b.set_instance(inst).expect("Couldn't find instance");
-        inst.clone()
-    } else {
-        "default".into()
-    };
-    let loc_coords: HashMap<String, f32> = font_a
-        .location
-        .iter()
-        .map(|v| (v.selector.to_string(), v.value))
-        .collect();
-    this_location_value.insert("location".into(), json!(loc_name));
-    this_location_value.insert("coords".into(), json!(loc_coords));
+    // let loc_name: String = if let Some(ref loc) = cli.location {
+    //     let _hack = font_a.set_location(loc);
+    //     let _hack = font_b.set_location(loc);
+    //     loc.clone()
+    // } else if let Some(ref inst) = cli.instance {
+    //     font_a.set_instance(inst).expect("Couldn't find instance");
+    //     font_b.set_instance(inst).expect("Couldn't find instance");
+    //     inst.clone()
+    // } else {
+    //     "default".into()
+    // };
 
-    if cli.glyphs {
-        let glyph_diff = modified_encoded_glyphs(&font_a, &font_b);
-        if !glyph_diff.is_empty() {
-            this_location_value.insert("glyphs".into(), json!(glyph_diff));
-        }
+    for instance in font_a.instances() {
+        font_a
+            .set_instance(&instance)
+            .expect("Couldn't find instance");
+        font_b
+            .set_instance(&instance)
+            .expect("Couldn't find instance");
+        let location_name = instance;
+
+        let this_location_value = test_at_location(&font_a, location_name, &cli, &font_b);
+        result.locations.push(this_location_value);
     }
-    if cli.words {
-        let word_diff = test_font_words(&font_a, &font_b);
-        this_location_value.insert("words".into(), word_diff);
-    }
-
-    location_results.push(this_location_value);
-    result.insert("locations".into(), json!(location_results));
 
     // Report back
     if cli.html {
@@ -145,14 +137,31 @@ fn main() {
             &cli.font1,
             &cli.font2,
             Path::new(&cli.output),
-            &font_a,
-            &font_b,
             result,
             tera.unwrap(),
         );
     } else if cli.json {
-        reporters::json::report(result.into(), cli.pretty);
+        reporters::json::report(result, cli.pretty);
     } else {
         reporters::text::report(result, cli.succinct);
     }
+}
+
+fn test_at_location(font_a: &DFont, loc_name: String, cli: &Cli, font_b: &DFont) -> LocationResult {
+    let mut this_location_value = LocationResult::default();
+    let loc_coords: HashMap<String, f32> = font_a
+        .location
+        .iter()
+        .map(|v| (v.selector.to_string(), v.value))
+        .collect();
+    this_location_value.location = loc_name;
+    this_location_value.coords = loc_coords;
+
+    if cli.glyphs {
+        this_location_value.glyphs = modified_encoded_glyphs(font_a, font_b);
+    }
+    if cli.words {
+        this_location_value.words = Some(test_font_words(font_a, font_b));
+    }
+    this_location_value
 }

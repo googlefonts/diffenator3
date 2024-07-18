@@ -1,11 +1,10 @@
-mod encodedglyphs;
+pub mod encodedglyphs;
 mod renderer;
 mod utils;
 mod wordlists;
 
 use crate::dfont::DFont;
 use cfg_if::cfg_if;
-pub use encodedglyphs::{modified_encoded_glyphs, new_missing_glyphs};
 use image::{GenericImage, GrayImage, ImageBuffer};
 use renderer::Renderer;
 use rustybuzz::Direction;

@@ -1,7 +1,0 @@
-.{{font_class.class_name}}{
-    font-family: "{{font_class.cssfamilyname }}", "Adobe NotDef";
-    {% if "wght" in font_class.coords %}font-weight: {{font_class.coords['wght']}};{% endif %}
-    {% if "wdth" in font_class.coords %}font-stretch: {{font_class.coords['wdth']}}%;{% endif %}
-    {% if "Italic" in font_class.style_name %}font-style: italic;{% else %}font-style: normal;{% endif %}
-    {% if font_class.font_variation_settings %} font-variation-settings: {{font_class.font_variation_settings }}; {%endif%}
-}

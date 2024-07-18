@@ -25,7 +25,7 @@ html {
 
 .box-text {}
 
-#nav {
+#ui-nav {
     position: fixed;
     right: 20px;
     z-index: 100;
@@ -33,7 +33,7 @@ html {
 
 #font-toggle {}
 
-.nav-item {
+.ui-nav-item {
     display: block;
     cursor: pointer;
     -webkit-user-select: none;
@@ -48,47 +48,9 @@ html {
     color: white;
     background-color: black;
     display: block;
-    font-size: 9pt;
+    font-size: 14pt;
     padding: 5px;
     margin: 2px;
-}
-
-.tooltip {
-    position: relative;
-    display: inline-block;
-    border-bottom: 1px dotted black;
-}
-
-.tooltip .tooltiptext {
-    font-family: sans-serif;
-    visibility: hidden;
-    width: 500px;
-    background-color: black;
-    color: #fff;
-    text-align: left;
-    font-size: 12pt;
-    line-height: 15pt;
-    border-radius: 6px;
-    padding: 5px 0;
-
-    /* Position the tooltip */
-    position: absolute;
-    z-index: 1;
-}
-
-.tooltip:hover .tooltiptext {
-    padding: 10px;
-    visibility: visible;
-}
-
-.tooltipleft {
-    float: left;
-    width: 249px;
-}
-
-.tooltipright {
-    float: right;
-    width: 250px;
 }
 
 /* Stuff needed for the table differ */
@@ -166,6 +128,7 @@ body {
     padding: 5pt;
     margin: 5pt;
     width: 50pt;
+    font-size: {{ pt_size | int}}px;
     line-height: {{ pt_size | int * 1.5}}px;
   }
   .cell-word{
@@ -175,6 +138,7 @@ body {
     text-align: center;
     padding: 5pt;
     margin: 5pt;
+    font-size: {{ pt_size | int}}px;
     line-height: {{ pt_size | int * 1.5}}px;
   }
   .cat-strings .cell {
@@ -186,4 +150,11 @@ body {
   .box-title {
     clear: both;
   }
-  
+  .node.closed::before {
+    content: "+";
+    margin-right: 5pt;
+  }
+  .node.open::before {
+    content: "-";
+    margin-right: 5pt;
+  }
