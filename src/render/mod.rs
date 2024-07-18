@@ -156,10 +156,13 @@ impl From<Difference> for GlyphDiff {
 pub struct Difference {
     pub word: String,
     pub buffer_a: String,
-    pub buffer_b: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buffer_b: Option<String>,
     // pub diff_map: Vec<i16>,
     pub percent: f32,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub ot_features: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub lang: String,
 }
 
@@ -210,11 +213,12 @@ pub(crate) fn diff_many_words(
                 .borrow_mut()
                 .render_positioned_glyphs(&commands_b);
             let percent = count_differences(img_a, img_b);
+            let buffers_same = buffer_a == buffer_b;
 
             Some(Difference {
                 word: word.to_string(),
                 buffer_a,
-                buffer_b,
+                buffer_b: if buffers_same { None } else { Some(buffer_b) },
                 // diff_map,
                 percent,
                 ot_features: "".to_string(),
