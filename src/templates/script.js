@@ -13,7 +13,7 @@ function diffTables_statichtml() {
 
 function cmapDiff_static_html() {
   if (report.cmap_diff && (report.cmap_diff.new || report.cmap_diff.missing)) {
-	$("#cmapdiff").append(`<h2 class="mt-2">Added and Removed Encoded Glyphs</h2>`);
+	$("#cmapdiff").append(`<h4 class="mt-2">Added and Removed Encoded Glyphs</h4>`);
     if (report["cmap_diff"]["new"]) {
       $("#cmapdiff").append(`<h4 class="box-title">Added Glyphs</h4>`);
       let added = $("<div>");
@@ -52,7 +52,7 @@ function buildLocation_statichtml(loc) {
 	$("#main").append(`<h4 class="mt-2">${textLocation}</h2>`);
 
 	if (loc.glyphs) {
-		$("#main").append("<h5 class='box-title'>Modified Glyphs</h5>");
+		$("#main").append("<h4>Modified Glyphs</h4>");
 		let glyphs = $("<div>");
 		for (let glyph of loc.glyphs) {
 			addAGlyph(glyph, glyphs);
@@ -61,7 +61,7 @@ function buildLocation_statichtml(loc) {
 	}
 
 	if (loc.words) {
-		$("#main").append("<h5 class='box-title'>Modified Words</h5>");
+		$("#main").append("<h4>Modified Words</h4>");
 		for (let [script, words] of Object.entries(loc.words)) {
 			let scriptTitle = $(`<h6>${script}</h6>`);
 			$("#main").append(scriptTitle);
@@ -85,7 +85,7 @@ $(function () {
 
   for (var [index, loc] of report["locations"].entries()) {
     var loc_nav = $(`<li class="nav-item">
-		<a class="nav-link" href="#" data-index="${index}">${loc.location}</a>
+		<a class="nav-link text-secondary" href="#" data-index="${index}">${loc.location}</a>
 	</li>`);
     $("#locationnav").append(loc_nav);
   }

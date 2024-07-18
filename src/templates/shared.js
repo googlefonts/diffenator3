@@ -60,7 +60,7 @@ function addAWord(diff, where) {
 	}
 	where.append(`
 		<div class="cell-word font-before">
-		<span data-toggle="tooltip" data-html="true" data-title="before: <pre>${diff.buffer_a}</pre><br>after: <pre>${diff.buffer_b}</pre><br>percent: ${diff.percent}">
+		<span data-toggle="tooltip" data-html="true" data-title="Before: <pre>${diff.buffer_a}</pre>After: <pre>${diff.buffer_b}</pre><br>difference: ${Math.round(diff.percent*100)/100}%">
 		${diff.word}
 		</span>
 		</div>
