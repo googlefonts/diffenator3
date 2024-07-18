@@ -11,7 +11,7 @@ The WASM version is a bit more interesting; it can take two font files
 over the web and display a HTML report similar to diffenator2. It
 doesn't yet compare variable fonts in the same way.
 
-You can use the WASM version at https://simoncozens.github.io/diffenator3
+You can use the WASM version at https://googlefonts.github.io/diffenator3
 
 ## To rebuild the WASM version
 
