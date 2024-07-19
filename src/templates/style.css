@@ -5,11 +5,16 @@ body {
     font-family: "Montserrat", sans-serif !important;
 }
 
-.nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
-    background-color: #6fb1f2 !important;
+.nav-pills .nav-item.show .nav-link, .nav-pills .nav-link.active {
+    background-color: #ced9e4 !important;
+}
+.nav-item {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 2px;
 }
 
-.nav-tabs .nav-link{
+.nav-pills .nav-link{
     background-color: #9fcaf5 !important;
 }
 h4 {
@@ -220,4 +225,8 @@ body {
 
   h1,h2,h3,h4,h5 {
     clear: both;
+  }
+
+  #locationnav li {
+    white-space: wrap;
   }

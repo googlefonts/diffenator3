@@ -1,3 +1,4 @@
+use crate::setting::parse_location;
 use font_types::NameId;
 use read_fonts::FontRef;
 use skrifa::{instance::Location, setting::VariationSetting, MetadataProvider};
@@ -29,12 +30,17 @@ impl DFont {
         fnt
     }
 
-    pub fn set_location(&mut self, variations: &str) -> Result<(), String> {
-        self.location = self.parse_location(variations)?;
+    /// Must be called after the location is set
+    pub fn normalize_location(&mut self) {
         self.normalized_location = self.fontref().axes().location(&self.location);
+    }
+
+    pub fn set_location(&mut self, variations: &str) -> Result<(), String> {
+        self.location = parse_location(variations)?;
+        self.normalize_location();
         Ok(())
     }
-    pub fn instances(&mut self) -> Vec<String> {
+    pub fn instances(&self) -> Vec<String> {
         self.fontref()
             .named_instances()
             .iter()
@@ -117,20 +123,6 @@ impl DFont {
                 )
             })
             .collect()
-    }
-
-    fn parse_location(&self, variations: &str) -> Result<Vec<VariationSetting>, String> {
-        let mut settings: Vec<VariationSetting> = vec![];
-        for variation in variations.split(',') {
-            let mut parts = variation.split('=');
-            let axis = parts.next().ok_or("Couldn't parse axis".to_string())?;
-            let value = parts.next().ok_or("Couldn't parse value".to_string())?;
-            let value = value
-                .parse::<f32>()
-                .map_err(|_| "Couldn't parse value".to_string())?;
-            settings.push((axis, value).into());
-        }
-        Ok(settings)
     }
 
     pub fn supported_scripts(&self) -> HashSet<String> {

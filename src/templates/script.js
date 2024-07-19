@@ -39,17 +39,21 @@ function cmapDiff_static_html() {
 function buildLocation_statichtml(loc) {
 	// Set font styles to appropriate axis locations
 	let rule = document.styleSheets[0].cssRules[2].style
-	let cssSetting = Object.entries(loc.coords).map(function ([axis, value]) {
-		return `"${axis}" ${value}`
-	}).join(", ");
-	let textLocation = Object.entries(loc.coords).map(function ([axis, value]) {
-		return `${axis}=${value}`
-	}).join(" ");
-	rule.setProperty("font-variation-settings", cssSetting)
+	let cssSetting = "";
+	let textLocation = "Default";
+	if (loc.coords) {
+		cssSetting = Object.entries(loc.coords).map(function ([axis, value]) {
+			return `"${axis}" ${value}`
+		}).join(", ");
+		textLocation = Object.entries(loc.coords).map(function ([axis, value]) {
+			return `${axis}=${value}`
+		}).join(" ");
+		rule.setProperty("font-variation-settings", cssSetting)
+	}
 
 	$("#main").empty();
 
-	$("#main").append(`<h4 class="mt-2">${textLocation}</h2>`);
+	$("#title").html(`<h4 class="mt-2">${textLocation}</h2>`);
 
 	if (loc.glyphs) {
 		$("#main").append("<h4>Modified Glyphs</h4>");
@@ -85,7 +89,7 @@ $(function () {
 
   for (var [index, loc] of report["locations"].entries()) {
     var loc_nav = $(`<li class="nav-item">
-		<a class="nav-link text-secondary" href="#" data-index="${index}">${loc.location}</a>
+		<a class="nav-link text-secondary" href="#" data-index="${index}">${loc.location.replaceAll(',', ',\u200b')}</a>
 	</li>`);
     $("#locationnav").append(loc_nav);
   }
@@ -114,4 +118,19 @@ $(function () {
     "src",
     "url({{ new_filename }})"
   );
+
+  let animationHandle;
+  function animate () {
+	$("#fonttoggle").click()
+	animationHandle = setTimeout(animate, 1000);
+  }
+  $("#fontanimate").click(function () {
+	if ($(this).text() == "Animate") {
+	  $(this).text("Stop");
+	  animate();
+	} else {
+	  $(this).text("Animate");
+	  clearTimeout(animationHandle);
+	}
+  });
 });

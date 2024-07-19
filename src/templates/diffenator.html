@@ -39,24 +39,25 @@
 </head>
 
 <body>
-	<div class="container">
 
 		<div id="ui-nav">
 		  <div class="ui-nav-item" id="fonttoggle">Old</div>
+		  <div class="ui-nav-item" id="fontanimate">Animate</div>
 		  <div id="axes">
 		  </div>
 		</div>
 	
-
-		<ul class="nav nav-tabs" id="locationnav">
-		</ul>
-		<div id="cmapdiff"> </div>
-
-		<div id="main"></div>
-
-
-		<div id="difftable"> </div>
-
+	<div class="row">
+		<div class="col-2">
+			<ul class="nav nav-pills" id="locationnav">
+			</ul>
+		</div>
+		<div class="col mt-3">
+			<div id="title"></div>
+			<div id="cmapdiff"> </div>
+			<div id="main"></div>
+			<div id="difftable"> </div>
+		</div>
 	</div>
 	<script type="module">
 		{% include "shared.js" %}
