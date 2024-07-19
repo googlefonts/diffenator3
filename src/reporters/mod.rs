@@ -25,7 +25,7 @@ pub struct LocationResult {
 }
 
 impl LocationResult {
-    fn is_some(&self) -> bool {
+    pub fn is_some(&self) -> bool {
         self.error.is_some()
             || !self.glyphs.is_empty()
             || (self.words.is_some() && self.words.as_ref().unwrap().is_something())

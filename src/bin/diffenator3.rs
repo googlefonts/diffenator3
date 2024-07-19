@@ -118,19 +118,6 @@ fn main() {
     }
 
     // Location-specific tests
-
-    // let loc_name: String = if let Some(ref loc) = cli.location {
-    //     let _hack = font_a.set_location(loc);
-    //     let _hack = font_b.set_location(loc);
-    //     loc.clone()
-    // } else if let Some(ref inst) = cli.instance {
-    //     font_a.set_instance(inst).expect("Couldn't find instance");
-    //     font_b.set_instance(inst).expect("Couldn't find instance");
-    //     inst.clone()
-    // } else {
-    //     "default".into()
-    // };
-
     let settings: Vec<Setting> = generate_settings(&cli, &font_a, &font_b);
 
     result.locations = settings
@@ -144,6 +131,11 @@ fn main() {
             }
         })
         .collect();
+
+    // If there's more than one, filter out the boring ones
+    if result.locations.len() > 1 {
+        result.locations.retain(|l| l.is_some());
+    }
 
     // Report back
     if cli.html {

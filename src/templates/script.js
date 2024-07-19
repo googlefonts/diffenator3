@@ -86,6 +86,11 @@ $(function () {
   }
   cmapDiff_static_html();
   $('[data-toggle="tooltip"]').tooltip()
+  if (!report["locations"]) {
+	$("#title").html("<h4 class='mt-2'>No differences found</h4>");
+	$("#ui-nav").hide();
+	return;
+  }
 
   for (var [index, loc] of report["locations"].entries()) {
     var loc_nav = $(`<li class="nav-item">
