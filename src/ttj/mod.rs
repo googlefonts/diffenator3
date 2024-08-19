@@ -1,12 +1,12 @@
 use crate::ttj::{jsondiff::diff, serializefont::ToValue};
 use read_fonts::{traversal::SomeTable, FontRef, TableProvider};
 use serde_json::{Map, Value};
-use skrifa::{charmap::Charmap, string::StringId, GlyphId, MetadataProvider};
+use skrifa::{charmap::Charmap, string::StringId, GlyphId, GlyphId16, MetadataProvider};
 
 pub mod jsondiff;
 mod serializefont;
 
-fn serialize_name_table<'a>(font: &impl MetadataProvider<'a>) -> Value {
+fn serialize_name_table<'a>(font: &(impl MetadataProvider<'a> + TableProvider<'a>)) -> Value {
     let mut map = Map::new();
     if let Ok(name) = font.name() {
         let mut ids: Vec<StringId> = name.name_record().iter().map(|x| x.name_id()).collect();
@@ -29,14 +29,15 @@ fn serialize_name_table<'a>(font: &impl MetadataProvider<'a>) -> Value {
 }
 
 fn gid_to_name<'a>(font: &impl TableProvider<'a>, gid: GlyphId) -> String {
-    if let Ok(Some(name)) = font
-        .post()
-        .map(|post| post.glyph_name(gid).map(|x| x.to_string()))
-    {
-        name
-    } else {
-        format!("gid{:}", gid)
+    if let Ok(gid16) = TryInto::<GlyphId16>::try_into(gid) {
+        if let Ok(Some(name)) = font
+            .post()
+            .map(|post| post.glyph_name(gid16).map(|x| x.to_string()))
+        {
+            return name;
+        }
     }
+    return format!("gid{:}", gid);
 }
 
 fn serialize_cmap_table<'a>(font: &impl TableProvider<'a>) -> Value {
@@ -55,7 +56,7 @@ fn serialize_hmtx_table<'a>(font: &impl TableProvider<'a>) -> Value {
         let widths = hmtx.h_metrics();
         let long_metrics = widths.len();
         for gid in 0..font.maxp().unwrap().num_glyphs() {
-            let name = gid_to_name(font, GlyphId::new(gid));
+            let name = gid_to_name(font, GlyphId::new(gid as u32));
             if gid < (long_metrics as u16) {
                 if let Some((width, lsb)) = widths
                     .get(gid as usize)

@@ -11,6 +11,7 @@ impl<'a> ToValue for FieldType<'a> {
             Self::I8(arg0) => Value::Number((*arg0).into()),
             Self::U8(arg0) => Value::Number((*arg0).into()),
             Self::I16(arg0) => Value::Number((*arg0).into()),
+            Self::I24(arg0) => Value::Number((Into::<i32>::into(*arg0)).into()),
             Self::U16(arg0) => Value::Number((*arg0).into()),
             Self::I32(arg0) => Value::Number((*arg0).into()),
             Self::U32(arg0) => Value::Number((*arg0).into()),
@@ -26,7 +27,7 @@ impl<'a> ToValue for FieldType<'a> {
             Self::F2Dot14(arg0) => Value::Number(Number::from_f64(arg0.to_f32() as f64).unwrap()),
             Self::Fixed(arg0) => Value::Number(Number::from(arg0.to_i32())),
             Self::LongDateTime(arg0) => Value::Number(arg0.as_secs().into()),
-            Self::GlyphId(arg0) => Value::String(format!("g{}", arg0.to_u16())),
+            Self::GlyphId16(arg0) => Value::String(format!("g{}", arg0.to_u16())),
             Self::NameId(arg0) => Value::String(arg0.to_string()),
             Self::StringOffset(string) => match &string.target {
                 Ok(arg0) => Value::String(arg0.as_ref().iter_chars().collect()),

@@ -70,7 +70,7 @@ impl<'a> Renderer<'a> {
 
             let _ = self
                 .outlines
-                .get(GlyphId::new(info.glyph_id as u16))
+                .get(GlyphId::new(info.glyph_id))
                 .unwrap()
                 .draw(settings, &mut pen);
             serialized_buffer.push_str(&format!("{}", info.glyph_id,));
