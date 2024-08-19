@@ -213,6 +213,7 @@ pub(crate) fn diff_many_words(
         if commands_a == commands_b {
             continue;
         }
+        let buffers_same = buffer_a == buffer_b;
         let img_a = renderer_a.render_positioned_glyphs(&commands_a);
         let img_b = renderer_b.render_positioned_glyphs(&commands_b);
         let percent = count_differences(img_a, img_b);
@@ -220,7 +221,7 @@ pub(crate) fn diff_many_words(
             differences.push(Difference {
                 word: word.to_string(),
                 buffer_a,
-                buffer_b,
+                buffer_b: if buffers_same { None } else { Some(buffer_b) },
                 // diff_map,
                 ot_features: "".to_string(),
                 lang: "".to_string(),

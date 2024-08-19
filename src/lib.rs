@@ -16,7 +16,7 @@ cfg_if! {
     if #[cfg(target_family = "wasm")] {
         use std::collections::HashMap;
         use dfont::DFont;
-        use render::{test_font_glyphs, test_font_words};
+        use render::{test_font_words, encodedglyphs};
         use serde_json::json;
         use ttj::table_diff;
         use skrifa::MetadataProvider;
@@ -81,19 +81,6 @@ cfg_if! {
         }
 
         #[wasm_bindgen]
-        pub fn diff(font_a: &[u8], font_b: &[u8]) -> String {
-            let f_a = DFont::new(font_a);
-            let f_b = DFont::new(font_b);
-            let val = json!({
-                "tables": table_diff(&f_a.fontref(), &f_b.fontref()),
-                "glyphs": test_font_glyphs(&f_a, &f_b),
-                "words": test_font_words(&f_a, &f_b),
-            });
-            serde_json::to_string(&val)
-                .unwrap_or("Couldn't do it".to_string())
-        }
-
-        #[wasm_bindgen]
         pub fn diff_tables(font_a: &[u8], font_b: &[u8], f: &js_sys::Function) {
             let f_a = DFont::new(font_a);
             let f_b = DFont::new(font_b);
@@ -105,14 +92,24 @@ cfg_if! {
         }
 
         #[wasm_bindgen]
-        pub fn diff_glyphs(font_a: &[u8], font_b: &[u8], location: &str, f: &js_sys::Function) {
+        pub fn modified_glyphs(font_a: &[u8], font_b: &[u8], location: &str, f: &js_sys::Function) {
             let mut f_a = DFont::new(font_a);
             let mut f_b = DFont::new(font_b);
             let _hack = f_a.set_location(location);
             let _hack = f_b.set_location(location);
 
             let val = json!({
-                "glyphs": test_font_glyphs(&f_a, &f_b)
+                "modified_glyphs": encodedglyphs::modified_encoded_glyphs(&f_a, &f_b)
+            });
+            f.call1(&JsValue::NULL, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
+        }
+
+        #[wasm_bindgen]
+        pub fn new_missing_glyphs(font_a: &[u8], font_b: &[u8],f: &js_sys::Function) {
+            let f_a = DFont::new(font_a);
+            let f_b = DFont::new(font_b);
+            let val = json!({
+                "new_missing_glyphs": encodedglyphs::new_missing_glyphs(&f_a, &f_b)
             });
             f.call1(&JsValue::NULL, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
         }
