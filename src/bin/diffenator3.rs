@@ -74,7 +74,11 @@ struct Cli {
     #[clap(long = "location", help_heading = "Locations to test")]
     location: Vec<String>,
     /// Instance to compare (may be repeated; use * for all instances)
-    #[clap(long = "instances", help_heading = "Locations to test")]
+    #[clap(
+        long = "instances",
+        help_heading = "Locations to test",
+        default_value = "*"
+    )]
     instances: Vec<String>,
     /// Cross-product (use min/default/max of all axes)
     #[clap(long = "cross-product", help_heading = "Locations to test")]
