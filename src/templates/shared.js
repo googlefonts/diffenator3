@@ -43,7 +43,7 @@ function addAGlyph(glyph, where) {
   }
   let cp =
     "<br>U+" +
-    glyph.string.charCodeAt(0).toString(16).padStart(4, "0").toUpperCase();
+    glyph.string.codePointAt(0).toString(16).padStart(4, "0").toUpperCase();
   where.append(`
         <div class="cell-glyph font-before">
         ${glyph.string}
