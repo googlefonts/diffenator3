@@ -23,8 +23,7 @@ async function init() {
       wasm.new_missing_glyphs(beforeFont, afterFont, (new_missing_glyphs) => {
         self.postMessage({
           type: "new_missing_glyphs",
-          new_missing_glyphs:
-            JSON.parse(new_missing_glyphs)["new_missing_glyphs"],
+          cmap_diff: JSON.parse(new_missing_glyphs)["new_missing_glyphs"],
         });
       });
     } else if (command == "modified_glyphs") {

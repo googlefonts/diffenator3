@@ -148,8 +148,8 @@ body {
     padding: 5pt;
     margin: 5pt;
     width: 50pt;
-    font-size: {{ pt_size | int}}px;
-    line-height: {{ pt_size | int * 1.5}}px;
+    font-size: var(--node-pt-size);
+    line-height: calc(var(--node-pt-size) * 1.5);
   }
   .cell-word{
     z-index: -100;
@@ -158,8 +158,8 @@ body {
     text-align: center;
     padding: 5pt;
     margin: 5pt;
-    font-size: {{ pt_size | int}}px;
-    line-height: {{ pt_size | int * 1.5}}px;
+    font-size: var(--node-pt-size);
+    line-height: calc(var(--node-pt-size) * 1.5);
     box-shadow: rgba(0, 0, 0, 0.15) 1.95px 1.95px 2.6px;
   }
   .cell-glyph{
@@ -171,9 +171,9 @@ body {
     box-shadow: rgba(0, 0, 0, 0.15) 1.95px 1.95px 2.6px;
     padding: 5pt;
     margin: 5pt;
-    width: {{ pt_size | int * 2}}px;
-    min-height: {{ pt_size | int * 2}}px;
-    font-size: {{ pt_size | int}}px;
+    width: calc(var(--node-pt-size) * 2);
+    min-height: calc(var(--node-pt-size) * 2);
+    font-size: var(--node-pt-size);
   }
   .cell-glyph.font-before, .cell-word.font-before {
     background: #eff6f2;
@@ -229,4 +229,38 @@ body {
 
   #locationnav li {
     white-space: wrap;
+  }
+
+/* The following rules are used in the WASM version, not in the CLI version.
+   But we keep them here so we can share them between the two versions. */
+
+   .modal-dialog {
+    max-width: 100% !important;
+    margin: 0 !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100vh;
+    display: flex;
+  }
+
+  .fontdrop {
+    padding: 30px;
+    border-radius: 20px;
+    outline: 3px dashed #ffffffff;
+    outline-offset: -20px;
+  }
+
+  #fontbefore {
+    background-color: #ddffdddd;
+  }
+
+  #fontafter {
+    background-color: #ffdddddd;
+  }
+
+  .dragging {
+    background-image: linear-gradient(rgb(0 0 0/5%) 0 0);
+    outline: 5px dashed #ffffffff;
   }

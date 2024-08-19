@@ -31,6 +31,10 @@
       font-family: "Font After", "Adobe Notdef";
     }
 
+	:root {
+	--node-pt-size: {{ pt_size | int }}px;
+	}
+
 	{% include "style.css" %}
 		</style>
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
