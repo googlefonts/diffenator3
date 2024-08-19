@@ -41,10 +41,13 @@ name = "ttj"
 path = "src/bin/ttj.rs"
 
 [dependencies]
+
+# Keep these in sync
+read-fonts = "0.21.0"
+font-types = "0.7.0"
+skrifa = "0.21.0"
+
 cfg-if = "1.0.0"
-read-fonts = "0.19.1"
-font-types = "0.5.3"
-skrifa = "0.19.1"
 serde_json = { version = "1.0.96", features = ["preserve_order"] }
 serde = { version = "*", features = ["derive"] }
 indexmap = "1.9.3"
