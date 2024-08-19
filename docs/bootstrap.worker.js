@@ -31,8 +31,8 @@
 /******/ 					"__wbindgen_string_new": function(p0i32,p1i32) {
 /******/ 						return installedModules["../pkg/diffenator3_bg.js"].exports["__wbindgen_string_new"](p0i32,p1i32);
 /******/ 					},
-/******/ 					"__wbg_call_b3ca7c6051f9bec1": function(p0i32,p1i32,p2i32) {
-/******/ 						return installedModules["../pkg/diffenator3_bg.js"].exports["__wbg_call_b3ca7c6051f9bec1"](p0i32,p1i32,p2i32);
+/******/ 					"__wbg_call_89af060b4e1523f2": function(p0i32,p1i32,p2i32) {
+/******/ 						return installedModules["../pkg/diffenator3_bg.js"].exports["__wbg_call_89af060b4e1523f2"](p0i32,p1i32,p2i32);
 /******/ 					},
 /******/ 					"__wbg_new_abda76e883ba8a5f": function() {
 /******/ 						return installedModules["../pkg/diffenator3_bg.js"].exports["__wbg_new_abda76e883ba8a5f"]();
@@ -101,7 +101,7 @@
 /******/ 				promises.push(installedWasmModuleData);
 /******/ 			else {
 /******/ 				var importObject = wasmImportObjects[wasmModuleId]();
-/******/ 				var req = fetch(__webpack_require__.p + "" + {"../pkg/diffenator3_bg.wasm":"4e63794b39b83b4a3b88"}[wasmModuleId] + ".module.wasm");
+/******/ 				var req = fetch(__webpack_require__.p + "" + {"../pkg/diffenator3_bg.wasm":"fd5dd7b693de39dfe6b0"}[wasmModuleId] + ".module.wasm");
 /******/ 				var promise;
 /******/ 				if(importObject instanceof Promise && typeof WebAssembly.compileStreaming === 'function') {
 /******/ 					promise = Promise.all([WebAssembly.compileStreaming(req), importObject]).then(function(items) {
@@ -192,7 +192,7 @@
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("var module = __webpack_require__.e(/*! import() */ 0).then(__webpack_require__.bind(null, /*! ../pkg/diffenator3.js */ \"../pkg/diffenator3.js\"));\nasync function init() {\n    let wasm = await module;\n    self.postMessage({ type: \"ready\" })\n    console.log(\"Got wasm module\", wasm);\n    wasm.debugging();\n    self.onmessage = async (event) => {\n        console.log(\"Worker received message\");\n        console.log(event);\n        const { command, beforeFont, location, afterFont } = event.data;\n        if (command == \"axes\") {\n            self.postMessage({\n                \"type\": \"axes\",\n                \"axes\": JSON.parse(wasm.axes(beforeFont, afterFont))[\"axes\"]\n            });\n        } else if (command == \"tables\") {\n            wasm.diff_tables(beforeFont, afterFont, (tables) => {\n                self.postMessage({\n                    \"type\": \"tables\",\n                    \"tables\": JSON.parse(tables)[\"tables\"]\n                });\n            });\n        } else if (command == \"glyphs\") {\n            wasm.diff_glyphs(beforeFont, afterFont, location, (glyphs) => {\n                self.postMessage({\n                    \"type\": \"glyphs\",\n                    \"glyphs\": JSON.parse(glyphs)[\"glyphs\"]\n                });\n            });\n        } else if (command == \"words\") {\n            wasm.diff_words(beforeFont, afterFont, location, (words) => {\n                self.postMessage({\n                    \"type\": \"words\",\n                    \"words\": JSON.parse(words)[\"words\"]\n                });\n            });\n        }\n\n    }\n    return self;\n}\n\ninit();\n\n\n//# sourceURL=webpack:///./webworker.js?");
+eval("var module = __webpack_require__.e(/*! import() */ 0).then(__webpack_require__.bind(null, /*! ../pkg/diffenator3.js */ \"../pkg/diffenator3.js\"));\nasync function init() {\n  let wasm = await module;\n  self.postMessage({ type: \"ready\" });\n  // console.log(\"Got wasm module\", wasm);\n  wasm.debugging();\n  self.onmessage = async (event) => {\n    // console.log(\"Worker received message\");\n    // console.log(event);\n    const { command, beforeFont, location, afterFont } = event.data;\n    if (command == \"axes\") {\n      let obj = JSON.parse(wasm.axes(beforeFont, afterFont));\n      obj[\"type\"] = \"axes\";\n      self.postMessage(obj);\n    } else if (command == \"tables\") {\n      wasm.diff_tables(beforeFont, afterFont, (tables) => {\n        self.postMessage({\n          type: \"tables\",\n          tables: JSON.parse(tables)[\"tables\"],\n        });\n      });\n    } else if (command == \"new_missing_glyphs\") {\n      wasm.new_missing_glyphs(beforeFont, afterFont, (new_missing_glyphs) => {\n        self.postMessage({\n          type: \"new_missing_glyphs\",\n          cmap_diff: JSON.parse(new_missing_glyphs)[\"new_missing_glyphs\"],\n        });\n      });\n    } else if (command == \"modified_glyphs\") {\n      wasm.modified_glyphs(beforeFont, afterFont, location, (glyphs) => {\n        self.postMessage({\n          type: \"modified_glyphs\",\n          modified_glyphs: JSON.parse(glyphs)[\"modified_glyphs\"],\n        });\n      });\n    } else if (command == \"words\") {\n      wasm.diff_words(beforeFont, afterFont, location, (words) => {\n        self.postMessage({\n          type: \"words\",\n          words: JSON.parse(words)[\"words\"],\n        });\n      });\n    }\n  };\n  return self;\n}\n\ninit();\n\n\n//# sourceURL=webpack:///./webworker.js?");
 
 /***/ })
 
