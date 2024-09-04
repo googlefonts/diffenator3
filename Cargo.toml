@@ -6,7 +6,7 @@ edition = "2021"
 [profile.dev]
 # Rustybuzz debug-asserts that the provided script is the same as
 # the text's script, *even if* you're using guess_segment_properties.
-debug-assertions=false
+debug-assertions = false
 
 [profile.release]
 opt-level = "z"
@@ -14,13 +14,13 @@ lto = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 rayon = { version = "*" }
-indicatif = {version = "*", features = ["rayon"] }
+indicatif = { version = "*", features = ["rayon"] }
 thread_local = "1.1"
 tera = "1"
 colored = "2.1.0"
 homedir = "0.3.3"
 walkdir = "2.5.0"
-clap = { version = "4.5.9", features=["derive"]}
+clap = { version = "4.5.9", features = ["derive"] }
 itertools = "0.13.0"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
@@ -43,7 +43,7 @@ path = "src/bin/ttj.rs"
 [dependencies]
 
 # Keep these in sync
-read-fonts = "0.21.0"
+read-fonts = { version = "0.21.0", features = ["serde"] }
 font-types = "0.7.0"
 skrifa = "0.21.0"
 

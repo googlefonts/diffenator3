@@ -1,8 +1,14 @@
-use crate::ttj::{jsondiff::diff, serializefont::ToValue};
-use read_fonts::{traversal::SomeTable, FontRef, TableProvider};
+use crate::ttj::jsondiff::diff;
+use crate::ttj::serializefont::ToValue;
+use read_fonts::tables::{self};
+use read_fonts::traversal::SomeTable;
+use read_fonts::{FontRef, TableProvider};
 use serde_json::{Map, Value};
-use skrifa::{charmap::Charmap, string::StringId, GlyphId, GlyphId16, MetadataProvider};
+use skrifa::charmap::Charmap;
+use skrifa::string::StringId;
+use skrifa::{GlyphId, GlyphId16, MetadataProvider};
 
+mod gdef;
 pub mod jsondiff;
 mod serializefont;
 
@@ -37,7 +43,7 @@ fn gid_to_name<'a>(font: &impl TableProvider<'a>, gid: GlyphId) -> String {
             return name;
         }
     }
-    return format!("gid{:}", gid);
+    format!("gid{:}", gid)
 }
 
 fn serialize_cmap_table<'a>(font: &impl TableProvider<'a>) -> Value {
@@ -105,8 +111,12 @@ pub fn font_to_json(font: &FontRef) -> Value {
             b"loca" => font.loca(None).map(|t| <dyn SomeTable>::serialize(&t)),
             b"glyf" => font.glyf().map(|t| <dyn SomeTable>::serialize(&t)),
             b"gvar" => font.gvar().map(|t| <dyn SomeTable>::serialize(&t)),
+            // b"gasp" => {
+            //     let gasp: Result<tables::gasp::Gasp, _> = font.expect_table();
+            //     gasp.map(|t| <dyn SomeTable>::serialize(&t))
+            // }
             // b"cmap" => font.cmap().map(|t| <dyn SomeTable>::serialize(&t)),
-            b"GDEF" => font.gdef().map(|t| <dyn SomeTable>::serialize(&t)),
+            // b"GDEF" => font.gdef().map(|t| <dyn SomeTable>::serialize(&t)),
             b"GPOS" => font.gpos().map(|t| <dyn SomeTable>::serialize(&t)),
             b"GSUB" => font.gsub().map(|t| <dyn SomeTable>::serialize(&t)),
             b"COLR" => font.colr().map(|t| <dyn SomeTable>::serialize(&t)),
@@ -131,6 +141,7 @@ pub fn font_to_json(font: &FontRef) -> Value {
     map.insert("name".to_string(), serialize_name_table(font));
     map.insert("cmap".to_string(), serialize_cmap_table(font));
     map.insert("hmtx".to_string(), serialize_hmtx_table(font));
+    map.insert("GDEF".to_string(), gdef::serialize_gdef_table(font));
     Value::Object(map)
 }
 

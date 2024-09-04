@@ -526,6 +526,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3ade9a548352698c7f1e340fd5caf76b9f06c0b587e6b4840ea077e1524c685"
 dependencies = [
  "bytemuck",
+ "serde",
 ]
 
 [[package]]
@@ -1096,6 +1097,7 @@ checksum = "5baa1d3f6c6449e4299e17814855468617c2924753ce4f0601b16cba9f8e7bd8"
 dependencies = [
  "bytemuck",
  "font-types",
+ "serde",
 ]
 
 [[package]]
