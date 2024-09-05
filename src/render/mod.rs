@@ -6,7 +6,6 @@ pub mod wordlists;
 use crate::dfont::DFont;
 use crate::render::utils::count_differences;
 use cfg_if::cfg_if;
-use image::{GenericImage, GrayImage, ImageBuffer};
 use renderer::Renderer;
 use rustybuzz::Direction;
 use serde::Serialize;

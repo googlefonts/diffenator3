@@ -1,15 +1,17 @@
 use crate::ttj::jsondiff::diff;
 use crate::ttj::serializefont::ToValue;
+use namemap::NameMap;
 use read_fonts::traversal::SomeTable;
 use read_fonts::{FontRef, TableProvider};
 use serde_json::{Map, Value};
 use skrifa::charmap::Charmap;
 use skrifa::string::StringId;
-use skrifa::{GlyphId, GlyphId16, MetadataProvider};
+use skrifa::MetadataProvider;
 
 mod gdef;
 pub mod jsondiff;
 mod layout;
+mod namemap;
 mod serializefont;
 
 fn serialize_name_table<'a>(font: &(impl MetadataProvider<'a> + TableProvider<'a>)) -> Value {
@@ -34,41 +36,23 @@ fn serialize_name_table<'a>(font: &(impl MetadataProvider<'a> + TableProvider<'a
     Value::Object(map)
 }
 
-fn gid_to_name<'a>(font: &impl TableProvider<'a>, gid: GlyphId) -> String {
-    if let Ok(gid16) = TryInto::<GlyphId16>::try_into(gid) {
-        if let Ok(Some(name)) = font
-            .post()
-            .map(|post| post.glyph_name(gid16).map(|x| x.to_string()))
-        {
-            return name;
-        }
-    }
-    format!("gid{:}", gid)
-}
-
-fn serialize_cmap_table<'a>(font: &impl TableProvider<'a>, names: &[String]) -> Value {
+fn serialize_cmap_table<'a>(font: &impl TableProvider<'a>, names: &NameMap) -> Value {
     let charmap = Charmap::new(font);
     let mut map: Map<String, Value> = Map::new();
     for (codepoint, gid) in charmap.mappings() {
-        let name = names
-            .get(gid.to_u32() as usize)
-            .map(|n| n.to_string())
-            .unwrap_or_else(|| format!("gid{}", gid));
+        let name = names.get(gid);
         map.insert(format!("U+{:04X}", codepoint), Value::String(name));
     }
     Value::Object(map)
 }
 
-fn serialize_hmtx_table<'a>(font: &impl TableProvider<'a>, names: &[String]) -> Value {
+fn serialize_hmtx_table<'a>(font: &impl TableProvider<'a>, names: &NameMap) -> Value {
     let mut map = Map::new();
     if let Ok(hmtx) = font.hmtx() {
         let widths = hmtx.h_metrics();
         let long_metrics = widths.len();
         for gid in 0..font.maxp().unwrap().num_glyphs() {
-            let name = names
-                .get(gid as usize)
-                .map(|n| n.to_string())
-                .unwrap_or_else(|| format!("gid{}", gid));
+            let name = names.get(gid);
             if gid < (long_metrics as u16) {
                 if let Some((width, lsb)) = widths
                     .get(gid as usize)
@@ -94,13 +78,11 @@ fn serialize_hmtx_table<'a>(font: &impl TableProvider<'a>, names: &[String]) -> 
     Value::Object(map)
 }
 
-pub fn font_to_json(font: &FontRef, glyphmap: Option<&[String]>) -> Value {
+pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
     let glyphmap = if let Some(glyphmap) = glyphmap {
         glyphmap
     } else {
-        &(0..font.maxp().unwrap().num_glyphs())
-            .map(|gid| gid_to_name(font, GlyphId::new(gid as u32)))
-            .collect::<Vec<String>>()
+        &NameMap::new(font)
     };
     let mut map = Map::new();
 
@@ -154,25 +136,27 @@ pub fn font_to_json(font: &FontRef, glyphmap: Option<&[String]>) -> Value {
     map.insert("name".to_string(), serialize_name_table(font));
     map.insert("cmap".to_string(), serialize_cmap_table(font, glyphmap));
     map.insert("hmtx".to_string(), serialize_hmtx_table(font, glyphmap));
-    map.insert("GDEF".to_string(), gdef::serialize_gdef_table(font));
-    map.insert("GPOS".to_string(), layout::serialize_gpos_table(font));
-    map.insert("GSUB".to_string(), layout::serialize_gsub_table(font));
+    map.insert(
+        "GDEF".to_string(),
+        gdef::serialize_gdef_table(font, glyphmap),
+    );
+    map.insert(
+        "GPOS".to_string(),
+        layout::serialize_gpos_table(font, glyphmap),
+    );
+    map.insert(
+        "GSUB".to_string(),
+        layout::serialize_gsub_table(font, glyphmap),
+    );
     Value::Object(map)
 }
 
 pub fn table_diff(font_a: &FontRef, font_b: &FontRef) -> Value {
-    let glyphmap_a: Vec<String> = (0..font_a.maxp().unwrap().num_glyphs())
-        .map(|gid| gid_to_name(font_a, GlyphId::new(gid as u32)))
-        .collect();
-    let glyphmap_b: Vec<String> = (0..font_b.maxp().unwrap().num_glyphs())
-        .map(|gid| gid_to_name(font_b, GlyphId::new(gid as u32)))
-        .collect();
-    let count_glyphname_differences = glyphmap_a
-        .iter()
-        .zip(glyphmap_b.iter())
-        .filter(|(a, b)| a != b)
-        .count();
-    let big_difference = count_glyphname_differences > glyphmap_a.len() / 2;
+    let glyphmap_a = NameMap::new(font_a);
+    let glyphmap_b = NameMap::new(font_b);
+    let big_difference = !glyphmap_a.compatible(&glyphmap_b);
+
+    #[cfg(not(target_family = "wasm"))]
     if big_difference {
         println!("Glyph names differ dramatically between fonts, using font names from font A");
     }
@@ -189,16 +173,3 @@ pub fn table_diff(font_a: &FontRef, font_b: &FontRef) -> Value {
         ),
     )
 }
-
-// fn main() {
-//     let bytes = std::fs::read("Nunito[wght,ital].ttf").expect("Can't read");
-//     let font1 = FontRef::new(&bytes).expect("Can't parse");
-//     let bytes = std::fs::read("Nunito[wght].ttf").expect("Can't read");
-//     let font2 = FontRef::new(&bytes).expect("Can't parse");
-//     let left = font_to_json(&font1);
-//     let right = font_to_json(&font2);
-//     println!(
-//         "{:}",
-//         serde_json::to_string_pretty(&diff(&left, &right)).unwrap()
-//     );
-// }
