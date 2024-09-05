@@ -51,6 +51,16 @@ impl Setting {
             }
             Setting::Default => {}
         }
+        log::debug!("Font A location is: {:?}", font_a.location);
+        log::debug!("Font B location is: {:?}", font_b.location);
+        log::debug!(
+            "Font A normalized location is: {:?}",
+            font_a.normalized_location
+        );
+        log::debug!(
+            "Font B normalized location is: {:?}",
+            font_b.normalized_location
+        );
         Ok(())
     }
 

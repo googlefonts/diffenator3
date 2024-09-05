@@ -97,6 +97,7 @@ struct Cli {
 
 fn main() {
     let cli = Cli::parse();
+    env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
 
     let font_binary_a = std::fs::read(&cli.font1).expect("Couldn't open file");
     let font_binary_b = std::fs::read(&cli.font2).expect("Couldn't open file");
