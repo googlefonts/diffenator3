@@ -10,6 +10,7 @@ use skrifa::{GlyphId, GlyphId16, MetadataProvider};
 
 mod gdef;
 pub mod jsondiff;
+mod layout;
 mod serializefont;
 
 fn serialize_name_table<'a>(font: &(impl MetadataProvider<'a> + TableProvider<'a>)) -> Value {
@@ -117,7 +118,7 @@ pub fn font_to_json(font: &FontRef) -> Value {
             // }
             // b"cmap" => font.cmap().map(|t| <dyn SomeTable>::serialize(&t)),
             // b"GDEF" => font.gdef().map(|t| <dyn SomeTable>::serialize(&t)),
-            b"GPOS" => font.gpos().map(|t| <dyn SomeTable>::serialize(&t)),
+            // b"GPOS" => font.gpos().map(|t| <dyn SomeTable>::serialize(&t)),
             b"GSUB" => font.gsub().map(|t| <dyn SomeTable>::serialize(&t)),
             b"COLR" => font.colr().map(|t| <dyn SomeTable>::serialize(&t)),
             b"CPAL" => font.cpal().map(|t| <dyn SomeTable>::serialize(&t)),
@@ -142,6 +143,8 @@ pub fn font_to_json(font: &FontRef) -> Value {
     map.insert("cmap".to_string(), serialize_cmap_table(font));
     map.insert("hmtx".to_string(), serialize_hmtx_table(font));
     map.insert("GDEF".to_string(), gdef::serialize_gdef_table(font));
+    map.insert("GPOS".to_string(), layout::serialize_gpos_table(font));
+    map.insert("GSUB".to_string(), layout::serialize_gsub_table(font));
     Value::Object(map)
 }
 
