@@ -1,11 +1,11 @@
 use crate::setting::parse_location;
 use font_types::NameId;
 use read_fonts::FontRef;
-use skrifa::{instance::Location, setting::VariationSetting, MetadataProvider};
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-};
+use skrifa::instance::Location;
+use skrifa::setting::VariationSetting;
+use skrifa::MetadataProvider;
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use ucd::Codepoint;
 
 pub struct DFont {

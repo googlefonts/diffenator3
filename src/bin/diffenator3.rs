@@ -1,21 +1,19 @@
-use clap::{builder::ArgAction, Parser};
-use diffenator3::{
-    dfont::DFont,
-    render::{
-        encodedglyphs::{modified_encoded_glyphs, new_missing_glyphs},
-        test_font_words,
-    },
-    reporters::{self, html::template_engine, LocationResult, Report},
-    setting::{parse_location, Setting},
-    ttj::{jsondiff::Substantial, table_diff},
-};
+use clap::builder::ArgAction;
+use clap::Parser;
+use diffenator3::dfont::DFont;
+use diffenator3::render::encodedglyphs::{modified_encoded_glyphs, new_missing_glyphs};
+use diffenator3::render::test_font_words;
+use diffenator3::reporters::html::template_engine;
+use diffenator3::reporters::{self, LocationResult, Report};
+use diffenator3::setting::{parse_location, Setting};
+use diffenator3::ttj::jsondiff::Substantial;
+use diffenator3::ttj::table_diff;
+use env_logger::Env;
 use indexmap::IndexSet;
 use itertools::Itertools;
 use skrifa::{MetadataProvider, Tag};
-use std::{
-    collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
-};
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

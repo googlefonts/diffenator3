@@ -1,9 +1,7 @@
 use std::fmt::Display;
 
-use crate::{
-    dfont::DFont,
-    render::{diff_many_words, GlyphDiff},
-};
+use crate::dfont::DFont;
+use crate::render::{diff_many_words, GlyphDiff};
 use rustybuzz::Direction;
 use serde::Serialize;
 

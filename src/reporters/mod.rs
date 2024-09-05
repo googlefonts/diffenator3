@@ -6,10 +6,9 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::{
-    render::{encodedglyphs::CmapDiff, GlyphDiff},
-    ttj::jsondiff::Substantial,
-};
+use crate::render::encodedglyphs::CmapDiff;
+use crate::render::GlyphDiff;
+use crate::ttj::jsondiff::Substantial;
 
 #[derive(Serialize, Default)]
 pub struct LocationResult {
