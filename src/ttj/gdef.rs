@@ -5,7 +5,6 @@ use read_fonts::tables::gdef::{
     AttachList, CaretValue, ClassDef, GlyphClassDef, LigCaretList, MarkGlyphSets,
 };
 use read_fonts::tables::gpos::DeviceOrVariationIndex::VariationIndex;
-use read_fonts::tables::variations::DeltaSetIndex;
 use read_fonts::{FontRef, TableProvider};
 use serde_json::{json, Map, Value};
 use skrifa::GlyphId16;

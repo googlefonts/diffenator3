@@ -209,8 +209,8 @@ impl SerializeLookup for PositionLookup<'_> {
 }
 
 impl SerializeLookup for SubstitutionLookup<'_> {
-    fn serialize_lookup(&self, font: &FontRef, names: &NameMap) -> Value {
-        let mut map = Map::new();
+    fn serialize_lookup(&self, _font: &FontRef, _names: &NameMap) -> Value {
+        let map = Map::new();
         Value::Object(map)
     }
 }
@@ -350,17 +350,41 @@ impl SerializeSubtable for CursivePosFormat1<'_> {
     fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "cursive".into());
-        map.insert(
-            "format".to_string(),
-            Value::Number(self.pos_format().into()),
-        );
+        for (glyph_id, record) in self.coverage()?.iter().zip(self.entry_exit_record()) {
+            let name = names.get(glyph_id);
+            let entry = record
+                .entry_anchor(self.offset_data())
+                .map(|a| a?.serialize(self.offset_data(), font))
+                .transpose()?;
+            let exit = record
+                .exit_anchor(self.offset_data())
+                .map(|a| a?.serialize(self.offset_data(), font))
+                .transpose()?;
+            map.insert(
+                name,
+                Value::Object(
+                    vec![
+                        (
+                            "entry".to_string(),
+                            Value::String(entry.unwrap_or("NONE".to_string())),
+                        ),
+                        (
+                            "exit".to_string(),
+                            Value::String(exit.unwrap_or("NONE".to_string())),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+            );
+        }
 
         Ok(Value::Object(map))
     }
 }
 
 impl SerializeSubtable for MarkBasePosFormat1<'_> {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, _font: &FontRef, _names: &NameMap) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "mark_to_base".into());
         map.insert(
@@ -373,7 +397,7 @@ impl SerializeSubtable for MarkBasePosFormat1<'_> {
 }
 
 impl SerializeSubtable for MarkLigPosFormat1<'_> {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, _font: &FontRef, _names: &NameMap) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "mark_to_lig".into());
         map.insert(
@@ -386,7 +410,7 @@ impl SerializeSubtable for MarkLigPosFormat1<'_> {
 }
 
 impl SerializeSubtable for MarkMarkPosFormat1<'_> {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, _font: &FontRef, _names: &NameMap) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "mark_to_Mark".into());
         map.insert(
@@ -398,13 +422,12 @@ impl SerializeSubtable for MarkMarkPosFormat1<'_> {
     }
 }
 
-trait SerializeValueRecord {
+trait SerializeValueRecordLike {
     fn serialize(&self, offset_data: FontData<'_>, font: &FontRef) -> Result<String, ReadError>;
 }
 
-impl SerializeValueRecord for read_fonts::tables::gpos::ValueRecord {
+impl SerializeValueRecordLike for read_fonts::tables::gpos::ValueRecord {
     fn serialize(&self, offset_data: FontData<'_>, font: &FontRef) -> Result<String, ReadError> {
-        // XXX Handle device/variation tables
         let mut vr = String::new();
         if let Some(x) = self.x_advance() {
             if let Some(Ok(VariationIndex(device))) = self.x_advance_device(offset_data) {
@@ -415,17 +438,60 @@ impl SerializeValueRecord for read_fonts::tables::gpos::ValueRecord {
         } else if self.y_advance().is_some() {
             vr.push('0');
         }
+
         if let Some(y) = self.y_advance() {
-            vr.push_str(&format!(",{}", y));
+            vr.push(',');
+            if let Some(Ok(VariationIndex(device))) = self.y_advance_device(offset_data) {
+                vr.push_str(&serialize_all_deltas(device, font, y.into())?)
+            } else {
+                vr.push_str(&format!("{}", y));
+            }
         }
+
         if self.x_placement().is_none() && self.y_placement().is_none() {
             return Ok(vr);
         }
-        vr.push_str(&format!(
-            "@{},{}",
-            self.x_placement().unwrap_or_default(),
-            self.y_placement().unwrap_or_default()
-        ));
+        vr.push('@');
+        if let Some(x) = self.x_placement() {
+            if let Some(Ok(VariationIndex(device))) = self.x_placement_device(offset_data) {
+                vr.push_str(&serialize_all_deltas(device, font, x.into())?)
+            } else {
+                vr.push_str(&format!("{}", x));
+            }
+        } else {
+            vr.push('0');
+        }
+        vr.push(',');
+        if let Some(y) = self.y_placement() {
+            if let Some(Ok(VariationIndex(device))) = self.y_placement_device(offset_data) {
+                vr.push_str(&serialize_all_deltas(device, font, y.into())?)
+            } else {
+                vr.push_str(&format!("{}", y));
+            }
+        } else {
+            vr.push('0');
+        }
+        Ok(vr)
+    }
+}
+
+impl SerializeValueRecordLike for read_fonts::tables::gpos::AnchorTable<'_> {
+    fn serialize(&self, _offset_data: FontData<'_>, font: &FontRef) -> Result<String, ReadError> {
+        let mut vr = String::new();
+        let x = self.x_coordinate();
+        if let Some(Ok(VariationIndex(device))) = self.x_device() {
+            vr.push_str(&serialize_all_deltas(device, font, x.into())?)
+        } else {
+            vr.push_str(&format!("{}", x));
+        }
+        vr.push(',');
+        let y = self.y_coordinate();
+        if let Some(Ok(VariationIndex(device))) = self.y_device() {
+            vr.push_str(&serialize_all_deltas(device, font, y.into())?)
+        } else {
+            vr.push_str(&format!("{}", y));
+        }
+
         Ok(vr)
     }
 }
