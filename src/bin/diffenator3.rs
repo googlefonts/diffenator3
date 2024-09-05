@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    /// Don't show diffs in font-tables
+    /// Don't show diffs in font tables
     #[clap(long = "no-tables", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
     tables: bool,
 
