@@ -72,11 +72,7 @@ struct Cli {
     #[clap(long = "location", help_heading = "Locations to test")]
     location: Vec<String>,
     /// Instance to compare (may be repeated; use * for all instances)
-    #[clap(
-        long = "instances",
-        help_heading = "Locations to test",
-        default_value = "*"
-    )]
+    #[clap(long = "instances", help_heading = "Locations to test")]
     instances: Vec<String>,
     /// Cross-product (use min/default/max of all axes)
     #[clap(long = "cross-product", help_heading = "Locations to test")]
@@ -96,7 +92,7 @@ struct Cli {
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
 
     let font_binary_a = std::fs::read(&cli.font1).expect("Couldn't open file");
@@ -120,6 +116,10 @@ fn main() {
         result.cmap_diff = Some(new_missing_glyphs(&font_a, &font_b));
     }
 
+    // If there are no instances, location or cross-products, we set instances to "*"
+    if cli.instances.is_empty() && cli.location.is_empty() && !cli.cross_product {
+        cli.instances.push("*".to_string());
+    }
     // Location-specific tests
     let settings: Vec<Setting> = generate_settings(&cli, &font_a, &font_b);
 
