@@ -1,9 +1,10 @@
 pub mod encodedglyphs;
-mod renderer;
-mod utils;
-mod wordlists;
+pub mod renderer;
+pub mod utils;
+pub mod wordlists;
 
 use crate::dfont::DFont;
+use crate::render::utils::count_differences;
 use cfg_if::cfg_if;
 use image::{GenericImage, GrayImage, ImageBuffer};
 use renderer::Renderer;
@@ -22,8 +23,6 @@ cfg_if! {
     }
 }
 
-const FUZZ: u8 = 20;
-
 pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
     let mut map = serde_json::Map::new();
     for script in font_a
@@ -41,27 +40,6 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
         }
     }
     json!(map)
-}
-
-fn make_same_size(image_a: GrayImage, image_b: GrayImage) -> (GrayImage, GrayImage) {
-    let max_width = image_a.width().max(image_b.width());
-    let max_height = image_a.height().max(image_b.height());
-    let mut a = ImageBuffer::new(max_width, max_height);
-    let mut b = ImageBuffer::new(max_width, max_height);
-    a.copy_from(&image_a, 0, 0).unwrap();
-    b.copy_from(&image_b, 0, 0).unwrap();
-    (a, b)
-}
-
-fn count_differences(img_a: GrayImage, img_b: GrayImage) -> f32 {
-    let (img_a, img_b) = make_same_size(img_a, img_b);
-    let img_a_vec = img_a.to_vec();
-    let differing_pixels = img_a_vec
-        .iter()
-        .zip(img_b.to_vec())
-        .filter(|(&cha, chb)| cha.abs_diff(*chb) > FUZZ)
-        .count();
-    differing_pixels as f32 / (img_a.width() as f32 * img_a.height() as f32) * 100.0
 }
 
 #[derive(Debug, Serialize)]

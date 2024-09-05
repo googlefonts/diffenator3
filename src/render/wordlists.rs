@@ -117,8 +117,7 @@ pub(crate) fn get_wordlist(script: &str) -> Option<Vec<String>> {
     Some(wordlist)
 }
 
-
-pub(crate) fn get_script_tag(script: &str) -> Option<rustybuzz::Script> {
+pub fn get_script_tag(script: &str) -> Option<rustybuzz::Script> {
     match script {
         "Adlam" => Some(rustybuzz::script::ADLAM),
         "Arabic" => Some(rustybuzz::script::ARABIC),
@@ -160,11 +159,11 @@ pub(crate) fn get_script_tag(script: &str) -> Option<rustybuzz::Script> {
         "Tibetan" => Some(rustybuzz::script::TIBETAN),
         "Tifinagh" => Some(rustybuzz::script::TIFINAGH),
         "Vai" => Some(rustybuzz::script::VAI),
-        _ =>  None,
+        _ => None,
     }
 }
 
-pub(crate) fn get_script_direction(script: &str) -> rustybuzz::Direction {
+pub fn get_script_direction(script: &str) -> rustybuzz::Direction {
     match script {
         "Arabic" => rustybuzz::Direction::RightToLeft,
         "Avestan" => rustybuzz::Direction::RightToLeft,
