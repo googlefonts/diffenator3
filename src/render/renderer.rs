@@ -65,7 +65,7 @@ impl<'a> Renderer<'a> {
                 return None;
             }
             pen.offset_x = cursor + (position.x_offset as f32 * factor);
-            pen.offset_y = -position.y_offset as f32 * factor;
+            pen.offset_y = position.y_offset as f32 * factor;
             let settings = DrawSettings::unhinted(Size::new(self.scale), self.location);
 
             let _ = self
