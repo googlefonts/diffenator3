@@ -352,31 +352,22 @@ impl SerializeSubtable for CursivePosFormat1<'_> {
         map.insert("type".to_string(), "cursive".into());
         for (glyph_id, record) in self.coverage()?.iter().zip(self.entry_exit_record()) {
             let name = names.get(glyph_id);
-            let entry = record
+            let mut entrymap = Map::new();
+            if let Some(entry) = record
                 .entry_anchor(self.offset_data())
                 .map(|a| a?.serialize(self.offset_data(), font))
-                .transpose()?;
-            let exit = record
+                .transpose()?
+            {
+                entrymap.insert("entry".to_string(), Value::String(entry));
+            }
+            if let Some(exit) = record
                 .exit_anchor(self.offset_data())
                 .map(|a| a?.serialize(self.offset_data(), font))
-                .transpose()?;
-            map.insert(
-                name,
-                Value::Object(
-                    vec![
-                        (
-                            "entry".to_string(),
-                            Value::String(entry.unwrap_or("NONE".to_string())),
-                        ),
-                        (
-                            "exit".to_string(),
-                            Value::String(exit.unwrap_or("NONE".to_string())),
-                        ),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
-            );
+                .transpose()?
+            {
+                entrymap.insert("exit".to_string(), Value::String(exit));
+            }
+            map.insert(name, Value::Object(entrymap));
         }
 
         Ok(Value::Object(map))
@@ -569,7 +560,7 @@ pub(crate) fn serialize_all_deltas(
                         .unwrap_or("Unknown")
                 ));
             }
-            return Ok(deltas.join(" "));
+            return Ok("(".to_string() + deltas.join(" ").as_str() + ")");
         }
     }
     Ok(format!("{}", current))
