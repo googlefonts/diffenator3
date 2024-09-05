@@ -1,11 +1,9 @@
 use image::{DynamicImage, GrayImage, Luma};
 use rustybuzz::{shape_with_plan, Direction, Face, ShapePlan, UnicodeBuffer};
-use skrifa::{
-    instance::{LocationRef, Size},
-    outline::DrawSettings,
-    raw::TableProvider,
-    GlyphId, MetadataProvider, OutlineGlyphCollection,
-};
+use skrifa::instance::{LocationRef, Size};
+use skrifa::outline::DrawSettings;
+use skrifa::raw::TableProvider;
+use skrifa::{GlyphId, MetadataProvider, OutlineGlyphCollection};
 use zeno::Command;
 
 use super::utils::{terrible_bounding_box, RecordingPen};
