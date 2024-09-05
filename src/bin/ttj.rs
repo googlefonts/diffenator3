@@ -12,6 +12,6 @@ fn main() {
     let name = matches.get_one::<String>("font").expect("No font name?");
     let font_binary = std::fs::read(name).expect("Couldn't open file");
     let font = FontRef::new(&font_binary).expect("Can't parse");
-    let json = font_to_json(&font);
+    let json = font_to_json(&font, None);
     println!("{:}", serde_json::to_string_pretty(&json).unwrap());
 }
