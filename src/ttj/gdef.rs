@@ -1,4 +1,4 @@
-use crate::ttj::layout::serialize_all_deltas;
+use crate::ttj::layout::variable_scalars::serialize_all_deltas;
 
 use super::namemap::NameMap;
 use read_fonts::tables::gdef::{
