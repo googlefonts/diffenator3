@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use skrifa::setting::VariationSetting;
 
 use crate::dfont::DFont;
@@ -5,11 +7,18 @@ use crate::dfont::DFont;
 /// A position across both fonts to test; could be an
 /// instance, could be a location
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Setting {
     Instance(String),
     Location(Vec<VariationSetting>),
     Default,
+}
+
+impl Eq for Setting {}
+impl std::hash::Hash for Setting {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        format!("{:?}", self).hash(state);
+    }
 }
 
 pub fn parse_location(variations: &str) -> Result<Vec<VariationSetting>, String> {
@@ -26,6 +35,22 @@ pub fn parse_location(variations: &str) -> Result<Vec<VariationSetting>, String>
     Ok(settings)
 }
 
+impl Display for Setting {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Setting::Instance(inst) => write!(f, "{} instance", inst),
+            Setting::Location(loc) => {
+                let loc = loc
+                    .iter()
+                    .map(|vs| format!("{}={}", vs.selector, vs.value))
+                    .collect::<Vec<String>>()
+                    .join(",");
+                write!(f, "{}", loc)
+            }
+            Setting::Default => write!(f, "default location"),
+        }
+    }
+}
 impl Setting {
     pub fn from_instance(instance: String) -> Self {
         Setting::Instance(instance)

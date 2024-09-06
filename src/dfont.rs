@@ -1,6 +1,7 @@
+use crate::monkeypatching::DenormalizeLocation;
 use crate::setting::parse_location;
 use font_types::NameId;
-use read_fonts::FontRef;
+use read_fonts::{FontRef, ReadError, TableProvider};
 use skrifa::instance::Location;
 use skrifa::setting::VariationSetting;
 use skrifa::MetadataProvider;
@@ -134,5 +135,23 @@ impl DFont {
             }
         }
         strings
+    }
+
+    pub fn masters(&self) -> Result<Vec<Vec<VariationSetting>>, ReadError> {
+        let gvar = self.fontref().gvar()?;
+        let tuples = gvar.shared_tuples()?.tuples();
+        let peaks: Vec<Vec<VariationSetting>> = tuples
+            .iter()
+            .flatten()
+            .flat_map(|tuple| {
+                let location = tuple
+                    .values()
+                    .iter()
+                    .map(|x| x.get().to_f32())
+                    .collect::<Vec<f32>>();
+                self.fontref().denormalize_location(&location)
+            })
+            .collect();
+        Ok(peaks)
     }
 }

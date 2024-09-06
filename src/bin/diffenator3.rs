@@ -74,6 +74,9 @@ struct Cli {
     /// Instance to compare (may be repeated; use * for all instances)
     #[clap(long = "instances", help_heading = "Locations to test")]
     instances: Vec<String>,
+    /// Masters (as detected from the gvar table)
+    #[clap(long = "masters", help_heading = "Locations to test")]
+    masters: bool,
     /// Cross-product (use min/default/max of all axes)
     #[clap(long = "cross-product", help_heading = "Locations to test")]
     cross_product: bool,
@@ -117,7 +120,7 @@ fn main() {
     }
 
     // If there are no instances, location or cross-products, we set instances to "*"
-    if cli.instances.is_empty() && cli.location.is_empty() && !cli.cross_product {
+    if cli.instances.is_empty() && cli.location.is_empty() && !cli.masters && !cli.cross_product {
         cli.instances.push("*".to_string());
     }
     // Location-specific tests
@@ -192,6 +195,16 @@ fn generate_settings(args: &Cli, font_a: &DFont, font_b: &DFont) -> Vec<Setting>
         let loc = parse_location(location).expect("Couldn't parse location");
         settings.push(Setting::from_setting(loc));
     }
+
+    if args.masters {
+        if let Ok(masters) = font_a.masters() {
+            settings.push(Setting::Default);
+            for master in masters.into_iter() {
+                let setting = Setting::from_setting(master);
+                settings.push(setting);
+            }
+        }
+    }
     if args.cross_product {
         let mut axes: HashSet<Tag> = font_a.fontref().axes().iter().map(|a| a.tag()).collect();
         axes.extend(font_b.fontref().axes().iter().map(|a| a.tag()));
@@ -232,7 +245,8 @@ fn generate_settings(args: &Cli, font_a: &DFont, font_b: &DFont) -> Vec<Setting>
         // Add default setting
         settings.push(Setting::Default);
     }
-    settings
+    // Deduplicate
+    settings.into_iter().unique().collect()
 }
 
 fn split_axis(axis: &Tag, tuple: (f32, f32, f32), split_count: usize) -> Vec<(Tag, f32)> {

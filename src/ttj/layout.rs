@@ -1,4 +1,3 @@
-use read_fonts::tables::fvar::VariationAxisRecord;
 use read_fonts::tables::gpos::DeviceOrVariationIndex::VariationIndex;
 use read_fonts::tables::gpos::{
     CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1, MarkMarkPosFormat1, PairPos,
@@ -9,6 +8,8 @@ use read_fonts::tables::layout::{self};
 use read_fonts::{FontData, FontRead, FontRef, ReadError, TableProvider};
 use serde_json::{Map, Value};
 use skrifa::GlyphId16;
+
+use crate::monkeypatching::DenormalizeLocation;
 
 use super::namemap::NameMap;
 
@@ -487,32 +488,11 @@ impl SerializeValueRecordLike for read_fonts::tables::gpos::AnchorTable<'_> {
     }
 }
 
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
-}
-fn poor_mans_denormalize(peak: f32, axis: &VariationAxisRecord) -> f32 {
-    // Insert avar here
-    if peak > 0.0 {
-        lerp(
-            axis.default_value().to_f32(),
-            axis.max_value().to_f32(),
-            peak,
-        )
-    } else {
-        lerp(
-            axis.default_value().to_f32(),
-            axis.min_value().to_f32(),
-            -peak,
-        )
-    }
-}
-
 pub(crate) fn serialize_all_deltas(
     device: read_fonts::tables::layout::VariationIndex,
     font: &FontRef,
     current: i32,
 ) -> Result<String, ReadError> {
-    let axes = font.fvar()?.axes()?;
     if let Some(Ok(ivs)) = font.gdef()?.item_var_store() {
         let regions = ivs.variation_region_list()?.variation_regions();
         // Let's turn these back to userspace
@@ -520,22 +500,22 @@ pub(crate) fn serialize_all_deltas(
             .iter()
             .flatten()
             .map(|r| {
-                let location: Vec<String> = r
+                let tuple: Vec<f32> = r
                     .region_axes()
                     .iter()
-                    .enumerate()
-                    .map(|(axis_ix, tuple)| {
-                        let axis = axes.get(axis_ix).unwrap();
-                        let peak = tuple.peak_coord().to_f32();
-                        (axis, peak)
-                    })
-                    .filter(|&(_axis, peak)| peak != 0.0)
-                    .map(|(axis, peak)| {
-                        let value = poor_mans_denormalize(peak, axis);
-                        format!("{}={}", axis.axis_tag(), value)
-                    })
+                    .map(|x| x.peak_coord().to_f32())
                     .collect();
-                location.join(",")
+                if let Ok(location) = font.denormalize_location(&tuple) {
+                    let loc_str: Vec<String> = location
+                        .iter()
+                        .map(|setting| {
+                            setting.selector.to_string() + "=" + &setting.value.to_string()
+                        })
+                        .collect();
+                    loc_str.join(",")
+                } else {
+                    "Unknown".to_string()
+                }
             })
             .collect();
 
