@@ -234,13 +234,68 @@ impl SerializeSubtable for MarkBasePosFormat1<'_> {
 }
 
 impl SerializeSubtable for MarkLigPosFormat1<'_> {
-    fn serialize_subtable(&self, _font: &FontRef, _names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "mark_to_lig".into());
-        map.insert(
-            "format".to_string(),
-            Value::Number(self.pos_format().into()),
-        );
+        let mark_array = self.mark_array()?;
+        let mut marks = Map::new();
+        for (mark_glyph, mark_record) in self.mark_coverage()?.iter().zip(mark_array.mark_records())
+        {
+            let mark_name = names.get(mark_glyph);
+            let class_name = format!("anchor_{}", mark_record.mark_class());
+            // "marks": {
+            //    "anchor_0": {
+            //         "glyph": "anchor",
+            //         "glyph": "anchor",
+            //    }, ...
+            // }
+            marks
+                .entry(class_name)
+                .or_insert_with(|| Map::new().into())
+                .as_object_mut()
+                .unwrap()
+                .insert(
+                    mark_name,
+                    mark_record
+                        .mark_anchor(mark_array.offset_data())?
+                        .serialize(self.offset_data(), font)?
+                        .into(),
+                );
+        }
+        map.insert("marks".to_string(), marks.into());
+
+        let mut ligatures = Map::new();
+        let ligature_array = self.ligature_array()?;
+        for (ligature_glyph, ligature_attach_record) in self
+            .ligature_coverage()?
+            .iter()
+            .zip(ligature_array.ligature_attaches().iter().flatten())
+        {
+            let mut anchors = Map::new();
+            for (component_id, component_record) in ligature_attach_record
+                .component_records()
+                .iter()
+                .flatten()
+                .enumerate()
+            {
+                for (class, anchor) in component_record
+                    .ligature_anchors(ligature_attach_record.offset_data())
+                    .iter()
+                    .enumerate()
+                {
+                    if let Some(Ok(anchor)) = anchor {
+                        anchors.insert(
+                            format!("anchor_{}_{}", class, component_id + 1),
+                            anchor.serialize(self.offset_data(), font)?.into(),
+                        );
+                    }
+                }
+            }
+
+            let ligature_name = names.get(ligature_glyph);
+            ligatures.insert(ligature_name, anchors.into());
+        }
+        map.insert("ligatures".to_string(), ligatures.into());
 
         Ok(Value::Object(map))
     }
