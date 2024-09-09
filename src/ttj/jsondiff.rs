@@ -17,7 +17,7 @@ impl Substantial for Value {
     }
 }
 
-pub(crate) fn diff(this: &Value, other: &Value) -> Value {
+pub fn diff(this: &Value, other: &Value, max_changes: usize) -> Value {
     match (this, other) {
         (Value::Null, Value::Null) => Value::Null,
         (Value::Number(l), Value::Number(r)) => {
@@ -47,12 +47,14 @@ pub(crate) fn diff(this: &Value, other: &Value) -> Value {
                 let difference = diff(
                     l.get(i).unwrap_or(&Value::Null),
                     r.get(i).unwrap_or(&Value::Null),
+                    max_changes,
                 );
                 if difference.is_something() {
                     res.insert(i.to_string(), difference);
                 }
             }
-            if res.len() > 133 {
+            if res.len() > max_changes && max_changes > 0 {
+                println!("Max changes was {}, length was {}", max_changes, res.len());
                 json!({ "error": format!("There are {} changes, check manually!", res.len()) })
             } else {
                 Value::Object(res)
@@ -67,6 +69,7 @@ pub(crate) fn diff(this: &Value, other: &Value) -> Value {
                 let difference = diff(
                     l.get(key).unwrap_or(&Value::Null),
                     r.get(key).unwrap_or(&Value::Null),
+                    max_changes,
                 );
                 if difference.is_something() {
                     res.insert(key.to_string(), difference);
@@ -74,7 +77,7 @@ pub(crate) fn diff(this: &Value, other: &Value) -> Value {
             }
             if res.is_empty() {
                 Value::Null
-            } else if res.len() > 133 {
+            } else if res.len() > max_changes && max_changes > 0 {
                 json!({ "error": format!("There are {} changes, check manually!", res.len()) })
             } else {
                 Value::Object(res)

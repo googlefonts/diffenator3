@@ -56,6 +56,10 @@ struct Cli {
     #[clap(long = "succinct", overrides_with = "succinct", help_heading = Some("Report format"))]
     _no_succinct: bool,
 
+    /// Maximum number of changes to report before giving up
+    #[clap(long = "max-changes", default_value = "128", help_heading = Some("Report format"))]
+    max_changes: usize,
+
     /// Indent JSON
     #[clap(long = "pretty", requires = "json", help_heading = Some("Report format"))]
     pretty: bool,
@@ -110,7 +114,7 @@ fn main() {
 
     // Location-independent tests
     if cli.tables {
-        let table_diff = table_diff(&font_a.fontref(), &font_b.fontref());
+        let table_diff = table_diff(&font_a.fontref(), &font_b.fontref(), cli.max_changes);
         if table_diff.is_something() {
             result.tables = Some(table_diff);
         }

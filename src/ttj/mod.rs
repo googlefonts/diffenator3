@@ -11,7 +11,7 @@ use skrifa::MetadataProvider;
 mod gdef;
 pub mod jsondiff;
 mod layout;
-mod namemap;
+pub mod namemap;
 mod serializefont;
 
 fn serialize_name_table<'a>(font: &(impl MetadataProvider<'a> + TableProvider<'a>)) -> Value {
@@ -151,7 +151,7 @@ pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
     Value::Object(map)
 }
 
-pub fn table_diff(font_a: &FontRef, font_b: &FontRef) -> Value {
+pub fn table_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize) -> Value {
     let glyphmap_a = NameMap::new(font_a);
     let glyphmap_b = NameMap::new(font_b);
     let big_difference = !glyphmap_a.compatible(&glyphmap_b);
@@ -171,5 +171,6 @@ pub fn table_diff(font_a: &FontRef, font_b: &FontRef) -> Value {
                 &glyphmap_b
             }),
         ),
+        max_changes,
     )
 }

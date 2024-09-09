@@ -87,7 +87,7 @@ cfg_if! {
             let f_b = DFont::new(font_b);
 
             let val = json!({
-                "tables": table_diff(&f_a.fontref(), &f_b.fontref())
+                "tables": table_diff(&f_a.fontref(), &f_b.fontref(), 128)
             });
             f.call1(&JsValue::NULL, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
         }
