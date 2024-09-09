@@ -4,7 +4,7 @@ use crate::ttj::jsondiff::Substantial;
 use colored::Colorize;
 use serde_json::Map;
 
-fn show_map_diff(fields: &Map<String, serde_json::Value>, indent: usize, succinct: bool) {
+pub fn show_map_diff(fields: &Map<String, serde_json::Value>, indent: usize, succinct: bool) {
     for (field, diff) in fields.iter() {
         print!("{}", " ".repeat(indent * 2));
         if field == "error" {

@@ -40,10 +40,14 @@ impl NameMap {
             .zip(other.0.iter())
             .filter(|(a, b)| a != b)
             .count();
-        count_glyphname_differences < self.0.len() / 2
+        count_glyphname_differences < self.0.len() / 4
     }
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
