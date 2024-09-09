@@ -93,12 +93,12 @@ body {
 }
 
 .attr-before {
-    color: red;
+    color: green;
     cursor: text;
 }
 
 .attr-after {
-    color: green;
+    color: red;
     cursor: text;
 }
 
