@@ -1,9 +1,11 @@
 mod gpos;
+mod gsub;
 pub(crate) mod variable_scalars;
 
 use read_fonts::tables::gpos::{PositionLookup, PositionSubtables};
 use read_fonts::tables::gsub::{
-    ChainedSequenceContext, FeatureList, SequenceContext, SubstitutionLookup, SubstitutionSubtables,
+    ChainedSequenceContext, ClassDef, FeatureList, SequenceContext, SubstitutionLookup,
+    SubstitutionSubtables,
 };
 use read_fonts::tables::layout::{self};
 use read_fonts::tables::varc::CoverageTable;
@@ -201,17 +203,15 @@ impl SerializeLookup for SubstitutionLookup<'_> {
     fn serialize_lookup(&self, font: &FontRef, names: &NameMap) -> Value {
         if let Ok(subtables) = self.subtables() {
             let serialized_tables: Vec<Result<Value, _>> = match subtables {
-                // SubstitutionSubtables::Single(st) => serialize_it!(st, font, names),
-                // SubstitutionSubtables::Multiple(st) => serialize_it!(st, font, names),
-                // SubstitutionSubtables::Cursive(st) => serialize_it!(st, font, names),
-                // SubstitutionSubtables::MarkToBase(st) => serialize_it!(st, font, names),
-                // SubstitutionSubtables::MarkToLig(st) => serialize_it!(st, font, names),
-                // SubstitutionSubtables::MarkToMark(st) => serialize_it!(st, font, names),
+                SubstitutionSubtables::Single(st) => serialize_it!(st, font, names),
+                SubstitutionSubtables::Multiple(st) => serialize_it!(st, font, names),
+                SubstitutionSubtables::Alternate(st) => serialize_it!(st, font, names),
+                SubstitutionSubtables::Ligature(st) => serialize_it!(st, font, names),
+                SubstitutionSubtables::Reverse(st) => serialize_it!(st, font, names),
                 SubstitutionSubtables::ChainContextual(st) => {
                     serialize_it!(st, font, names)
                 }
                 SubstitutionSubtables::Contextual(st) => serialize_it!(st, font, names),
-                _ => vec![],
             };
             return Value::Array(
                 serialized_tables
@@ -228,6 +228,7 @@ impl SerializeLookup for SubstitutionLookup<'_> {
 struct Slot {
     glyphs: Vec<GlyphId16>,
     lookups: Vec<u16>,
+    class_0: bool,
 }
 
 impl From<GlyphId16> for Slot {
@@ -235,6 +236,7 @@ impl From<GlyphId16> for Slot {
         Slot {
             glyphs: vec![glyph],
             lookups: vec![],
+            class_0: false,
         }
     }
 }
@@ -243,14 +245,25 @@ impl From<CoverageTable<'_>> for Slot {
         Slot {
             glyphs: glyph.iter().collect(),
             lookups: vec![],
+            class_0: false,
         }
     }
 }
 
 impl Slot {
+    fn new_class0() -> Self {
+        Slot {
+            glyphs: vec![],
+            lookups: vec![],
+            class_0: true,
+        }
+    }
+
     fn as_string(&self, names: &NameMap, marked: bool) -> String {
         let mut result = String::new();
-        if self.glyphs.len() > 1 {
+        if self.class_0 {
+            result.push_str("@Any");
+        } else if self.glyphs.len() > 1 {
             result.push('[');
             result.push_str(
                 &self
@@ -328,9 +341,8 @@ impl SerializeSubtable for SequenceContext<'_> {
         let mut map = Map::new();
         let rules = match self {
             SequenceContext::Format1(f1) => serialize_sequence_f1(f1),
-            // SequenceContext::Format2(f2) => serialize_sequence_f2(&f2),
-            SequenceContext::Format3(f3) => serialize_sequence_f3(&f3),
-            _ => Ok(vec![]),
+            SequenceContext::Format2(f2) => serialize_sequence_f2(f2),
+            SequenceContext::Format3(f3) => serialize_sequence_f3(f3),
         }?;
         map.insert("type".to_string(), "sequence_context".into());
         map.insert(
@@ -357,6 +369,53 @@ fn serialize_sequence_f1(f1: &layout::SequenceContextFormat1) -> Result<Vec<Chai
                         .input_sequence()
                         .iter()
                         .map(|x| Slot::from(x.get())),
+                );
+                let mut rule = ChainRule {
+                    backtrack: vec![],
+                    input: glyphs,
+                    lookahead: vec![],
+                };
+                for lookup_record in sequencerule.seq_lookup_records() {
+                    if let Some(slot) = rule.input.get_mut(lookup_record.sequence_index() as usize)
+                    {
+                        slot.lookups.push(lookup_record.lookup_list_index());
+                    }
+                }
+                rules.push(rule);
+            }
+        }
+    }
+    Ok(rules)
+}
+
+fn serialize_sequence_f2(f2: &layout::SequenceContextFormat2) -> Result<Vec<ChainRule>, ReadError> {
+    let mut rules = vec![];
+    let classes = f2.class_def()?;
+    let class_to_slot = |wanted_class: u16| {
+        if wanted_class == 0 {
+            Slot::new_class0()
+        } else {
+            let glyphs = classes
+                .iter()
+                .filter(|&(_gid, class)| class == wanted_class)
+                .map(|(gid, _)| gid);
+            Slot {
+                glyphs: glyphs.collect(),
+                lookups: vec![],
+                class_0: false,
+            }
+        }
+    };
+
+    for (first_class, sequenceruleset) in f2.class_seq_rule_sets().iter().enumerate() {
+        if let Some(Ok(sequenceruleset)) = sequenceruleset {
+            for sequencerule in sequenceruleset.class_seq_rules().iter().flatten() {
+                let mut glyphs = vec![class_to_slot(first_class as u16)];
+                glyphs.extend(
+                    sequencerule
+                        .input_sequence()
+                        .iter()
+                        .map(|x| class_to_slot(x.get())),
                 );
                 let mut rule = ChainRule {
                     backtrack: vec![],
@@ -405,9 +464,8 @@ impl SerializeSubtable for ChainedSequenceContext<'_> {
         let mut map = Map::new();
         let rules = match self {
             ChainedSequenceContext::Format1(f1) => serialize_chain_sequence_f1(f1),
-            // SequenceContext::Format2(f2) => serialize_chain_sequence_f2(&f2),
-            ChainedSequenceContext::Format3(f3) => serialize_chain_sequence_f3(&f3),
-            _ => Ok(vec![]),
+            ChainedSequenceContext::Format2(f2) => serialize_chain_sequence_f2(f2),
+            ChainedSequenceContext::Format3(f3) => serialize_chain_sequence_f3(f3),
         }?;
         map.insert("type".to_string(), "chained_sequence_context".into());
         map.insert(
@@ -447,6 +505,70 @@ fn serialize_chain_sequence_f1(
                     .iter()
                     .map(|x| Slot::from(x.get()))
                     .collect();
+                let mut rule = ChainRule {
+                    backtrack,
+                    input: glyphs,
+                    lookahead,
+                };
+                for lookup_record in sequencerule.seq_lookup_records() {
+                    if let Some(slot) = rule.input.get_mut(lookup_record.sequence_index() as usize)
+                    {
+                        slot.lookups.push(lookup_record.lookup_list_index());
+                    }
+                }
+                rules.push(rule);
+            }
+        }
+    }
+    Ok(rules)
+}
+
+fn serialize_chain_sequence_f2(
+    f2: &layout::ChainedSequenceContextFormat2,
+) -> Result<Vec<ChainRule>, ReadError> {
+    let mut rules = vec![];
+    let classes = f2.input_class_def()?;
+    let back_classes = f2.backtrack_class_def()?;
+    let lookahead_classes = f2.lookahead_class_def()?;
+    let class_to_slot = |wanted_class: u16, classdefs: &ClassDef<'_>| {
+        if wanted_class == 0 {
+            Slot::new_class0()
+        } else {
+            let glyphs = classdefs
+                .iter()
+                .filter(|&(_gid, class)| class == wanted_class)
+                .map(|(gid, _)| gid);
+            Slot {
+                glyphs: glyphs.collect(),
+                lookups: vec![],
+                class_0: false,
+            }
+        }
+    };
+
+    for (first_class, sequenceruleset) in f2.chained_class_seq_rule_sets().iter().enumerate() {
+        if let Some(Ok(sequenceruleset)) = sequenceruleset {
+            for sequencerule in sequenceruleset.chained_class_seq_rules().iter().flatten() {
+                let mut glyphs = vec![class_to_slot(first_class as u16, &classes)];
+                glyphs.extend(
+                    sequencerule
+                        .input_sequence()
+                        .iter()
+                        .map(|x| class_to_slot(x.get(), &classes)),
+                );
+
+                let mut backtrack: Vec<Slot> = sequencerule
+                    .backtrack_sequence()
+                    .iter()
+                    .map(|x| class_to_slot(x.get(), &back_classes))
+                    .collect();
+                backtrack.reverse();
+                let lookahead: Vec<Slot> = sequencerule
+                    .lookahead_sequence()
+                    .iter()
+                    .map(|x| class_to_slot(x.get(), &lookahead_classes))
+                    .collect();
+
                 let mut rule = ChainRule {
                     backtrack,
                     input: glyphs,
