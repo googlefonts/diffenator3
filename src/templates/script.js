@@ -49,6 +49,9 @@ $(function () {
   if (report["tables"]) {
     diffTables(report);
   }
+  if (report["kerns"]) {
+    diffKerns(report);
+  }
   cmapDiff(report);
   $('[data-toggle="tooltip"]').tooltip();
   if (!report["locations"]) {

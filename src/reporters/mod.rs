@@ -43,6 +43,8 @@ pub struct Report {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tables: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub kerns: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cmap_diff: Option<CmapDiff>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub locations: Vec<LocationResult>,

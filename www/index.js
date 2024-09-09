@@ -7,6 +7,7 @@ import {
   cmapDiff,
   setupAnimation,
   diffTables,
+  diffKerns,
 } from "../src/templates/shared";
 
 jQuery.fn.shake = function (interval, distance, times) {
@@ -143,6 +144,10 @@ class Diffenator {
       // console.log("Hiding spinner")
       $("#spinnerModal").hide();
       diffTables(message);
+    } else if (message.type == "kerns") {
+      // console.log("Hiding spinner")
+      $("#spinnerModal").hide();
+      diffKerns(message);
     } else if (message.type == "modified_glyphs") {
       $("#spinnerModal").hide();
       let glyph_diff = message.modified_glyphs;
@@ -189,6 +194,11 @@ class Diffenator {
     });
     diffWorker.postMessage({
       command: "tables",
+      beforeFont: this.beforeFont,
+      afterFont: this.afterFont,
+    });
+    diffWorker.postMessage({
+      command: "kerns",
       beforeFont: this.beforeFont,
       afterFont: this.afterFont,
     });

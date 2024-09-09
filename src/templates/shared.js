@@ -84,6 +84,21 @@ function diffTables(report) {
   });
 }
 
+function diffKerns(report) {
+  $("#diffkerns").empty();
+  $("#diffkerns").append(`<h4 class="mt-2">Modified Kerns</h4>`);
+  $("#diffkerns").append(
+    `<table class="table table-striped" id="diffkerns"><tr><th>Pair</th><th>Old</old><th>New</th></table>`
+  );
+  for (let [pair, value] of Object.entries(report["kerns"])) {
+    let row = $("<tr>");
+    row.append(`<td>${pair}</td>`);
+    row.append(`<td>${value[0]}</td>`);
+    row.append(`<td>${value[1]}</td>`);
+    $("#diffkerns table").append(row);
+  }
+}
+
 function cmapDiff(report) {
   if (report.cmap_diff && (report.cmap_diff.new || report.cmap_diff.missing)) {
     $("#cmapdiff").append(
@@ -144,5 +159,6 @@ export {
   addAWord,
   cmapDiff,
   diffTables,
+  diffKerns,
   setupAnimation,
 };

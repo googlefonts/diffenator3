@@ -1,4 +1,4 @@
-mod gpos;
+pub(crate) mod gpos;
 mod gsub;
 pub(crate) mod variable_scalars;
 

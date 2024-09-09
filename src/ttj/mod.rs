@@ -14,6 +14,8 @@ mod layout;
 pub mod namemap;
 mod serializefont;
 
+pub use layout::gpos::just_kerns;
+
 fn serialize_name_table<'a>(font: &(impl MetadataProvider<'a> + TableProvider<'a>)) -> Value {
     let mut map = Map::new();
     if let Ok(name) = font.name() {
@@ -151,10 +153,10 @@ pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
     Value::Object(map)
 }
 
-pub fn table_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize) -> Value {
+pub fn table_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_match: bool) -> Value {
     let glyphmap_a = NameMap::new(font_a);
     let glyphmap_b = NameMap::new(font_b);
-    let big_difference = !glyphmap_a.compatible(&glyphmap_b);
+    let big_difference = !no_match && !glyphmap_a.compatible(&glyphmap_b);
 
     #[cfg(not(target_family = "wasm"))]
     if big_difference {
@@ -173,4 +175,29 @@ pub fn table_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize) -> Val
         ),
         max_changes,
     )
+}
+
+pub fn kern_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_match: bool) -> Value {
+    let glyphmap_a = NameMap::new(font_a);
+    let glyphmap_b = NameMap::new(font_b);
+    let big_difference = !no_match && !glyphmap_a.compatible(&glyphmap_b);
+
+    #[cfg(not(target_family = "wasm"))]
+    if big_difference {
+        println!("Glyph names differ dramatically between fonts, using font names from font A");
+    }
+
+    let kerns_a = just_kerns(font_to_json(font_a, None));
+    // println!("Font A flat kerning: {:#?}", kerns_a);
+    let kerns_b = just_kerns(font_to_json(
+        font_b,
+        Some(if big_difference {
+            &glyphmap_a
+        } else {
+            &glyphmap_b
+        }),
+    ));
+    // println!("Font B flat kerning: {:#?}", kerns_a);
+
+    diff(&kerns_a, &kerns_b, max_changes)
 }

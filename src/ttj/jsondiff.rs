@@ -54,7 +54,6 @@ pub fn diff(this: &Value, other: &Value, max_changes: usize) -> Value {
                 }
             }
             if res.len() > max_changes && max_changes > 0 {
-                println!("Max changes was {}, length was {}", max_changes, res.len());
                 json!({ "error": format!("There are {} changes, check manually!", res.len()) })
             } else {
                 Value::Object(res)

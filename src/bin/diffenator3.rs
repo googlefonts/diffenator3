@@ -7,7 +7,7 @@ use diffenator3::reporters::html::template_engine;
 use diffenator3::reporters::{self, LocationResult, Report};
 use diffenator3::setting::{parse_location, Setting};
 use diffenator3::ttj::jsondiff::Substantial;
-use diffenator3::ttj::table_diff;
+use diffenator3::ttj::{kern_diff, table_diff};
 use env_logger::Env;
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -25,6 +25,14 @@ struct Cli {
     /// Show diffs in font tables [default]
     #[clap(long = "tables", overrides_with = "tables", help_heading = Some("Tests to run"))]
     _no_tables: bool,
+
+    /// Don't show diffs in font kerning pairs
+    #[clap(long = "no-kerns", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
+    kerns: bool,
+
+    /// Show diffs in font kerning pairs [default]
+    #[clap(long = "kerns", overrides_with = "kerns", help_heading = Some("Tests to run"))]
+    _no_kerns: bool,
 
     /// Don't show diffs in glyph images
     #[clap(long = "no-glyphs", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
@@ -72,6 +80,10 @@ struct Cli {
     #[clap(long = "templates", requires = "html", help_heading = Some("Report format"))]
     templates: Option<String>,
 
+    /// Update diffenator3's stock templates
+    #[clap(long = "update-templates", requires = "html", help_heading = Some("Report format"))]
+    update_templates: bool,
+
     /// Location in user space, in the form axis=123,other=456 (may be repeated)
     #[clap(long = "location", help_heading = "Locations to test")]
     location: Vec<String>,
@@ -92,6 +104,10 @@ struct Cli {
     )]
     splits: usize,
 
+    /// Don't try to match glyph names between fonts
+    #[clap(long = "no-match", help_heading = Some("Report format"))]
+    no_match: bool,
+
     /// The first font file to compare
     font1: PathBuf,
     /// The second font file to compare
@@ -105,7 +121,9 @@ fn main() {
     let font_binary_a = std::fs::read(&cli.font1).expect("Couldn't open file");
     let font_binary_b = std::fs::read(&cli.font2).expect("Couldn't open file");
 
-    let tera = cli.html.then(|| template_engine(cli.templates.as_ref()));
+    let tera = cli
+        .html
+        .then(|| template_engine(cli.templates.as_ref(), cli.update_templates));
 
     let mut font_a = DFont::new(&font_binary_a);
     let mut font_b = DFont::new(&font_binary_b);
@@ -114,9 +132,25 @@ fn main() {
 
     // Location-independent tests
     if cli.tables {
-        let table_diff = table_diff(&font_a.fontref(), &font_b.fontref(), cli.max_changes);
+        let table_diff = table_diff(
+            &font_a.fontref(),
+            &font_b.fontref(),
+            cli.max_changes,
+            cli.no_match,
+        );
         if table_diff.is_something() {
             result.tables = Some(table_diff);
+        }
+    }
+    if cli.kerns {
+        let kern_diff = kern_diff(
+            &font_a.fontref(),
+            &font_b.fontref(),
+            cli.max_changes,
+            cli.no_match,
+        );
+        if kern_diff.is_something() {
+            result.kerns = Some(kern_diff);
         }
     }
     if cli.glyphs {

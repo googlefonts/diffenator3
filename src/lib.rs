@@ -19,7 +19,7 @@ cfg_if! {
         use dfont::DFont;
         use render::{test_font_words, encodedglyphs};
         use serde_json::json;
-        use ttj::table_diff;
+        use ttj::{table_diff, kern_diff};
         use skrifa::MetadataProvider;
 
         use wasm_bindgen::prelude::*;
@@ -87,7 +87,19 @@ cfg_if! {
             let f_b = DFont::new(font_b);
 
             let val = json!({
-                "tables": table_diff(&f_a.fontref(), &f_b.fontref(), 128)
+                "tables": table_diff(&f_a.fontref(), &f_b.fontref(), 128, true)
+            });
+            f.call1(&JsValue::NULL, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
+        }
+
+
+        #[wasm_bindgen]
+        pub fn diff_kerns(font_a: &[u8], font_b: &[u8], f: &js_sys::Function) {
+            let f_a = DFont::new(font_a);
+            let f_b = DFont::new(font_b);
+
+            let val = json!({
+                "kerns": kern_diff(&f_a.fontref(), &f_b.fontref(), 1000, true)
             });
             f.call1(&JsValue::NULL, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
         }

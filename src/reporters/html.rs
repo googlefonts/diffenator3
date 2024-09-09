@@ -48,8 +48,8 @@ pub fn report(
     std::process::exit(0);
 }
 
-pub fn template_engine(user_templates: Option<&String>) -> Tera {
-    let homedir = create_user_home_templates_directory();
+pub fn template_engine(user_templates: Option<&String>, overwrite: bool) -> Tera {
+    let homedir = create_user_home_templates_directory(overwrite);
     let mut tera = Tera::new(&format!("{}/*", homedir.to_str().unwrap())).unwrap_or_else(|e| {
         println!("Problem parsing templates: {:?}", e);
         std::process::exit(1)
@@ -81,7 +81,7 @@ pub fn template_engine(user_templates: Option<&String>) -> Tera {
     tera
 }
 
-pub fn create_user_home_templates_directory() -> PathBuf {
+pub fn create_user_home_templates_directory(force: bool) -> PathBuf {
     let home = homedir::my_home()
         .expect("Couldn't got home directory")
         .expect("No home directory found");
@@ -103,7 +103,7 @@ pub fn create_user_home_templates_directory() -> PathBuf {
     ];
     for template in all_templates.iter() {
         let path = templates_dir.join(template[0]);
-        if !path.exists() {
+        if !path.exists() || force {
             std::fs::write(&path, template[1]).unwrap_or_else(|e| {
                 println!(
                     "Couldn't write template file {}: {}",

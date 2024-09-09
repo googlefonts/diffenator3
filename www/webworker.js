@@ -19,6 +19,13 @@ async function init() {
           tables: JSON.parse(tables)["tables"],
         });
       });
+    } else if (command == "kerns") {
+      wasm.diff_kerns(beforeFont, afterFont, (kerns) => {
+        self.postMessage({
+          type: "kerns",
+          kerns: JSON.parse(kerns)["kerns"],
+        });
+      });
     } else if (command == "new_missing_glyphs") {
       wasm.new_missing_glyphs(beforeFont, afterFont, (new_missing_glyphs) => {
         self.postMessage({
