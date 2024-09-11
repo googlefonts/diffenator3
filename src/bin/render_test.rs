@@ -2,7 +2,8 @@
 use clap::Parser;
 use diffenator3::render::renderer::Renderer;
 use diffenator3::render::utils::{count_differences, make_same_size};
-use diffenator3::render::wordlists;
+use diffenator3::render::{wordlists, DEFAULT_GRAY_FUZZ};
+use diffenator3::setting::{parse_location, Setting};
 use image::{Pixel, Rgba, RgbaImage};
 
 #[derive(Parser)]
@@ -11,10 +12,15 @@ struct Args {
     font1: String,
     /// Second font file
     font2: String,
+
+    /// Location in user space, in the form axis=123,other=456 (may be repeated)
+    #[clap(long = "location")]
+    location: Option<String>,
+
     /// Text to render
     text: String,
     /// Font size
-    #[clap(short, long, default_value = "40.0")]
+    #[clap(short, long, default_value = "64.0")]
     size: f32,
     /// Script
     #[clap(short, long, default_value = "Latin")]
@@ -24,9 +30,17 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let data_a = std::fs::read(&args.font1).expect("Can't read font file");
-    let dfont_a = diffenator3::dfont::DFont::new(&data_a);
+    let mut dfont_a = diffenator3::dfont::DFont::new(&data_a);
     let data_b = std::fs::read(&args.font2).expect("Can't read font file");
-    let dfont_b = diffenator3::dfont::DFont::new(&data_b);
+    let mut dfont_b = diffenator3::dfont::DFont::new(&data_b);
+
+    if let Some(location) = args.location {
+        let loc = parse_location(&location).expect("Couldn't parse location");
+        Setting::from_setting(loc)
+            .set_on_fonts(&mut dfont_a, &mut dfont_b)
+            .expect("Couldn't set location");
+    }
+
     let direction = wordlists::get_script_direction(&args.script);
     let script_tag = wordlists::get_script_tag(&args.script);
 
@@ -61,7 +75,7 @@ fn main() {
     }
     overlay.save("overlay.png").expect("Can't save");
 
-    let differing_pixels = count_differences(image_a, image_b);
+    let differing_pixels = count_differences(image_a, image_b, DEFAULT_GRAY_FUZZ);
     println!("Pixel differences: {:.2?}", differing_pixels);
     println!("See output images: image_a.png, image_b.png, overlay.png");
 }
