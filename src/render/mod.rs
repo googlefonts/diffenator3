@@ -22,6 +22,17 @@ cfg_if! {
     }
 }
 
+pub const DEFAULT_WORDS_FONT_SIZE: f32 = 32.0;
+pub const DEFAULT_GLYPHS_FONT_SIZE: f32 = 64.0;
+pub const DEFAULT_WORDS_THRESHOLD: f32 = 0.2;
+/// Gray pixels which differ by less than this amount are considered the same
+pub const DEFAULT_GRAY_FUZZ: u8 = 20;
+
+/// Compare two fonts by rendering a list of words and comparing the images
+///
+/// Word lists are gathered for all scripts which are supported by both fonts.
+/// The return value is a JSON object where each key is a script tag and the
+/// value is a list of serialized [Difference] objects.
 pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
     let mut map = serde_json::Map::new();
     for script in font_a
@@ -31,8 +42,15 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
         if let Some(wordlist) = wordlists::get_wordlist(script) {
             let direction = wordlists::get_script_direction(script);
             let script_tag = wordlists::get_script_tag(script);
-            let results =
-                diff_many_words(font_a, font_b, 20.0, wordlist, 0.2, direction, script_tag);
+            let results = diff_many_words(
+                font_a,
+                font_b,
+                DEFAULT_WORDS_FONT_SIZE,
+                wordlist,
+                DEFAULT_WORDS_THRESHOLD,
+                direction,
+                script_tag,
+            );
             if !results.is_empty() {
                 map.insert(script.to_string(), serde_json::to_value(results).unwrap());
             }
@@ -41,11 +59,16 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
     json!(map)
 }
 
+/// Represents a difference between two encoded glyphs
 #[derive(Debug, Serialize)]
 pub struct GlyphDiff {
+    /// The string representation of the glyph
     pub string: String,
+    /// The Unicode name of the glyph
     pub name: String,
+    /// The Unicode codepoint of the glyph
     pub unicode: String,
+    /// The percentage of differing pixels
     pub percent: f32,
 }
 
@@ -71,22 +94,45 @@ impl From<Difference> for GlyphDiff {
     }
 }
 
+/// Represents a difference between two renderings, whether words or glyphs
 #[derive(Debug, Serialize)]
 pub struct Difference {
+    /// The text string which was rendered
     pub word: String,
+    /// A string representation of the shaped buffer in the first font
     pub buffer_a: String,
+    /// A string representation of the shaped buffer in the second font, if different
     #[serde(skip_serializing_if = "Option::is_none")]
     pub buffer_b: Option<String>,
-    // pub diff_map: Vec<i16>,
+    /// The percentage of differing pixels
     pub percent: f32,
+    /// The OpenType features applied to the text
     #[serde(skip_serializing_if = "String::is_empty")]
     pub ot_features: String,
+    /// The OpenType language tag applied to the text
     #[serde(skip_serializing_if = "String::is_empty")]
     pub lang: String,
 }
 
 // A fast but complicated version
 #[cfg(not(target_family = "wasm"))]
+/// Compare two fonts by rendering a list of words and comparing the images
+///
+/// This function is parallelized and uses rayon to speed up the process.
+///
+/// # Arguments
+///
+/// * `font_a` - The first font to compare
+/// * `font_b` - The second font to compare
+/// * `font_size` - The size of the font to render
+/// * `wordlist` - A list of words to render
+/// * `threshold` - The percentage of differing pixels to consider a difference
+/// * `direction` - The direction of the text
+/// * `script` - The script of the text
+///
+/// # Returns
+///
+/// A list of [Difference] objects representing the differences between the two renderings.
 pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
@@ -131,7 +177,7 @@ pub(crate) fn diff_many_words(
             let img_b = renderer_b
                 .borrow_mut()
                 .render_positioned_glyphs(&commands_b);
-            let percent = count_differences(img_a, img_b);
+            let percent = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
             let buffers_same = buffer_a == buffer_b;
 
             Some(Difference {

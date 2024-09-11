@@ -2,8 +2,12 @@ use image::{GenericImage, GrayImage, ImageBuffer};
 use skrifa::outline::OutlinePen;
 use zeno::{Command, PathBuilder};
 
-const FUZZ: u8 = 20;
-
+/// Compute the bounding box of a path, in a terrible but fast way
+///
+/// This computes the bounding box of all control points in the path. Where
+/// curves extend beyond the control points, the real bounding box will be larger
+/// than the one returned here. But it's good enough for well-behaved curves
+/// with points on extrema.
 pub(crate) fn terrible_bounding_box(pen_buffer: &[Command]) -> (f32, f32, f32, f32) {
     let mut max_x: f32 = 0.0;
     let mut min_x: f32 = 0.0;
@@ -90,6 +94,9 @@ impl OutlinePen for RecordingPen {
     }
 }
 
+/// Make two images the same size by padding the smaller one with white
+///
+/// The smaller image is anchored to the top left corner of the larger image.
 pub fn make_same_size(image_a: GrayImage, image_b: GrayImage) -> (GrayImage, GrayImage) {
     let max_width = image_a.width().max(image_b.width());
     let max_height = image_a.height().max(image_b.height());
@@ -100,13 +107,14 @@ pub fn make_same_size(image_a: GrayImage, image_b: GrayImage) -> (GrayImage, Gra
     (a, b)
 }
 
-pub fn count_differences(img_a: GrayImage, img_b: GrayImage) -> f32 {
+/// Compare two images and return the percentage of differing pixels
+pub fn count_differences(img_a: GrayImage, img_b: GrayImage, fuzz: u8) -> f32 {
     let (img_a, img_b) = make_same_size(img_a, img_b);
     let img_a_vec = img_a.to_vec();
     let differing_pixels = img_a_vec
         .iter()
         .zip(img_b.to_vec())
-        .filter(|(&cha, chb)| cha.abs_diff(*chb) > FUZZ)
+        .filter(|(&cha, chb)| cha.abs_diff(*chb) > fuzz)
         .count();
     differing_pixels as f32 / (img_a.width() as f32 * img_a.height() as f32) * 100.0
 }

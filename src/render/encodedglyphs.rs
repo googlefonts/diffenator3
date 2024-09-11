@@ -76,7 +76,7 @@ pub fn modified_encoded_glyphs(font_a: &DFont, font_b: &DFont) -> Vec<GlyphDiff>
     let mut result: Vec<GlyphDiff> = diff_many_words(
         font_a,
         font_b,
-        40.0,
+        64.0,
         word_list,
         threshold,
         Direction::LeftToRight,
