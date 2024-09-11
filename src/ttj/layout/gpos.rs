@@ -1,6 +1,7 @@
-use super::super::namemap::NameMap;
 use super::variable_scalars::SerializeValueRecordLike;
 use super::SerializeSubtable;
+use crate::monkeypatching::MonkeyPatchClassDef;
+use crate::ttj::context::SerializationContext;
 use read_fonts::tables::gpos::CursivePosFormat1;
 use read_fonts::tables::gpos::MarkBasePosFormat1;
 use read_fonts::tables::gpos::MarkLigPosFormat1;
@@ -8,13 +9,12 @@ use read_fonts::tables::gpos::MarkMarkPosFormat1;
 use read_fonts::tables::gpos::PairPos;
 use read_fonts::tables::gpos::SinglePos;
 use read_fonts::ReadError;
+use serde_json::json;
 use serde_json::Map;
 use serde_json::Value;
-use skrifa::FontRef;
-use skrifa::GlyphId16;
 
 impl SerializeSubtable for SinglePos<'_> {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "single".into());
         let coverage = match self {
@@ -23,16 +23,16 @@ impl SerializeSubtable for SinglePos<'_> {
         };
         match self {
             SinglePos::Format1(s) => {
-                let value: String = s.value_record().serialize(self.offset_data(), font)?;
+                let value = s.value_record().serialize(self.offset_data(), context)?;
                 for glyph in coverage.iter() {
-                    let name = names.get(glyph);
-                    map.insert(name, Value::String(value.clone()));
+                    let name = context.names.get(glyph);
+                    map.insert(name, value.clone());
                 }
             }
             SinglePos::Format2(s) => {
                 for (vr, glyph) in s.value_records().iter().flatten().zip(coverage.iter()) {
-                    let name = names.get(glyph);
-                    map.insert(name, Value::String(vr.serialize(self.offset_data(), font)?));
+                    let name = context.names.get(glyph);
+                    map.insert(name, vr.serialize(self.offset_data(), context)?);
                 }
             }
         }
@@ -41,29 +41,37 @@ impl SerializeSubtable for SinglePos<'_> {
 }
 
 impl SerializeSubtable for PairPos<'_> {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "pair".into());
         match self {
             PairPos::Format1(s) => {
                 for (left_glyph, pairs) in s.coverage()?.iter().zip(s.pair_sets().iter()) {
-                    let left_name = names.get(left_glyph);
+                    let left_name = context.names.get(left_glyph);
                     let pairs = pairs?;
                     for pair in pairs.pair_value_records().iter() {
                         let pair = pair?;
-                        let right_name = names.get(pair.second_glyph());
-                        let value_1 = pair.value_record1().serialize(pairs.offset_data(), font)?;
-                        let value_2 = pair.value_record2().serialize(pairs.offset_data(), font)?;
+                        let right_name = context.names.get(pair.second_glyph());
+                        let value_1 = pair
+                            .value_record1()
+                            .serialize(pairs.offset_data(), context)?;
+                        let value_2 = pair
+                            .value_record2()
+                            .serialize(pairs.offset_data(), context)?;
+                        let pair_value =
+                            if value_2.as_object().map(|x| x.is_empty()).unwrap_or(false) {
+                                value_1
+                            } else {
+                                json!({
+                                    "first": value_1,
+                                    "second": value_2
+                                })
+                            };
                         map.entry(left_name.clone())
                             .or_insert_with(|| Value::Object(Map::new()))
                             .as_object_mut()
                             .unwrap()
-                            .insert(
-                                right_name,
-                                Value::String(
-                                    format!("{} {}", value_1, value_2).trim().to_string(),
-                                ),
-                            );
+                            .insert(right_name, pair_value);
                     }
                 }
             }
@@ -73,35 +81,25 @@ impl SerializeSubtable for PairPos<'_> {
                 let mut classes = Map::new();
                 let mut kerns = Map::new();
                 for left_class in 0..s.class1_count() {
-                    let left_class_glyphs: &mut dyn Iterator<Item = GlyphId16> = if left_class == 0
-                    {
-                        // use the coverage
-                        &mut (s.coverage()?.iter())
-                    } else {
-                        &mut (class1
-                            .iter()
-                            .filter(|&(_gid, class)| class == left_class)
-                            .map(|(gid, _)| gid))
-                    };
+                    let left_class_glyphs = class1.class_glyphs(left_class, Some(s.coverage()?));
                     classes.insert(
                         format!("@CLASS_L_{}", left_class),
                         Value::Array(
                             left_class_glyphs
-                                .map(|gid| Value::String(names.get(gid)))
+                                .into_iter()
+                                .map(|gid| Value::String(context.names.get(gid)))
                                 .collect(),
                         ),
                     );
                 }
                 for right_class in 1..s.class2_count() {
-                    let right_class_glyphs = class2
-                        .iter()
-                        .filter(|&(_gid, class)| class == right_class)
-                        .map(|(gid, _)| gid);
+                    let right_class_glyphs = class2.class_glyphs(right_class, None);
                     classes.insert(
                         format!("@CLASS_R_{}", right_class),
                         Value::Array(
                             right_class_glyphs
-                                .map(|gid| Value::String(names.get(gid)))
+                                .into_iter()
+                                .map(|gid| Value::String(context.names.get(gid)))
                                 .collect(),
                         ),
                     );
@@ -120,20 +118,25 @@ impl SerializeSubtable for PairPos<'_> {
                         };
                         let value_1 = class2_record
                             .value_record1()
-                            .serialize(s.offset_data(), font)?;
+                            .serialize(s.offset_data(), context)?;
                         let value_2 = class2_record
                             .value_record2()
-                            .serialize(s.offset_data(), font)?;
-                        let valuerecords = format!("{} {}", value_1, value_2);
-                        if valuerecords == "0 " && (left_class == 0 || right_class == 0) {
-                            continue;
-                        }
+                            .serialize(s.offset_data(), context)?;
+                        let pair_value =
+                            if value_2.as_object().map(|x| x.is_empty()).unwrap_or(false) {
+                                value_1
+                            } else {
+                                json!({
+                                    "first": value_1,
+                                    "second": value_2
+                                })
+                            };
                         kerns
                             .entry(left_name.clone())
                             .or_insert_with(|| Value::Object(Map::new()))
                             .as_object_mut()
                             .unwrap()
-                            .insert(right_name, Value::String(valuerecords.trim().to_string()));
+                            .insert(right_name, pair_value);
                     }
                 }
                 map.insert("classes".to_string(), classes.into());
@@ -145,25 +148,25 @@ impl SerializeSubtable for PairPos<'_> {
 }
 
 impl SerializeSubtable for CursivePosFormat1<'_> {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "cursive".into());
         for (glyph_id, record) in self.coverage()?.iter().zip(self.entry_exit_record()) {
-            let name = names.get(glyph_id);
+            let name = context.names.get(glyph_id);
             let mut entrymap = Map::new();
             if let Some(entry) = record
                 .entry_anchor(self.offset_data())
-                .map(|a| a?.serialize(self.offset_data(), font))
+                .map(|a| a?.serialize(self.offset_data(), context))
                 .transpose()?
             {
-                entrymap.insert("entry".to_string(), Value::String(entry));
+                entrymap.insert("entry".to_string(), entry);
             }
             if let Some(exit) = record
                 .exit_anchor(self.offset_data())
-                .map(|a| a?.serialize(self.offset_data(), font))
+                .map(|a| a?.serialize(self.offset_data(), context))
                 .transpose()?
             {
-                entrymap.insert("exit".to_string(), Value::String(exit));
+                entrymap.insert("exit".to_string(), exit);
             }
             map.insert(name, Value::Object(entrymap));
         }
@@ -173,14 +176,14 @@ impl SerializeSubtable for CursivePosFormat1<'_> {
 }
 
 impl SerializeSubtable for MarkBasePosFormat1<'_> {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "mark_to_base".into());
         let mark_array = self.mark_array()?;
         let mut marks = Map::new();
         for (mark_glyph, mark_record) in self.mark_coverage()?.iter().zip(mark_array.mark_records())
         {
-            let mark_name = names.get(mark_glyph);
+            let mark_name = context.names.get(mark_glyph);
             let class_name = format!("anchor_{}", mark_record.mark_class());
             // "marks": {
             //    "anchor_0": {
@@ -197,8 +200,7 @@ impl SerializeSubtable for MarkBasePosFormat1<'_> {
                     mark_name,
                     mark_record
                         .mark_anchor(mark_array.offset_data())?
-                        .serialize(self.offset_data(), font)?
-                        .into(),
+                        .serialize(self.offset_data(), context)?,
                 );
         }
         map.insert("marks".to_string(), marks.into());
@@ -219,12 +221,12 @@ impl SerializeSubtable for MarkBasePosFormat1<'_> {
                 if let Some(Ok(anchor)) = anchor {
                     anchors.insert(
                         format!("anchor_{}", class),
-                        anchor.serialize(self.offset_data(), font)?.into(),
+                        anchor.serialize(self.offset_data(), context)?,
                     );
                 }
             }
 
-            let base_name = names.get(base_glyph);
+            let base_name = context.names.get(base_glyph);
             bases.insert(base_name, anchors.into());
         }
         map.insert("bases".to_string(), bases.into());
@@ -234,14 +236,14 @@ impl SerializeSubtable for MarkBasePosFormat1<'_> {
 }
 
 impl SerializeSubtable for MarkLigPosFormat1<'_> {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "mark_to_lig".into());
         let mark_array = self.mark_array()?;
         let mut marks = Map::new();
         for (mark_glyph, mark_record) in self.mark_coverage()?.iter().zip(mark_array.mark_records())
         {
-            let mark_name = names.get(mark_glyph);
+            let mark_name = context.names.get(mark_glyph);
             let class_name = format!("anchor_{}", mark_record.mark_class());
             // "marks": {
             //    "anchor_0": {
@@ -258,8 +260,7 @@ impl SerializeSubtable for MarkLigPosFormat1<'_> {
                     mark_name,
                     mark_record
                         .mark_anchor(mark_array.offset_data())?
-                        .serialize(self.offset_data(), font)?
-                        .into(),
+                        .serialize(self.offset_data(), context)?,
                 );
         }
         map.insert("marks".to_string(), marks.into());
@@ -286,13 +287,13 @@ impl SerializeSubtable for MarkLigPosFormat1<'_> {
                     if let Some(Ok(anchor)) = anchor {
                         anchors.insert(
                             format!("anchor_{}_{}", class, component_id + 1),
-                            anchor.serialize(self.offset_data(), font)?.into(),
+                            anchor.serialize(self.offset_data(), context)?,
                         );
                     }
                 }
             }
 
-            let ligature_name = names.get(ligature_glyph);
+            let ligature_name = context.names.get(ligature_glyph);
             ligatures.insert(ligature_name, anchors.into());
         }
         map.insert("ligatures".to_string(), ligatures.into());
@@ -302,7 +303,7 @@ impl SerializeSubtable for MarkLigPosFormat1<'_> {
 }
 
 impl SerializeSubtable for MarkMarkPosFormat1<'_> {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError> {
         let mut map = Map::new();
         map.insert("type".to_string(), "mark_to_mark".into());
         let mark_array = self.mark1_array()?;
@@ -310,7 +311,7 @@ impl SerializeSubtable for MarkMarkPosFormat1<'_> {
         for (mark_glyph, mark_record) in
             self.mark1_coverage()?.iter().zip(mark_array.mark_records())
         {
-            let mark_name = names.get(mark_glyph);
+            let mark_name = context.names.get(mark_glyph);
             let class_name = format!("anchor_{}", mark_record.mark_class());
             // "marks": {
             //    "anchor_0": {
@@ -327,8 +328,7 @@ impl SerializeSubtable for MarkMarkPosFormat1<'_> {
                     mark_name,
                     mark_record
                         .mark_anchor(mark_array.offset_data())?
-                        .serialize(self.offset_data(), font)?
-                        .into(),
+                        .serialize(self.offset_data(), context)?,
                 );
         }
         map.insert("marks".to_string(), marks.into());
@@ -349,12 +349,12 @@ impl SerializeSubtable for MarkMarkPosFormat1<'_> {
                 if let Some(Ok(anchor)) = anchor {
                     anchors.insert(
                         format!("anchor_{}", class),
-                        anchor.serialize(self.offset_data(), font)?.into(),
+                        anchor.serialize(self.offset_data(), context)?,
                     );
                 }
             }
 
-            let base_name = names.get(base_glyph);
+            let base_name = context.names.get(base_glyph);
             bases.insert(base_name, anchors.into());
         }
         map.insert("basemarks".to_string(), bases.into());
@@ -363,6 +363,36 @@ impl SerializeSubtable for MarkMarkPosFormat1<'_> {
     }
 }
 
+fn wrap_in_map(v: Value) -> Map<String, Value> {
+    if let Some(v) = v.as_object() {
+        return v.clone();
+    }
+    let mut map = Map::new();
+    map.insert("default".to_string(), v);
+    map
+}
+
+fn insert_or_merge(m: &mut Map<String, Value>, key: String, new: Map<String, Value>) {
+    if let Some(existing) = m.get_mut(&key).map(|x| x.as_object_mut().unwrap()) {
+        // existing and new are both either {x: {loc: 123}, y: {loc: 456}} or {x: 123, y: 456}
+        for (k, v) in new.into_iter() {
+            let new_obj = wrap_in_map(v);
+            let mut old_value = existing
+                .get(&k)
+                .map(|e| wrap_in_map(e.clone()))
+                .unwrap_or_default();
+            for (kk, vv) in new_obj.iter() {
+                let old = old_value.get(kk).map(|x| x.as_i64().unwrap()).unwrap_or(0);
+                old_value.insert(
+                    kk.to_string(),
+                    Value::Number((vv.as_i64().unwrap() + old).into()),
+                );
+            }
+        }
+    } else {
+        m.insert(key, new.into());
+    }
+}
 // Since we created the data structure, we're going to be unwrap()ping with gay abandon.
 pub fn just_kerns(font: Value) -> Value {
     let mut flatkerns = Map::new();
@@ -382,12 +412,20 @@ pub fn just_kerns(font: Value) -> Value {
             let classes = lookup.get("classes").unwrap().as_object().unwrap();
             let kerns = lookup.get("kerns").unwrap().as_object().unwrap();
             for (left_class, value) in kerns.iter() {
+                // println!("left (class): {}, value: {:#?})", left_class, value);
+                if value == &json!({"x": 0}) {
+                    continue;
+                }
+
                 for (right_class, kern) in value.as_object().unwrap().iter() {
-                    if kern == "0" {
+                    let kern = kern.as_object().unwrap();
+                    if kern.is_empty()
+                        || (kern.len() == 1 && kern.get("x") == Some(&Value::Number(0.into())))
+                    {
                         continue;
                     }
                     for left_glyph in classes.get(left_class).unwrap().as_array().unwrap().iter() {
-                        // println!("left (class): {:#?}", left_glyph);
+                        // println!("left (class): {:#?} (ID {})", left_glyph, left_class);
 
                         for right_glyph in
                             classes.get(right_class).unwrap().as_array().unwrap().iter()
@@ -396,19 +434,7 @@ pub fn just_kerns(font: Value) -> Value {
                             let key = left_glyph.as_str().unwrap().to_owned()
                                 + "/"
                                 + right_glyph.as_str().unwrap();
-
-                            if let Some(existing) = flatkerns.get(&key) {
-                                flatkerns.insert(
-                                    key,
-                                    Value::String(
-                                        existing.as_str().unwrap().to_owned()
-                                            + " + "
-                                            + kern.as_str().unwrap(),
-                                    ),
-                                );
-                            } else {
-                                flatkerns.insert(key, kern.clone());
-                            }
+                            insert_or_merge(&mut flatkerns, key, kern.clone());
                         }
                     }
                 }
@@ -420,20 +446,14 @@ pub fn just_kerns(font: Value) -> Value {
                     continue;
                 }
                 for (right, value) in value_map.as_object().unwrap().iter() {
-                    // println!(" right: {:#?}, value: {:?}", right, value);
-                    let key = left.to_owned() + "/" + right.as_str();
-                    if let Some(existing) = flatkerns.get(&key) {
-                        flatkerns.insert(
-                            key,
-                            Value::String(
-                                existing.as_str().unwrap().to_owned()
-                                    + " + "
-                                    + value.as_str().unwrap(),
-                            ),
-                        );
-                    } else {
-                        flatkerns.insert(key, value.clone());
+                    if value == &json!({"x": 0}) {
+                        continue;
                     }
+                    // println!(" right: {:#?}, value: {:?}", right, value);
+
+                    let kern = value.as_object().unwrap();
+                    let key = left.to_owned() + "/" + right.as_str();
+                    insert_or_merge(&mut flatkerns, key, kern.clone());
                 }
             }
         }

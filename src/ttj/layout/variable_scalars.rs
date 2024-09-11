@@ -1,139 +1,136 @@
+use std::collections::HashMap;
+
+use crate::ttj::context::SerializationContext;
 use read_fonts::tables::gpos::DeviceOrVariationIndex::VariationIndex;
+use read_fonts::tables::variations::DeltaSetIndex;
 use read_fonts::FontData;
 use read_fonts::ReadError;
 use read_fonts::TableProvider;
-use skrifa::FontRef;
-
-use crate::monkeypatching::DenormalizeLocation;
+use serde_json::Map;
+use serde_json::Value;
 
 pub(crate) trait SerializeValueRecordLike {
-    fn serialize(&self, offset_data: FontData<'_>, font: &FontRef) -> Result<String, ReadError>;
+    fn serialize(
+        &self,
+        offset_data: FontData<'_>,
+        context: &SerializationContext,
+    ) -> Result<Value, ReadError>;
 }
 
+pub(crate) fn hashmap_to_value(hashmap: HashMap<String, i32>) -> Value {
+    let delta_map: Map<String, Value> = hashmap
+        .iter()
+        .map(|(k, v)| (k.clone(), Value::Number((*v).into())))
+        .collect();
+    Value::Object(delta_map)
+}
 impl SerializeValueRecordLike for read_fonts::tables::gpos::ValueRecord {
-    fn serialize(&self, offset_data: FontData<'_>, font: &FontRef) -> Result<String, ReadError> {
-        let mut vr = String::new();
+    fn serialize(
+        &self,
+        offset_data: FontData<'_>,
+        context: &SerializationContext,
+    ) -> Result<Value, ReadError> {
+        let mut vr = Map::new();
         if let Some(x) = self.x_advance() {
             if let Some(Ok(VariationIndex(device))) = self.x_advance_device(offset_data) {
-                vr.push_str(&serialize_all_deltas(device, font, x.into())?)
+                vr.insert(
+                    "x".to_string(),
+                    hashmap_to_value(serialize_all_deltas(device, context, x.into())?),
+                );
             } else {
-                vr.push_str(&format!("{}", x));
+                vr.insert("x".to_string(), Value::Number(x.into()));
             }
-        } else if self.y_advance().is_some() {
-            vr.push('0');
         }
 
         if let Some(y) = self.y_advance() {
-            vr.push(',');
-            if let Some(Ok(VariationIndex(device))) = self.y_advance_device(offset_data) {
-                vr.push_str(&serialize_all_deltas(device, font, y.into())?)
+            if let Some(Ok(VariationIndex(device))) = self.x_advance_device(offset_data) {
+                vr.insert(
+                    "y".to_string(),
+                    hashmap_to_value(serialize_all_deltas(device, context, y.into())?),
+                );
             } else {
-                vr.push_str(&format!("{}", y));
+                vr.insert("y".to_string(), Value::Number(y.into()));
             }
         }
 
-        if self.x_placement().is_none() && self.y_placement().is_none() {
-            return Ok(vr);
-        }
-        vr.push('@');
         if let Some(x) = self.x_placement() {
             if let Some(Ok(VariationIndex(device))) = self.x_placement_device(offset_data) {
-                vr.push_str(&serialize_all_deltas(device, font, x.into())?)
+                vr.insert(
+                    "x_placement".to_string(),
+                    hashmap_to_value(serialize_all_deltas(device, context, x.into())?),
+                );
             } else {
-                vr.push_str(&format!("{}", x));
+                vr.insert("x_placement".to_string(), Value::Number(x.into()));
             }
-        } else {
-            vr.push('0');
         }
-        vr.push(',');
+
         if let Some(y) = self.y_placement() {
             if let Some(Ok(VariationIndex(device))) = self.y_placement_device(offset_data) {
-                vr.push_str(&serialize_all_deltas(device, font, y.into())?)
+                vr.insert(
+                    "y_placement".to_string(),
+                    hashmap_to_value(serialize_all_deltas(device, context, y.into())?),
+                );
             } else {
-                vr.push_str(&format!("{}", y));
+                vr.insert("y_placement".to_string(), Value::Number(y.into()));
             }
-        } else {
-            vr.push('0');
         }
-        Ok(vr)
+
+        Ok(Value::Object(vr))
     }
 }
 
 impl SerializeValueRecordLike for read_fonts::tables::gpos::AnchorTable<'_> {
-    fn serialize(&self, _offset_data: FontData<'_>, font: &FontRef) -> Result<String, ReadError> {
-        let mut vr = String::new();
+    fn serialize(
+        &self,
+        _offset_data: FontData<'_>,
+        context: &SerializationContext,
+    ) -> Result<Value, ReadError> {
+        let mut vr = Map::new();
         let x = self.x_coordinate();
         if let Some(Ok(VariationIndex(device))) = self.x_device() {
-            vr.push_str(&serialize_all_deltas(device, font, x.into())?)
+            vr.insert(
+                "x".to_string(),
+                hashmap_to_value(serialize_all_deltas(device, context, x.into())?),
+            );
         } else {
-            vr.push_str(&format!("{}", x));
+            vr.insert("x".to_string(), Value::Number(x.into()));
         }
-        vr.push(',');
         let y = self.y_coordinate();
         if let Some(Ok(VariationIndex(device))) = self.y_device() {
-            vr.push_str(&serialize_all_deltas(device, font, y.into())?)
+            vr.insert(
+                "y".to_string(),
+                hashmap_to_value(serialize_all_deltas(device, context, y.into())?),
+            );
         } else {
-            vr.push_str(&format!("{}", y));
+            vr.insert("y".to_string(), Value::Number(y.into()));
         }
 
-        Ok(vr)
+        Ok(Value::Object(vr))
     }
 }
 
 pub(crate) fn serialize_all_deltas(
     device: read_fonts::tables::layout::VariationIndex,
-    font: &FontRef,
+    context: &SerializationContext,
     current: i32,
-) -> Result<String, ReadError> {
-    if let Some(Ok(ivs)) = font.gdef()?.item_var_store() {
-        let regions = ivs.variation_region_list()?.variation_regions();
-        // Let's turn these back to userspace
-        let locations: Vec<String> = regions
+) -> Result<HashMap<String, i32>, ReadError> {
+    let d: DeltaSetIndex = device.into();
+    let mut result = HashMap::new();
+    result.insert("default".to_string(), current);
+    if let Some(Ok(ivs)) = context.font.gdef()?.item_var_store() {
+        let deltas: Vec<i32> = context
+            .gdef_regions
             .iter()
-            .flatten()
-            .map(|r| {
-                let tuple: Vec<f32> = r
-                    .region_axes()
-                    .iter()
-                    .map(|x| x.peak_coord().to_f32())
-                    .collect();
-                if let Ok(location) = font.denormalize_location(&tuple) {
-                    let loc_str: Vec<String> = location
-                        .iter()
-                        .map(|setting| {
-                            setting.selector.to_string() + "=" + &setting.value.to_string()
-                        })
-                        .collect();
-                    loc_str.join(",")
-                } else {
-                    "Unknown".to_string()
-                }
-            })
+            .map(|coords| ivs.compute_delta(d, coords).unwrap_or(0))
             .collect();
+        // println!("Deltas: {:?}", deltas);
 
-        if let Some(outer) = ivs
-            .item_variation_data()
-            .get(device.delta_set_outer_index() as usize)
-            .transpose()?
-        {
-            let affected_regions = outer.region_indexes();
-            let inner = outer.delta_set(device.delta_set_inner_index());
-            let mut deltas = vec![format!("{}", current)];
-            for (delta, region_index) in inner.zip(affected_regions.iter()) {
-                if delta == 0 {
-                    continue;
-                }
-                deltas.push(format!(
-                    "{}@{}",
-                    current + delta,
-                    locations
-                        .get(region_index.get() as usize)
-                        .map(|x| x.as_str())
-                        .unwrap_or("Unknown")
-                ));
+        for (location, delta) in context.gdef_locations.iter().zip(deltas.iter()) {
+            if *delta == 0 {
+                continue;
             }
-            return Ok("(".to_string() + deltas.join(" ").as_str() + ")");
+            result.insert(location.clone(), current + delta);
         }
     }
-    Ok(format!("{}", current))
+    Ok(result)
 }

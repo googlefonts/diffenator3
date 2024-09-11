@@ -9,63 +9,64 @@ use read_fonts::tables::gsub::{
 };
 use read_fonts::tables::layout::{self};
 use read_fonts::tables::varc::CoverageTable;
-use read_fonts::{FontRead, FontRef, ReadError, TableProvider};
+use read_fonts::{FontRead, ReadError, TableProvider};
 use serde_json::{Map, Value};
 use skrifa::GlyphId16;
 
+use super::context::SerializationContext;
 use super::namemap::NameMap;
 
-pub(crate) fn serialize_gpos_table(font: &FontRef, names: &NameMap) -> Value {
+pub(crate) fn serialize_gpos_table(context: &SerializationContext) -> Value {
     let mut map = Map::new();
-    if let Ok(gpos) = font.gpos() {
+    if let Ok(gpos) = context.font.gpos() {
         if let Ok(script_list) = gpos.script_list() {
             map.insert(
                 "script_list".to_string(),
-                Value::Object(serialize_script_list(&script_list, font)),
+                Value::Object(serialize_script_list(&script_list)),
             );
         }
         if let Ok(feature_list) = gpos.feature_list() {
             map.insert(
                 "feature_list".to_string(),
-                Value::Object(serialize_feature_list(&feature_list, font)),
+                Value::Object(serialize_feature_list(&feature_list)),
             );
         }
         if let Ok(lookup_list) = gpos.lookup_list() {
             map.insert(
                 "lookup_list".to_string(),
-                serialize_lookup_list(lookup_list, font, names),
+                serialize_lookup_list(lookup_list, context),
             );
         }
     }
     Value::Object(map)
 }
 
-pub(crate) fn serialize_gsub_table(font: &FontRef, names: &NameMap) -> Value {
+pub(crate) fn serialize_gsub_table(context: &SerializationContext) -> Value {
     let mut map = Map::new();
-    if let Ok(gsub) = font.gsub() {
+    if let Ok(gsub) = context.font.gsub() {
         if let Ok(script_list) = gsub.script_list() {
             map.insert(
                 "script_list".to_string(),
-                Value::Object(serialize_script_list(&script_list, font)),
+                Value::Object(serialize_script_list(&script_list)),
             );
         }
         if let Ok(feature_list) = gsub.feature_list() {
             map.insert(
                 "feature_list".to_string(),
-                Value::Object(serialize_feature_list(&feature_list, font)),
+                Value::Object(serialize_feature_list(&feature_list)),
             );
         }
         if let Ok(lookup_list) = gsub.lookup_list() {
             map.insert(
                 "lookup_list".to_string(),
-                serialize_lookup_list(lookup_list, font, names),
+                serialize_lookup_list(lookup_list, context),
             );
         }
     }
     Value::Object(map)
 }
 
-fn serialize_feature_list(feature_list: &FeatureList, _font: &FontRef) -> Map<String, Value> {
+fn serialize_feature_list(feature_list: &FeatureList) -> Map<String, Value> {
     let offsets = feature_list.offset_data();
     let mut map = Map::new();
     for featurerec in feature_list.feature_records().iter() {
@@ -85,10 +86,7 @@ fn serialize_feature_list(feature_list: &FeatureList, _font: &FontRef) -> Map<St
     map
 }
 
-fn serialize_script_list(
-    script_list: &read_fonts::tables::gpos::ScriptList,
-    font: &FontRef,
-) -> Map<String, Value> {
+fn serialize_script_list(script_list: &read_fonts::tables::gpos::ScriptList) -> Map<String, Value> {
     let offsets = script_list.offset_data();
     let mut map = Map::new();
     for scriptrec in script_list.script_records().iter() {
@@ -97,7 +95,7 @@ fn serialize_script_list(
             if let Some(Ok(dflt)) = script.default_lang_sys() {
                 map.insert(
                     format!("{}/dflt", scriptrec.script_tag()),
-                    Value::Object(serialize_langsys(&dflt, font)),
+                    Value::Object(serialize_langsys(&dflt)),
                 );
             }
             for langsysrecord in script.lang_sys_records().iter() {
@@ -108,7 +106,7 @@ fn serialize_script_list(
                             scriptrec.script_tag(),
                             langsysrecord.lang_sys_tag()
                         ),
-                        Value::Object(serialize_langsys(&langsys, font)),
+                        Value::Object(serialize_langsys(&langsys)),
                     );
                 }
             }
@@ -117,10 +115,7 @@ fn serialize_script_list(
     map
 }
 
-fn serialize_langsys(
-    langsys: &read_fonts::tables::layout::LangSys,
-    _font: &FontRef,
-) -> Map<String, Value> {
+fn serialize_langsys(langsys: &read_fonts::tables::layout::LangSys) -> Map<String, Value> {
     let mut map = Map::new();
     let feature_index = langsys.required_feature_index();
     if feature_index != 65535 {
@@ -144,49 +139,48 @@ fn serialize_langsys(
 
 fn serialize_lookup_list<'a, T: FontRead<'a> + SerializeLookup>(
     lookup_list: layout::LookupList<'a, T>,
-    font: &FontRef,
-    names: &NameMap,
+    context: &SerializationContext,
 ) -> serde_json::Value {
     // I know it's an array, but when you're looking through it you want to know what index you're looking at.
     let mut arr = Map::new();
     for (ix, lookuprec) in lookup_list.lookups().iter().enumerate() {
         if let Ok(lookuprec) = lookuprec {
-            arr.insert(format!("{}", ix), lookuprec.serialize_lookup(font, names));
+            arr.insert(format!("{}", ix), lookuprec.serialize_lookup(context));
         }
     }
     arr.into()
 }
 
 pub trait SerializeLookup {
-    fn serialize_lookup(&self, font: &FontRef, names: &NameMap) -> Value;
+    fn serialize_lookup(&self, context: &SerializationContext) -> Value;
 }
 pub trait SerializeSubtable {
-    fn serialize_subtable(&self, font: &FontRef, names: &NameMap) -> Result<Value, ReadError>;
+    fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError>;
 }
 
 macro_rules! serialize_it {
-    ($subtables: ident, $font: ident, $names: ident) => {
+    ($subtables: ident, $context: ident) => {
         $subtables
             .iter()
             .flatten()
-            .map(|st| st.serialize_subtable($font, $names))
+            .map(|st| st.serialize_subtable($context))
             .collect()
     };
 }
 impl SerializeLookup for PositionLookup<'_> {
-    fn serialize_lookup(&self, font: &FontRef, names: &NameMap) -> Value {
+    fn serialize_lookup(&self, context: &SerializationContext) -> Value {
         if let Ok(subtables) = self.subtables() {
             let serialized_tables: Vec<Result<Value, _>> = match subtables {
-                PositionSubtables::Single(st) => serialize_it!(st, font, names),
-                PositionSubtables::Pair(st) => serialize_it!(st, font, names),
-                PositionSubtables::Cursive(st) => serialize_it!(st, font, names),
-                PositionSubtables::MarkToBase(st) => serialize_it!(st, font, names),
-                PositionSubtables::MarkToLig(st) => serialize_it!(st, font, names),
-                PositionSubtables::MarkToMark(st) => serialize_it!(st, font, names),
+                PositionSubtables::Single(st) => serialize_it!(st, context),
+                PositionSubtables::Pair(st) => serialize_it!(st, context),
+                PositionSubtables::Cursive(st) => serialize_it!(st, context),
+                PositionSubtables::MarkToBase(st) => serialize_it!(st, context),
+                PositionSubtables::MarkToLig(st) => serialize_it!(st, context),
+                PositionSubtables::MarkToMark(st) => serialize_it!(st, context),
                 PositionSubtables::ChainContextual(st) => {
-                    serialize_it!(st, font, names)
+                    serialize_it!(st, context)
                 }
-                PositionSubtables::Contextual(st) => serialize_it!(st, font, names),
+                PositionSubtables::Contextual(st) => serialize_it!(st, context),
             };
             return Value::Array(
                 serialized_tables
@@ -200,18 +194,18 @@ impl SerializeLookup for PositionLookup<'_> {
 }
 
 impl SerializeLookup for SubstitutionLookup<'_> {
-    fn serialize_lookup(&self, font: &FontRef, names: &NameMap) -> Value {
+    fn serialize_lookup(&self, context: &SerializationContext) -> Value {
         if let Ok(subtables) = self.subtables() {
             let serialized_tables: Vec<Result<Value, _>> = match subtables {
-                SubstitutionSubtables::Single(st) => serialize_it!(st, font, names),
-                SubstitutionSubtables::Multiple(st) => serialize_it!(st, font, names),
-                SubstitutionSubtables::Alternate(st) => serialize_it!(st, font, names),
-                SubstitutionSubtables::Ligature(st) => serialize_it!(st, font, names),
-                SubstitutionSubtables::Reverse(st) => serialize_it!(st, font, names),
+                SubstitutionSubtables::Single(st) => serialize_it!(st, context),
+                SubstitutionSubtables::Multiple(st) => serialize_it!(st, context),
+                SubstitutionSubtables::Alternate(st) => serialize_it!(st, context),
+                SubstitutionSubtables::Ligature(st) => serialize_it!(st, context),
+                SubstitutionSubtables::Reverse(st) => serialize_it!(st, context),
                 SubstitutionSubtables::ChainContextual(st) => {
-                    serialize_it!(st, font, names)
+                    serialize_it!(st, context)
                 }
-                SubstitutionSubtables::Contextual(st) => serialize_it!(st, font, names),
+                SubstitutionSubtables::Contextual(st) => serialize_it!(st, context),
             };
             return Value::Array(
                 serialized_tables
@@ -337,7 +331,7 @@ impl ChainRule {
     }
 }
 impl SerializeSubtable for SequenceContext<'_> {
-    fn serialize_subtable(&self, _font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError> {
         let mut map = Map::new();
         let rules = match self {
             SequenceContext::Format1(f1) => serialize_sequence_f1(f1),
@@ -350,7 +344,7 @@ impl SerializeSubtable for SequenceContext<'_> {
             Value::Array(
                 rules
                     .into_iter()
-                    .map(|x| x.as_string(names).into())
+                    .map(|x| x.as_string(&context.names).into())
                     .collect(),
             ),
         );
@@ -460,7 +454,7 @@ fn serialize_sequence_f3(
 }
 
 impl SerializeSubtable for ChainedSequenceContext<'_> {
-    fn serialize_subtable(&self, _font: &FontRef, names: &NameMap) -> Result<Value, ReadError> {
+    fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError> {
         let mut map = Map::new();
         let rules = match self {
             ChainedSequenceContext::Format1(f1) => serialize_chain_sequence_f1(f1),
@@ -473,7 +467,7 @@ impl SerializeSubtable for ChainedSequenceContext<'_> {
             Value::Array(
                 rules
                     .into_iter()
-                    .map(|x| x.as_string(names).into())
+                    .map(|x| x.as_string(&context.names).into())
                     .collect(),
             ),
         );

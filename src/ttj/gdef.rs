@@ -1,40 +1,40 @@
-use crate::ttj::layout::variable_scalars::serialize_all_deltas;
+use crate::ttj::layout::variable_scalars::{hashmap_to_value, serialize_all_deltas};
 
-use super::namemap::NameMap;
+use super::context::SerializationContext;
 use read_fonts::tables::gdef::{
     AttachList, CaretValue, ClassDef, GlyphClassDef, LigCaretList, MarkGlyphSets,
 };
 use read_fonts::tables::gpos::DeviceOrVariationIndex::VariationIndex;
-use read_fonts::{FontRef, TableProvider};
+use read_fonts::TableProvider;
 use serde_json::{json, Map, Value};
 use skrifa::GlyphId16;
 
-pub(crate) fn serialize_gdef_table(font: &FontRef, names: &NameMap) -> Value {
+pub(crate) fn serialize_gdef_table(context: &SerializationContext) -> Value {
     let mut map = Map::new();
-    if let Ok(gdef) = font.gdef() {
+    if let Ok(gdef) = context.font.gdef() {
         if let Some(Ok(classdef)) = gdef.glyph_class_def() {
             map.insert(
                 "glyph_classes".to_string(),
-                Value::Object(serialize_classdefs(&classdef, names, true)),
+                Value::Object(serialize_classdefs(&classdef, context, true)),
             );
         }
         if let Some(Ok(attachlist)) = gdef.attach_list() {
-            serialize_attachlist(attachlist, names, &mut map);
+            serialize_attachlist(attachlist, context, &mut map);
         }
         if let Some(Ok(lig_caret_list)) = gdef.lig_caret_list() {
-            serialize_ligcarets(lig_caret_list, names, font, &mut map);
+            serialize_ligcarets(lig_caret_list, context, &mut map);
         }
         if let Some(Ok(classdef)) = gdef.mark_attach_class_def() {
             map.insert(
                 "mark_attach_classes".to_string(),
-                Value::Object(serialize_classdefs(&classdef, names, false)),
+                Value::Object(serialize_classdefs(&classdef, context, false)),
             );
         }
 
         if let Some(Ok(markglyphsets)) = gdef.mark_glyph_sets_def() {
             map.insert(
                 "mark_glyph_sets".to_string(),
-                Value::Object(serialize_markglyphs(&markglyphsets, names)),
+                Value::Object(serialize_markglyphs(&markglyphsets, context)),
             );
         }
     }
@@ -43,15 +43,14 @@ pub(crate) fn serialize_gdef_table(font: &FontRef, names: &NameMap) -> Value {
 
 fn serialize_ligcarets(
     lig_caret_list: LigCaretList,
-    names: &NameMap,
-    font: &FontRef,
+    context: &SerializationContext,
     map: &mut Map<String, Value>,
 ) {
     let mut lig_carets = Map::new();
     if let Ok(coverage) = lig_caret_list.coverage() {
         for (ligature, gid) in lig_caret_list.lig_glyphs().iter().zip(coverage.iter()) {
             if let Ok(ligature) = ligature {
-                let name = names.get(gid);
+                let name = context.names.get(gid);
                 lig_carets.insert(
                     name,
                     Value::Array(
@@ -68,7 +67,10 @@ fn serialize_ligcarets(
                                 }
                                 CaretValue::Format3(c) => {
                                     if let Ok(VariationIndex(device)) = c.device() {
-                                        json!({"coordinate": serialize_all_deltas(device, font, c.coordinate().into()).unwrap_or_else(|_| c.coordinate().to_string()) })
+                                        json!({"coordinate": serialize_all_deltas(device, context, c.coordinate().into())
+                                                             .map(hashmap_to_value)
+                                                             .unwrap_or_else(|_| Value::String(c.coordinate().to_string()))
+                                            })
                                     } else {
                                         json!({"variable_coordinate": c.coordinate() })
                                     }
@@ -83,12 +85,16 @@ fn serialize_ligcarets(
     map.insert("lig_carets".to_string(), Value::Object(lig_carets));
 }
 
-fn serialize_attachlist(attachlist: AttachList, names: &NameMap, map: &mut Map<String, Value>) {
+fn serialize_attachlist(
+    attachlist: AttachList,
+    context: &SerializationContext,
+    map: &mut Map<String, Value>,
+) {
     let mut attachments = Map::new();
     if let Ok(coverage) = attachlist.coverage() {
         for (point, gid) in attachlist.attach_points().iter().zip(coverage.iter()) {
             if let Ok(point) = point {
-                let name = names.get(gid);
+                let name = context.names.get(gid);
                 attachments.insert(
                     name,
                     Value::Array(
@@ -107,12 +113,12 @@ fn serialize_attachlist(attachlist: AttachList, names: &NameMap, map: &mut Map<S
 
 fn serialize_classdefs(
     classdef: &ClassDef<'_>,
-    names: &NameMap,
+    context: &SerializationContext,
     use_enum: bool,
 ) -> Map<String, Value> {
     let mut glyph_classes = Map::new();
-    for gid in 0..names.len() {
-        let name = names.get(gid as u32);
+    for gid in 0..context.names.len() {
+        let name = context.names.get(gid as u32);
         let class = classdef.get(GlyphId16::new(gid as u16));
         if class == 0 {
             continue;
@@ -129,7 +135,10 @@ fn serialize_classdefs(
     glyph_classes
 }
 
-fn serialize_markglyphs(markglyphsets: &MarkGlyphSets<'_>, names: &NameMap) -> Map<String, Value> {
+fn serialize_markglyphs(
+    markglyphsets: &MarkGlyphSets<'_>,
+    context: &SerializationContext,
+) -> Map<String, Value> {
     markglyphsets
         .coverages()
         .iter()
@@ -140,7 +149,7 @@ fn serialize_markglyphs(markglyphsets: &MarkGlyphSets<'_>, names: &NameMap) -> M
                 if let Ok(coverage) = coverage {
                     let glyphnames = coverage
                         .iter()
-                        .map(|gid| names.get(gid))
+                        .map(|gid| context.names.get(gid))
                         .collect::<Vec<String>>();
                     Value::Array(glyphnames.into_iter().map(Value::String).collect())
                 } else {

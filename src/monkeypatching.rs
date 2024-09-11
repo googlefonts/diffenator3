@@ -1,5 +1,10 @@
-use read_fonts::{tables::fvar::VariationAxisRecord, ReadError, TableProvider};
-use skrifa::{setting::VariationSetting, FontRef};
+use std::collections::HashSet;
+
+use read_fonts::{
+    tables::{fvar::VariationAxisRecord, gsub::ClassDef, varc::CoverageTable},
+    ReadError, TableProvider,
+};
+use skrifa::{setting::VariationSetting, FontRef, GlyphId16};
 
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
@@ -53,5 +58,31 @@ impl DenormalizeLocation for FontRef<'_> {
                 (axis.axis_tag().to_string().as_str(), value).into()
             })
             .collect())
+    }
+}
+
+pub trait MonkeyPatchClassDef {
+    fn class_glyphs(&self, class: u16, coverage: Option<CoverageTable>) -> Vec<GlyphId16>;
+}
+
+impl MonkeyPatchClassDef for ClassDef<'_> {
+    fn class_glyphs(&self, class: u16, coverage: Option<CoverageTable>) -> Vec<GlyphId16> {
+        if class == 0 {
+            // let coverage_map = coverage.unwrap().coverage_map();
+            if let Some(coverage) = coverage {
+                let all_glyphs: HashSet<GlyphId16> = coverage.iter().collect();
+                let in_a_class: HashSet<GlyphId16> =
+                    self.iter().map(|(gid, _a_class)| gid).collect();
+                // Remove all the glyphs in assigned class
+                all_glyphs.difference(&in_a_class).copied().collect()
+            } else {
+                panic!("ClassDef has no coverage table and class=0 was requested");
+            }
+        } else {
+            self.iter()
+                .filter(move |&(_gid, their_class)| their_class == class)
+                .map(|(gid, _)| gid)
+                .collect()
+        }
     }
 }

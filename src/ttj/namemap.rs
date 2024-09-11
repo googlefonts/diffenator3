@@ -13,6 +13,7 @@ fn gid_to_name<'a>(font: &impl TableProvider<'a>, gid: GlyphId) -> String {
     format!("gid{:}", gid)
 }
 
+#[derive(Debug, Clone)]
 pub struct NameMap(Vec<String>);
 
 impl NameMap {

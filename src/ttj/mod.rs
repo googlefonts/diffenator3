@@ -1,5 +1,6 @@
 use crate::ttj::jsondiff::diff;
 use crate::ttj::serializefont::ToValue;
+use context::SerializationContext;
 use namemap::NameMap;
 use read_fonts::traversal::SomeTable;
 use read_fonts::{FontRef, TableProvider};
@@ -8,6 +9,7 @@ use skrifa::charmap::Charmap;
 use skrifa::string::StringId;
 use skrifa::MetadataProvider;
 
+pub mod context;
 mod gdef;
 pub mod jsondiff;
 mod layout;
@@ -87,6 +89,9 @@ pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
         &NameMap::new(font)
     };
     let mut map = Map::new();
+    let context = SerializationContext::new(font, glyphmap.clone()).unwrap_or_else(|_| {
+        panic!("Could not create serialization context for font");
+    });
 
     for table in font.table_directory.table_records().iter() {
         let key = table.tag().to_string();
@@ -138,18 +143,9 @@ pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
     map.insert("name".to_string(), serialize_name_table(font));
     map.insert("cmap".to_string(), serialize_cmap_table(font, glyphmap));
     map.insert("hmtx".to_string(), serialize_hmtx_table(font, glyphmap));
-    map.insert(
-        "GDEF".to_string(),
-        gdef::serialize_gdef_table(font, glyphmap),
-    );
-    map.insert(
-        "GPOS".to_string(),
-        layout::serialize_gpos_table(font, glyphmap),
-    );
-    map.insert(
-        "GSUB".to_string(),
-        layout::serialize_gsub_table(font, glyphmap),
-    );
+    map.insert("GDEF".to_string(), gdef::serialize_gdef_table(&context));
+    map.insert("GPOS".to_string(), layout::serialize_gpos_table(&context));
+    map.insert("GSUB".to_string(), layout::serialize_gsub_table(&context));
     Value::Object(map)
 }
 
@@ -197,7 +193,7 @@ pub fn kern_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_matc
             &glyphmap_b
         }),
     ));
-    // println!("Font B flat kerning: {:#?}", kerns_a);
+    // println!("Font B flat kerning: {:#?}", kerns_b);
 
     diff(&kerns_a, &kerns_b, max_changes)
 }
