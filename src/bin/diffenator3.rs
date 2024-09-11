@@ -88,8 +88,8 @@ struct Cli {
     #[clap(long = "location", help_heading = "Locations to test")]
     location: Vec<String>,
     /// Instance to compare (may be repeated; use * for all instances)
-    #[clap(long = "instances", help_heading = "Locations to test")]
-    instances: Vec<String>,
+    #[clap(long = "instance", help_heading = "Locations to test")]
+    instance: Vec<String>,
     /// Masters (as detected from the gvar table)
     #[clap(long = "masters", help_heading = "Locations to test")]
     masters: bool,
@@ -158,8 +158,8 @@ fn main() {
     }
 
     // If there are no instances, location or cross-products, we set instances to "*"
-    if cli.instances.is_empty() && cli.location.is_empty() && !cli.masters && !cli.cross_product {
-        cli.instances.push("*".to_string());
+    if cli.instance.is_empty() && cli.location.is_empty() && !cli.masters && !cli.cross_product {
+        cli.instance.push("*".to_string());
     }
     // Location-specific tests
     let settings: Vec<Setting> = generate_settings(&cli, &font_a, &font_b);
@@ -218,7 +218,7 @@ fn test_at_location(font_a: &DFont, loc_name: String, cli: &Cli, font_b: &DFont)
 
 fn generate_settings(args: &Cli, font_a: &DFont, font_b: &DFont) -> Vec<Setting> {
     let mut settings = vec![];
-    for instance in &args.instances {
+    for instance in &args.instance {
         if instance == "*" {
             // Add the union of instances from both fonts
             let mut instances: IndexSet<String> = font_a.instances().into_iter().collect();
