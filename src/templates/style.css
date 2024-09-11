@@ -264,3 +264,8 @@ body {
     background-image: linear-gradient(rgb(0 0 0/5%) 0 0);
     outline: 5px dashed #ffffffff;
   }
+
+  #diffkerns {
+    max-height: 500px;
+    overflow-y: scroll;
+  }
