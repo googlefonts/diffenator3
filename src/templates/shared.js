@@ -91,11 +91,16 @@ function diffKerns(report) {
     `<table class="table table-striped" id="diffkerns"><tr><th>Pair</th><th>Old</old><th>New</th></table>`
   );
   for (let [pair, value] of Object.entries(report["kerns"])) {
-    let row = $("<tr>");
-    row.append(`<td>${pair}</td>`);
-    row.append(`<td>${value[0]}</td>`);
-    row.append(`<td>${value[1]}</td>`);
-    $("#diffkerns table").append(row);
+    if (pair == "error") {
+      $("#diffkerns").append(`<p class="text-danger">Error: ${value}</p>`);
+      continue;
+    } else {
+      let row = $("<tr>");
+      row.append(`<td>${pair}</td>`);
+      row.append(`<td>${value[0]}</td>`);
+      row.append(`<td>${value[1]}</td>`);
+      $("#diffkerns table").append(row);
+    }
   }
 }
 
