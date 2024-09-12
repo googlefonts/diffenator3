@@ -412,23 +412,34 @@ pub fn just_kerns(font: Value) -> Value {
             let classes = lookup.get("classes").unwrap().as_object().unwrap();
             let kerns = lookup.get("kerns").unwrap().as_object().unwrap();
             for (left_class, value) in kerns.iter() {
-                // println!("left (class): {}, value: {:#?})", left_class, value);
-                if value == &json!({"x": 0}) {
-                    continue;
-                }
-
                 for (right_class, kern) in value.as_object().unwrap().iter() {
-                    let kern = kern.as_object().unwrap();
-                    if kern.is_empty()
-                        || (kern.len() == 1 && kern.get("x") == Some(&Value::Number(0.into())))
+                    if kern == &json!({})
+                        || kern == &json!({"x": 0})
+                        || kern == &json!({"x": 0, "x_placement": 0})
                     {
                         continue;
                     }
-                    for left_glyph in classes.get(left_class).unwrap().as_array().unwrap().iter() {
+                    let kern = kern.as_object().unwrap();
+                    for left_glyph in classes
+                        .get(left_class)
+                        .unwrap_or(&json!(["@All"]))
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                    {
                         // println!("left (class): {:#?} (ID {})", left_glyph, left_class);
+                        // println!(
+                        //     "right class: {:#?} ({:#?})",
+                        //     right_class,
+                        //     classes.get(right_class)
+                        // );
 
-                        for right_glyph in
-                            classes.get(right_class).unwrap().as_array().unwrap().iter()
+                        for right_glyph in classes
+                            .get(right_class)
+                            .unwrap_or(&json!(["@All"]))
+                            .as_array()
+                            .unwrap()
+                            .iter()
                         {
                             // println!("   right (class): {:#?}, kern: {:#?}", right_glyph, kern);
                             let key = left_glyph.as_str().unwrap().to_owned()
