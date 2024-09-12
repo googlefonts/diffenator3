@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use crate::dfont::DFont;
+use crate::render::rustyruzz::Direction;
 use crate::render::{diff_many_words, GlyphDiff};
-use rustybuzz::Direction;
 use serde::Serialize;
 
 use super::{DEFAULT_GLYPHS_FONT_SIZE, DEFAULT_GLYPHS_THRESHOLD};

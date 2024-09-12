@@ -1,5 +1,7 @@
+use crate::render::rustyruzz::{
+    shape_with_plan, Direction, Face, Script, ShapePlan, UnicodeBuffer, Variation,
+};
 use image::{DynamicImage, GrayImage, Luma};
-use rustybuzz::{shape_with_plan, Direction, Face, ShapePlan, UnicodeBuffer};
 use skrifa::instance::{LocationRef, Size};
 use skrifa::outline::DrawSettings;
 use skrifa::raw::TableProvider;
@@ -23,7 +25,7 @@ impl<'a> Renderer<'a> {
         dfont: &'a DFont,
         font_size: f32,
         direction: Direction,
-        script: Option<rustybuzz::Script>,
+        script: Option<Script>,
     ) -> Self {
         let face = Face::from_slice(&dfont.backing, 0).expect("Foo");
         let font = skrifa::FontRef::new(&dfont.backing).unwrap_or_else(|_| {
@@ -142,7 +144,8 @@ impl<'a> Renderer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustybuzz::{script, Direction};
+    // use harfruzz::script;
+    use rustybuzz::script;
 
     #[test]
     fn test_zeno_path() {

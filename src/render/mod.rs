@@ -1,13 +1,13 @@
 pub mod encodedglyphs;
 pub mod renderer;
+pub(crate) mod rustyruzz;
 pub mod utils;
 pub mod wordlists;
-
 use crate::dfont::DFont;
+use crate::render::rustyruzz::{Direction, Script};
 use crate::render::utils::count_differences;
 use cfg_if::cfg_if;
 use renderer::Renderer;
-use rustybuzz::Direction;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -146,7 +146,7 @@ pub(crate) fn diff_many_words(
     wordlist: Vec<String>,
     threshold: usize,
     direction: Direction,
-    script: Option<rustybuzz::Script>,
+    script: Option<Script>,
 ) -> Vec<Difference> {
     let tl_a = ThreadLocal::new();
     let tl_b = ThreadLocal::new();
@@ -215,7 +215,7 @@ pub(crate) fn diff_many_words(
     wordlist: Vec<String>,
     threshold: usize,
     direction: Direction,
-    script: Option<rustybuzz::Script>,
+    script: Option<harfruzz::Script>,
 ) -> Vec<Difference> {
     let mut renderer_a = Renderer::new(font_a, font_size, direction, script);
     let mut renderer_b = Renderer::new(font_b, font_size, direction, script);
