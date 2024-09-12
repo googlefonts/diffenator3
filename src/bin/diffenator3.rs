@@ -132,6 +132,7 @@ fn main() {
 
     // Location-independent tests
     if cli.tables {
+        println!("Diffing binary tables");
         let table_diff = table_diff(
             &font_a.fontref(),
             &font_b.fontref(),
@@ -143,6 +144,7 @@ fn main() {
         }
     }
     if cli.kerns {
+        println!("Diffing kerning");
         let kern_diff = kern_diff(
             &font_a.fontref(),
             &font_b.fontref(),

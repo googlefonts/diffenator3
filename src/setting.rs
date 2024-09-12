@@ -23,7 +23,10 @@ impl std::hash::Hash for Setting {
 
 pub fn parse_location(variations: &str) -> Result<Vec<VariationSetting>, String> {
     let mut settings: Vec<VariationSetting> = vec![];
-    for variation in variations.split(',') {
+    for variation in variations.split(&[',', ' ']) {
+        if variation.is_empty() {
+            continue;
+        }
         let mut parts = variation.split('=');
         let axis = parts.next().ok_or("Couldn't parse axis".to_string())?;
         let value = parts.next().ok_or("Couldn't parse value".to_string())?;

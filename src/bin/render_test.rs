@@ -5,6 +5,7 @@ use diffenator3::render::utils::{count_differences, make_same_size};
 use diffenator3::render::{wordlists, DEFAULT_GRAY_FUZZ};
 use diffenator3::setting::{parse_location, Setting};
 use image::{Pixel, Rgba, RgbaImage};
+use zeno::Command;
 
 #[derive(Parser)]
 struct Args {
@@ -25,6 +26,10 @@ struct Args {
     /// Script
     #[clap(short, long, default_value = "Latin")]
     script: String,
+
+    /// Verbose debugging
+    #[clap(short, long)]
+    verbose: bool,
 }
 
 fn main() {
@@ -49,11 +54,18 @@ fn main() {
     let (serialized_buffer_a, commands) =
         renderer_a.string_to_positioned_glyphs(&args.text).unwrap();
     let image_a = renderer_a.render_positioned_glyphs(&commands);
+    if args.verbose {
+        println!("Commands A: {}", to_svg(commands));
+    }
     println!("Buffer A: {}", serialized_buffer_a);
 
     let (serialized_buffer_b, commands) =
         renderer_b.string_to_positioned_glyphs(&args.text).unwrap();
     let image_b = renderer_b.render_positioned_glyphs(&commands);
+    if args.verbose {
+        println!("Commands B: {}", to_svg(commands));
+    }
+
     println!("Buffer B: {}", serialized_buffer_b);
 
     let (mut image_a, mut image_b) = make_same_size(image_a, image_b);
@@ -78,4 +90,31 @@ fn main() {
     let differing_pixels = count_differences(image_a, image_b, DEFAULT_GRAY_FUZZ);
     println!("Pixel differences: {:.2?}", differing_pixels);
     println!("See output images: image_a.png, image_b.png, overlay.png");
+}
+
+fn to_svg(commands: Vec<Command>) -> String {
+    let mut svg = String::new();
+    for command in commands {
+        match command {
+            Command::MoveTo(p) => {
+                svg.push_str(&format!("M {} {} ", p.x, p.y));
+            }
+            Command::LineTo(p) => {
+                svg.push_str(&format!("L {} {} ", p.x, p.y));
+            }
+            Command::QuadTo(p1, p2) => {
+                svg.push_str(&format!("Q {} {} {} {} ", p1.x, p1.y, p2.x, p2.y));
+            }
+            Command::CurveTo(p1, p2, p3) => {
+                svg.push_str(&format!(
+                    "C {} {} {} {} {} {} ",
+                    p1.x, p1.y, p2.x, p2.y, p3.x, p3.y
+                ));
+            }
+            Command::Close => {
+                svg.push_str("Z  ");
+            }
+        }
+    }
+    svg
 }
