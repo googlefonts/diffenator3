@@ -18,6 +18,10 @@ use std::path::{Path, PathBuf};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
+    /// Number of worker processes. Defaults to the number of logical CPUs.
+    #[clap(short = 'J', long)]
+    pub jobs: Option<usize>,
+
     /// Don't show diffs in font tables
     #[clap(long = "no-tables", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
     tables: bool,
@@ -117,6 +121,13 @@ struct Cli {
 fn main() {
     let mut cli = Cli::parse();
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
+
+    if let Some(threads) = cli.jobs {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build_global()
+            .expect("Could not set thread count");
+    }
 
     let font_binary_a = std::fs::read(&cli.font1).expect("Couldn't open file");
     let font_binary_b = std::fs::read(&cli.font2).expect("Couldn't open file");
