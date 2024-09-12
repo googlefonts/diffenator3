@@ -92,7 +92,6 @@ function diffKerns(report) {
     } else {
       let row = $("<tr>");
       row.append(`<td>${pair}</td>`);
-      console.log(value);
       row.append(`<td>${serializeKernBefore(value)}</td>`);
       row.append(`<td>${serializeKernAfter(value)}</td>`);
       $("#diffkerns table").append(row);
