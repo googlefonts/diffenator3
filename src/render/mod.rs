@@ -1,3 +1,4 @@
+mod cachedoutlines;
 pub mod encodedglyphs;
 pub mod renderer;
 pub(crate) mod rustyruzz;

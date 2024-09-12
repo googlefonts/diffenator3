@@ -2,12 +2,12 @@ use crate::render::rustyruzz::{
     shape_with_plan, Direction, Face, Script, ShapePlan, UnicodeBuffer, Variation,
 };
 use image::{DynamicImage, GrayImage, Luma};
-use skrifa::instance::{LocationRef, Size};
-use skrifa::outline::DrawSettings;
+use skrifa::instance::Size;
 use skrifa::raw::TableProvider;
-use skrifa::{GlyphId, MetadataProvider, OutlineGlyphCollection};
+use skrifa::{GlyphId, MetadataProvider};
 use zeno::Command;
 
+use super::cachedoutlines::CachedOutlineGlyphCollection;
 use super::utils::{terrible_bounding_box, RecordingPen};
 use crate::dfont::DFont;
 
@@ -15,9 +15,8 @@ pub struct Renderer<'a> {
     face: Face<'a>,
     scale: f32,
     font: skrifa::FontRef<'a>,
-    location: LocationRef<'a>,
     plan: ShapePlan,
-    outlines: OutlineGlyphCollection<'a>,
+    outlines: CachedOutlineGlyphCollection<'a>,
 }
 
 impl<'a> Renderer<'a> {
@@ -46,14 +45,18 @@ impl<'a> Renderer<'a> {
             .collect();
         face.set_variations(&variations);
         let plan = ShapePlan::new(&face, direction, script, None, &[]);
-        let outlines = font.outline_glyphs();
+        let location = (&dfont.normalized_location).into();
+        let outlines = CachedOutlineGlyphCollection::new(
+            font.outline_glyphs(),
+            Size::new(font_size),
+            location,
+        );
 
         Self {
             face,
             font,
             plan,
             scale: font_size,
-            location: (&dfont.normalized_location).into(),
             outlines,
         }
     }
@@ -74,13 +77,7 @@ impl<'a> Renderer<'a> {
         for (position, info) in positions.iter().zip(infos) {
             pen.offset_x = cursor + (position.x_offset as f32 * factor);
             pen.offset_y = position.y_offset as f32 * factor;
-            let settings = DrawSettings::unhinted(Size::new(self.scale), self.location);
-            // XXX we can do this hundreds of times faster by caching the glyphs.
-            let _ = self
-                .outlines
-                .get(GlyphId::new(info.glyph_id))
-                .unwrap()
-                .draw(settings, &mut pen);
+            self.outlines.draw(GlyphId::new(info.glyph_id), &mut pen);
             serialized_buffer.push_str(&format!("{}", info.glyph_id,));
             if position.x_offset != 0 || position.y_offset != 0 {
                 serialized_buffer
