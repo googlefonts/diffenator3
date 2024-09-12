@@ -72,13 +72,10 @@ impl<'a> Renderer<'a> {
         let mut cursor = 0.0;
         let factor = self.scale / upem as f32;
         for (position, info) in positions.iter().zip(infos) {
-            if info.glyph_id == 0 {
-                return None;
-            }
             pen.offset_x = cursor + (position.x_offset as f32 * factor);
             pen.offset_y = position.y_offset as f32 * factor;
             let settings = DrawSettings::unhinted(Size::new(self.scale), self.location);
-
+            // XXX we can do this hundreds of times faster by caching the glyphs.
             let _ = self
                 .outlines
                 .get(GlyphId::new(info.glyph_id))

@@ -48,6 +48,17 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
         if let Some(wordlist) = wordlists::get_wordlist(script) {
             let direction = wordlists::get_script_direction(script);
             let script_tag = wordlists::get_script_tag(script);
+            // Only bother rendering the words that have cmap entries in both fonts
+            let wordlist = wordlist
+                .iter()
+                .filter(|word| {
+                    word.chars().all(|c| {
+                        font_a.codepoints.contains(&(c as u32))
+                            && font_b.codepoints.contains(&(c as u32))
+                    })
+                })
+                .map(|s| s.to_string())
+                .collect();
             let results = diff_many_words(
                 font_a,
                 font_b,
