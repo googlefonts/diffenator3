@@ -5,6 +5,8 @@ use crate::render::{diff_many_words, GlyphDiff};
 use rustybuzz::Direction;
 use serde::Serialize;
 
+use super::{DEFAULT_GLYPHS_FONT_SIZE, DEFAULT_GLYPHS_THRESHOLD};
+
 #[derive(Serialize)]
 pub struct EncodedGlyph {
     pub string: String,
@@ -67,7 +69,6 @@ pub fn modified_encoded_glyphs(font_a: &DFont, font_b: &DFont) -> Vec<GlyphDiff>
     let cmap_a = &font_a.codepoints;
     let cmap_b = &font_b.codepoints;
     let same_glyphs = cmap_a.intersection(cmap_b);
-    let threshold = 0.1;
     let word_list: Vec<String> = same_glyphs
         .map(|i| char::from_u32(*i))
         .filter(|x| x.is_some())
@@ -76,15 +77,15 @@ pub fn modified_encoded_glyphs(font_a: &DFont, font_b: &DFont) -> Vec<GlyphDiff>
     let mut result: Vec<GlyphDiff> = diff_many_words(
         font_a,
         font_b,
-        64.0,
+        DEFAULT_GLYPHS_FONT_SIZE,
         word_list,
-        threshold,
+        DEFAULT_GLYPHS_THRESHOLD,
         Direction::LeftToRight,
         None,
     )
     .into_iter()
     .map(|x| x.into())
     .collect();
-    result.sort_by_key(|x| (-x.percent * 10_000.0) as i32);
+    result.sort_by_key(|x| -(x.differing_pixels as i32));
     result
 }

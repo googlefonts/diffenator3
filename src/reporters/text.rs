@@ -103,7 +103,7 @@ fn report_location(locationresult: LocationResult) {
     if !locationresult.glyphs.is_empty() {
         println!("\n## Glyphs");
         for glyph in locationresult.glyphs {
-            println!(" - {} ({:.3}%)", glyph.string, glyph.percent);
+            println!(" - {} ({:.3} pixels)", glyph.string, glyph.differing_pixels);
         }
     }
 
@@ -116,7 +116,7 @@ fn report_location(locationresult: LocationResult) {
                 println!(
                     "  - {} ({:.3}%)",
                     difference["word"].as_str().unwrap(),
-                    difference["percent"].as_f64().unwrap()
+                    difference["differing_pixels"].as_i64().unwrap()
                 );
             }
         }

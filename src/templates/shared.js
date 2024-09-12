@@ -46,7 +46,7 @@ function addAGlyph(glyph, where) {
     glyph.string.codePointAt(0).toString(16).padStart(4, "0").toUpperCase();
   where.append(`
         <div class="cell-glyph font-before">
-        ${glyph.string}
+        <div data-toggle="tooltip" data-html="true" data-title="${glyph.differing_pixels} pixels"> ${glyph.string}
         <div class="codepoint" data-toggle="tooltip" data-html="true" data-title="${title}">
 		${cp}
         </div>
@@ -60,11 +60,7 @@ function addAWord(diff, where) {
   }
   where.append(`
 		<div class="cell-word font-before">
-		<span data-toggle="tooltip" data-html="true" data-title="Before: <pre>${
-      diff.buffer_a
-    }</pre>After: <pre>${diff.buffer_b}</pre><br>difference: ${
-    Math.round(diff.percent * 100) / 100
-  }%">
+		<span data-toggle="tooltip" data-html="true" data-title="Before: <pre>${diff.buffer_a}</pre>After: <pre>${diff.buffer_b}</pre><br>difference: ${diff.differing_pixels} pixels">
 		${diff.word}
 		</span>
 		</div>
@@ -83,7 +79,6 @@ function diffTables(report) {
     e.stopPropagation();
   });
 }
-
 function diffKerns(report) {
   $("#diffkerns").empty();
   $("#diffkerns").append(`<h4 class="mt-2">Modified Kerns</h4>`);
@@ -97,11 +92,74 @@ function diffKerns(report) {
     } else {
       let row = $("<tr>");
       row.append(`<td>${pair}</td>`);
-      row.append(`<td>${value[0]}</td>`);
-      row.append(`<td>${value[1]}</td>`);
+      console.log(value);
+      row.append(`<td>${serializeKernBefore(value)}</td>`);
+      row.append(`<td>${serializeKernAfter(value)}</td>`);
       $("#diffkerns table").append(row);
     }
   }
+}
+
+function serializeKernBefore(kern) {
+  if (Array.isArray(kern)) {
+    return serializeKern(kern[0], -1);
+  }
+  return serializeKern(kern, 0);
+}
+
+function serializeKernAfter(kern) {
+  if (Array.isArray(kern)) {
+    return serializeKern(kern[1], -1);
+  }
+  return serializeKern(kern, 1);
+}
+
+function serializeKern(kern, index) {
+  let string = "";
+  if (kern === null || kern === undefined) {
+    return "(null)";
+  }
+  if (kern.x) {
+    string += serializeKernValue(kern.x, index);
+  } else if (kern.y) {
+    string = "0";
+  }
+
+  if (kern.y) {
+    string += "," + serializeKernValue(kern.y, index);
+  }
+  if (!kern.x_placement && !kern.y_placement) {
+    return string;
+  }
+  string += "@";
+  if (kern.x_placement) {
+    string += serializeKernValue(kern.x_placement, index);
+  } else if (kern.y_placement) {
+    string += "0";
+  }
+  if (kern.y_placement) {
+    string += "," + serializeKernValue(kern.y_placement, index);
+  }
+  return string;
+}
+
+function serializeKernValue(kern, index) {
+  if (typeof kern == "number") {
+    return kern;
+  }
+  let string = "(";
+  let verybig = Object.entries(kern).length > 5;
+  for (let [key, value] of Object.entries(kern)) {
+    if (key == "default") {
+      string += value[index] + " ";
+    } else {
+      string += value[index] + "@" + key + " ";
+    }
+    if (verybig) {
+      string += "<br>";
+    }
+  }
+  return string.trim() + ")";
 }
 
 function cmapDiff(report) {

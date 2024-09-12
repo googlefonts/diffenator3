@@ -24,8 +24,13 @@ cfg_if! {
 
 pub const DEFAULT_WORDS_FONT_SIZE: f32 = 16.0;
 pub const DEFAULT_GLYPHS_FONT_SIZE: f32 = 32.0;
-/// Percentage difference between pixels after which two images are considered different (e.g. 0.2%)
-pub const DEFAULT_WORDS_THRESHOLD: f32 = 0.2;
+/// Number of differing pixels after which two images are considered different
+///
+/// This is a count rather than a percentage, because a percentage would mean
+/// that significant differences could "hide" inside a long word. This should
+/// be adjusted to the size of the font and the expected differences.
+pub const DEFAULT_WORDS_THRESHOLD: usize = 8;
+pub const DEFAULT_GLYPHS_THRESHOLD: usize = 16;
 /// Gray pixels which differ by less than this amount are considered the same
 pub const DEFAULT_GRAY_FUZZ: u8 = 8;
 
@@ -69,8 +74,8 @@ pub struct GlyphDiff {
     pub name: String,
     /// The Unicode codepoint of the glyph
     pub unicode: String,
-    /// The percentage of differing pixels
-    pub percent: f32,
+    /// The number of differing pixels
+    pub differing_pixels: usize,
 }
 
 impl From<Difference> for GlyphDiff {
@@ -82,14 +87,14 @@ impl From<Difference> for GlyphDiff {
                     .map(|n| n.to_string())
                     .unwrap_or_default(),
                 unicode: format!("U+{:04X}", c as i32),
-                percent: diff.percent,
+                differing_pixels: diff.differing_pixels,
             }
         } else {
             GlyphDiff {
                 string: "".to_string(),
                 name: "".to_string(),
                 unicode: "".to_string(),
-                percent: 0.0,
+                differing_pixels: 0,
             }
         }
     }
@@ -105,8 +110,8 @@ pub struct Difference {
     /// A string representation of the shaped buffer in the second font, if different
     #[serde(skip_serializing_if = "Option::is_none")]
     pub buffer_b: Option<String>,
-    /// The percentage of differing pixels
-    pub percent: f32,
+    /// The number of differing pixels
+    pub differing_pixels: usize,
     /// The OpenType features applied to the text
     #[serde(skip_serializing_if = "String::is_empty")]
     pub ot_features: String,
@@ -139,7 +144,7 @@ pub(crate) fn diff_many_words(
     font_b: &DFont,
     font_size: f32,
     wordlist: Vec<String>,
-    threshold: f32,
+    threshold: usize,
     direction: Direction,
     script: Option<rustybuzz::Script>,
 ) -> Vec<Difference> {
@@ -178,7 +183,7 @@ pub(crate) fn diff_many_words(
             let img_b = renderer_b
                 .borrow_mut()
                 .render_positioned_glyphs(&commands_b);
-            let percent = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
+            let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
             let buffers_same = buffer_a == buffer_b;
 
             Some(Difference {
@@ -186,7 +191,7 @@ pub(crate) fn diff_many_words(
                 buffer_a,
                 buffer_b: if buffers_same { None } else { Some(buffer_b) },
                 // diff_map,
-                percent,
+                differing_pixels,
                 ot_features: "".to_string(),
                 lang: "".to_string(),
             })
@@ -195,9 +200,9 @@ pub(crate) fn diff_many_words(
     let mut diffs: Vec<Difference> = differences
         .into_iter()
         .flatten()
-        .filter(|diff| diff.percent > threshold)
+        .filter(|diff| diff.differing_pixels > threshold)
         .collect();
-    diffs.sort_by_key(|x| (-x.percent * 10_000.0) as i32);
+    diffs.sort_by_key(|x| -(x.differing_pixels as i32));
     diffs
 }
 
@@ -208,7 +213,7 @@ pub(crate) fn diff_many_words(
     font_b: &DFont,
     font_size: f32,
     wordlist: Vec<String>,
-    threshold: f32,
+    threshold: usize,
     direction: Direction,
     script: Option<rustybuzz::Script>,
 ) -> Vec<Difference> {
@@ -253,7 +258,7 @@ pub(crate) fn diff_many_words(
             })
         }
     }
-    differences.sort_by_key(|x| (-x.percent * 10_000.0) as i32);
+    differences.sort_by_key(|x| -(x.differing_pixels as i32));
 
     differences
 }

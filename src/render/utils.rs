@@ -107,14 +107,13 @@ pub fn make_same_size(image_a: GrayImage, image_b: GrayImage) -> (GrayImage, Gra
     (a, b)
 }
 
-/// Compare two images and return the percentage of differing pixels
-pub fn count_differences(img_a: GrayImage, img_b: GrayImage, fuzz: u8) -> f32 {
+/// Compare two images and return the count of differing pixels
+pub fn count_differences(img_a: GrayImage, img_b: GrayImage, fuzz: u8) -> usize {
     let (img_a, img_b) = make_same_size(img_a, img_b);
     let img_a_vec = img_a.to_vec();
-    let differing_pixels = img_a_vec
+    img_a_vec
         .iter()
         .zip(img_b.to_vec())
         .filter(|(&cha, chb)| cha.abs_diff(*chb) > fuzz)
-        .count();
-    differing_pixels as f32 / (img_a.width() as f32 * img_a.height() as f32) * 100.0
+        .count()
 }
