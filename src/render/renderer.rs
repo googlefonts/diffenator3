@@ -27,13 +27,24 @@ impl<'a> Renderer<'a> {
         direction: Direction,
         script: Option<Script>,
     ) -> Self {
-        let face = Face::from_slice(&dfont.backing, 0).expect("Foo");
+        let mut face = Face::from_slice(&dfont.backing, 0).expect("Foo");
         let font = skrifa::FontRef::new(&dfont.backing).unwrap_or_else(|_| {
             panic!(
                 "error constructing a Font from data for {:}",
                 dfont.family_name()
             );
         });
+        let variations: Vec<_> = dfont
+            .location
+            .iter()
+            .map(|setting| {
+                let tag = setting.selector;
+                let tag = rustybuzz::ttf_parser::Tag::from_bytes(&tag.into_bytes());
+                let value = setting.value;
+                Variation { tag, value }
+            })
+            .collect();
+        face.set_variations(&variations);
         let plan = ShapePlan::new(&face, direction, script, None, &[]);
         let outlines = font.outline_glyphs();
 
