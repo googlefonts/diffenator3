@@ -22,11 +22,12 @@ cfg_if! {
     }
 }
 
-pub const DEFAULT_WORDS_FONT_SIZE: f32 = 32.0;
-pub const DEFAULT_GLYPHS_FONT_SIZE: f32 = 64.0;
+pub const DEFAULT_WORDS_FONT_SIZE: f32 = 16.0;
+pub const DEFAULT_GLYPHS_FONT_SIZE: f32 = 32.0;
+/// Percentage difference between pixels after which two images are considered different (e.g. 0.2%)
 pub const DEFAULT_WORDS_THRESHOLD: f32 = 0.2;
 /// Gray pixels which differ by less than this amount are considered the same
-pub const DEFAULT_GRAY_FUZZ: u8 = 20;
+pub const DEFAULT_GRAY_FUZZ: u8 = 8;
 
 /// Compare two fonts by rendering a list of words and comparing the images
 ///
