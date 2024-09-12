@@ -80,9 +80,12 @@ fn main() {
     for (x, y, pixel) in overlay.enumerate_pixels_mut() {
         let pixel_a = image_a.get_pixel(x, y);
         let pixel_b = image_b.get_pixel(x, y);
-        let mut a_green = Rgba([0, pixel_a.0[0], 0, 128]);
-        let b_red = Rgba([pixel_b.0[0], 0, 0, 128]);
+        let mut a_green = Rgba([0, 255 - pixel_a.0[0], 0, 128]);
+        let b_red = Rgba([255 - pixel_b.0[0], 0, 0, 128]);
         a_green.blend(&b_red);
+        if pixel_a.0[0].abs_diff(pixel_b.0[0]) > DEFAULT_GRAY_FUZZ {
+            a_green.blend(&Rgba([255, 255, 255, 90]));
+        }
         *pixel = a_green;
     }
     overlay.save("overlay.png").expect("Can't save");
