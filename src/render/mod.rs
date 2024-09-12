@@ -227,7 +227,7 @@ pub(crate) fn diff_many_words(
     wordlist: Vec<String>,
     threshold: usize,
     direction: Direction,
-    script: Option<harfruzz::Script>,
+    script: Option<Script>,
 ) -> Vec<Difference> {
     let mut renderer_a = Renderer::new(font_a, font_size, direction, script);
     let mut renderer_b = Renderer::new(font_b, font_size, direction, script);
@@ -257,8 +257,8 @@ pub(crate) fn diff_many_words(
         let buffers_same = buffer_a == buffer_b;
         let img_a = renderer_a.render_positioned_glyphs(&commands_a);
         let img_b = renderer_b.render_positioned_glyphs(&commands_b);
-        let percent = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
-        if percent > threshold {
+        let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
+        if differing_pixels > threshold {
             differences.push(Difference {
                 word: word.to_string(),
                 buffer_a,
@@ -266,7 +266,7 @@ pub(crate) fn diff_many_words(
                 // diff_map,
                 ot_features: "".to_string(),
                 lang: "".to_string(),
-                percent,
+                differing_pixels,
             })
         }
     }
