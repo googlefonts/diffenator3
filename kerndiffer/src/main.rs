@@ -5,11 +5,12 @@
 /// focusing on the kerning specifically.
 use clap::Parser;
 use colored::Colorize;
-use diffenator3_lib::ttj::kern_diff;
-use diffenator3_lib::{dfont::DFont, ttj::jsondiff::Substantial};
 use env_logger::Env;
+use read_fonts::FontRef;
 use serde_json::{Map, Value};
 use std::path::PathBuf;
+use ttj::jsondiff::Substantial;
+use ttj::kern_diff;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -35,14 +36,9 @@ fn main() {
     let font_binary_a = std::fs::read(&cli.font1).expect("Couldn't open file");
     let font_binary_b = std::fs::read(&cli.font2).expect("Couldn't open file");
 
-    let font_a = DFont::new(&font_binary_a);
-    let font_b = DFont::new(&font_binary_b);
-    let diff = kern_diff(
-        &font_a.fontref(),
-        &font_b.fontref(),
-        cli.max_changes,
-        cli.no_match,
-    );
+    let font_a = FontRef::new(&font_binary_a).expect("Couldn't parse font");
+    let font_b = FontRef::new(&font_binary_b).expect("Couldn't parse font");
+    let diff = kern_diff(&font_a, &font_b, cli.max_changes, cli.no_match);
     if let Value::Object(diff) = &diff {
         show_map_diff(diff, 0, false);
     } else {

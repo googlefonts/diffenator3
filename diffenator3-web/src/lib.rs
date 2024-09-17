@@ -1,9 +1,9 @@
 use diffenator3_lib::dfont::DFont;
 use diffenator3_lib::render::{encodedglyphs, encodedglyphs::CmapDiff, test_font_words};
-use diffenator3_lib::ttj::{kern_diff, table_diff};
 use serde_json::json;
 use skrifa::MetadataProvider;
 use std::collections::HashMap;
+use ttj::{kern_diff, table_diff};
 
 use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;

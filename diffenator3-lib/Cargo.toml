@@ -21,10 +21,11 @@ indexmap = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
 
+ttj = { path = "../ttj" }
 cfg-if = "1.0.0"
 ab_glyph = "0.2.21"
 ab_glyph_rasterizer = "0.1.8"
-image = "0.24.6"
+image = { version = "0.24.6", default-features = false }
 rustybuzz = "0.18.0"
 ucd = "0.1.1"
 unicode_names2 = "0.6.0"

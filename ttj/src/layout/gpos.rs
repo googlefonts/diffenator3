@@ -1,7 +1,7 @@
 use super::variable_scalars::SerializeValueRecordLike;
 use super::SerializeSubtable;
+use crate::context::SerializationContext;
 use crate::monkeypatching::MonkeyPatchClassDef;
-use crate::ttj::context::SerializationContext;
 use read_fonts::tables::gpos::CursivePosFormat1;
 use read_fonts::tables::gpos::MarkBasePosFormat1;
 use read_fonts::tables::gpos::MarkLigPosFormat1;

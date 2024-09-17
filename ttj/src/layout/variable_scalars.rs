@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ttj::context::SerializationContext;
+use crate::context::SerializationContext;
 use read_fonts::tables::gpos::DeviceOrVariationIndex::VariationIndex;
 use read_fonts::tables::variations::DeltaSetIndex;
 use read_fonts::FontData;

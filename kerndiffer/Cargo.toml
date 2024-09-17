@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-diffenator3-lib = { path = "../diffenator3-lib" }
 read-fonts = { workspace = true }
 serde_json = { workspace = true }
 clap = { version = "4.5.9", features = ["derive"] }
 env_logger = "0.11"
 colored = "2.1.0"
+ttj = { path = "../ttj" }

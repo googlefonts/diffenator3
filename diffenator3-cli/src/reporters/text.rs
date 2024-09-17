@@ -1,8 +1,8 @@
 use super::{LocationResult, Report};
 
 use colored::Colorize;
-use diffenator3_lib::ttj::jsondiff::Substantial;
 use serde_json::Map;
+use ttj::jsondiff::Substantial;
 
 pub fn show_map_diff(fields: &Map<String, serde_json::Value>, indent: usize, succinct: bool) {
     for (field, diff) in fields.iter() {

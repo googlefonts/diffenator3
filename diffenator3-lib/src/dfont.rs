@@ -1,4 +1,3 @@
-use crate::monkeypatching::DenormalizeLocation;
 use crate::setting::parse_location;
 use font_types::NameId;
 use read_fonts::{FontRef, ReadError, TableProvider};
@@ -7,6 +6,7 @@ use skrifa::setting::VariationSetting;
 use skrifa::MetadataProvider;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use ttj::monkeypatching::DenormalizeLocation;
 use ucd::Codepoint;
 
 /// A representation of everything we need to know about a font for diffenator purposes

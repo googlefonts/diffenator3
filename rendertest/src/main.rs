@@ -1,9 +1,9 @@
 /// Debug rendering differences between fonts
 use clap::Parser;
-use diffenator3::render::renderer::Renderer;
-use diffenator3::render::utils::{count_differences, make_same_size};
-use diffenator3::render::{wordlists, DEFAULT_GRAY_FUZZ};
-use diffenator3::setting::{parse_location, Setting};
+use diffenator3_lib::render::renderer::Renderer;
+use diffenator3_lib::render::utils::{count_differences, make_same_size};
+use diffenator3_lib::render::{wordlists, DEFAULT_GRAY_FUZZ};
+use diffenator3_lib::setting::{parse_location, Setting};
 use image::{Pixel, Rgba, RgbaImage};
 use zeno::Command;
 
@@ -35,9 +35,9 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let data_a = std::fs::read(&args.font1).expect("Can't read font file");
-    let mut dfont_a = diffenator3::dfont::DFont::new(&data_a);
+    let mut dfont_a = diffenator3_lib::dfont::DFont::new(&data_a);
     let data_b = std::fs::read(&args.font2).expect("Can't read font file");
-    let mut dfont_b = diffenator3::dfont::DFont::new(&data_b);
+    let mut dfont_b = diffenator3_lib::dfont::DFont::new(&data_b);
 
     if let Some(location) = args.location {
         let loc = parse_location(&location).expect("Couldn't parse location");

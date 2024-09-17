@@ -1,5 +1,5 @@
 use super::SerializeSubtable;
-use crate::ttj::context::SerializationContext;
+use crate::context::SerializationContext;
 use read_fonts::tables::gsub::AlternateSubstFormat1;
 use read_fonts::tables::gsub::LigatureSubstFormat1;
 use read_fonts::tables::gsub::MultipleSubstFormat1;

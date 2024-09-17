@@ -1,6 +1,14 @@
 /// Convert a font to a serialized JSON representation
-use crate::ttj::jsondiff::diff;
-use crate::ttj::serializefont::ToValue;
+pub mod context;
+mod gdef;
+pub mod jsondiff;
+mod layout;
+pub mod monkeypatching;
+pub mod namemap;
+mod serializefont;
+
+use crate::jsondiff::diff;
+use crate::serializefont::ToValue;
 use context::SerializationContext;
 use namemap::NameMap;
 use read_fonts::traversal::SomeTable;
@@ -9,13 +17,6 @@ use serde_json::{Map, Value};
 use skrifa::charmap::Charmap;
 use skrifa::string::StringId;
 use skrifa::MetadataProvider;
-
-pub mod context;
-mod gdef;
-pub mod jsondiff;
-mod layout;
-pub mod namemap;
-mod serializefont;
 
 pub use layout::gpos::just_kerns;
 

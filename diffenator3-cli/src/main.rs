@@ -15,14 +15,14 @@ use diffenator3_lib::dfont::DFont;
 use diffenator3_lib::render::encodedglyphs::{modified_encoded_glyphs, CmapDiff};
 use diffenator3_lib::render::test_font_words;
 use diffenator3_lib::setting::{parse_location, Setting};
-use diffenator3_lib::ttj::jsondiff::Substantial;
-use diffenator3_lib::ttj::{kern_diff, table_diff};
 use env_logger::Env;
 use indexmap::IndexSet;
 use itertools::Itertools;
 use skrifa::{MetadataProvider, Tag};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use ttj::jsondiff::Substantial;
+use ttj::{kern_diff, table_diff};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

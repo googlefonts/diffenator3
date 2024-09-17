@@ -1,4 +1,4 @@
-use crate::ttj::layout::variable_scalars::{hashmap_to_value, serialize_all_deltas};
+use crate::layout::variable_scalars::{hashmap_to_value, serialize_all_deltas};
 
 use super::context::SerializationContext;
 use read_fonts::tables::gdef::{
