@@ -1,3 +1,7 @@
+/// Additional routines to help with serialization of font data.
+///
+/// This module provides a few helper functions to serialize font data into JSON,
+/// based on the back of the read_fonts traversal feature.
 use read_fonts::traversal::{FieldType, SomeArray, SomeTable};
 use serde_json::{Map, Number, Value};
 

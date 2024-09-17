@@ -17,7 +17,7 @@ cfg_if! {
     if #[cfg(target_family = "wasm")] {
         use std::collections::HashMap;
         use dfont::DFont;
-        use render::{test_font_words, encodedglyphs};
+        use render::{test_font_words, encodedglyphs, encodedglyphs::CmapDiff};
         use serde_json::json;
         use ttj::{table_diff, kern_diff};
         use skrifa::MetadataProvider;
@@ -122,7 +122,7 @@ cfg_if! {
             let f_a = DFont::new(font_a);
             let f_b = DFont::new(font_b);
             let val = json!({
-                "new_missing_glyphs": encodedglyphs::new_missing_glyphs(&f_a, &f_b)
+                "new_missing_glyphs": CmapDiff::new(&f_a, &f_b)
             });
             f.call1(&JsValue::NULL, &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string()))).unwrap();
         }

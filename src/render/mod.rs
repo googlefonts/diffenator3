@@ -1,3 +1,7 @@
+/// Rendering and comparison of fonts
+///
+/// The routines in this file handle the rendering and comparison of text
+/// strings; the actual rendering proper is done in the `renderer` module.
 mod cachedoutlines;
 pub mod encodedglyphs;
 pub mod renderer;

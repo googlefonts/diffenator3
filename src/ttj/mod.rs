@@ -1,3 +1,4 @@
+/// Convert a font to a serialized JSON representation
 use crate::ttj::jsondiff::diff;
 use crate::ttj::serializefont::ToValue;
 use context::SerializationContext;
@@ -82,6 +83,15 @@ fn serialize_hmtx_table<'a>(font: &impl TableProvider<'a>, names: &NameMap) -> V
     Value::Object(map)
 }
 
+/// Convert a font to a serialized JSON representation
+///
+/// This function is used to serialize a font to a JSON representation which can be compared with
+/// another font. The JSON representation is a map of tables, where each table is represented as a
+/// map of fields and values. The user of this function can also provide a glyph map, which is a
+/// mapping from glyph IDs to glyph names. If the glyph map is not provided, the function will
+/// attempt to create one from the font itself. (You may want to specify a glyph map from another
+/// font to remove false positive differences if you are comparing two fonts which have the same glyph
+/// order but the glyph names have changed, e.g. when development names have changed to production names.)
 pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
     let glyphmap = if let Some(glyphmap) = glyphmap {
         glyphmap
@@ -89,18 +99,20 @@ pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
         &NameMap::new(font)
     };
     let mut map = Map::new();
+    // A serialization context bundles up all the information we need to serialize a font
     let context = SerializationContext::new(font, glyphmap.clone()).unwrap_or_else(|_| {
         panic!("Could not create serialization context for font");
     });
 
+    // Some tables are serialized by using read_font's traversal feature; typically those which
+    // are just a set of fields and values (or are so complicated we haven't yet been bothered
+    // to write our own serializers for them...)
     for table in font.table_directory.table_records().iter() {
         let key = table.tag().to_string();
         let value = match table.tag().into_bytes().as_ref() {
             b"head" => font.head().map(|t| <dyn SomeTable>::serialize(&t)),
-            // b"name" => font.name().map(|t| serialize_name_table(&t)),
             b"hhea" => font.hhea().map(|t| <dyn SomeTable>::serialize(&t)),
             b"vhea" => font.vhea().map(|t| <dyn SomeTable>::serialize(&t)),
-            // b"hmtx" => font.hmtx().map(|t| <dyn SomeTable>::serialize(&t)),
             b"vmtx" => font.vmtx().map(|t| <dyn SomeTable>::serialize(&t)),
             b"fvar" => font.fvar().map(|t| <dyn SomeTable>::serialize(&t)),
             b"avar" => font.avar().map(|t| <dyn SomeTable>::serialize(&t)),
@@ -113,14 +125,6 @@ pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
             b"loca" => font.loca(None).map(|t| <dyn SomeTable>::serialize(&t)),
             b"glyf" => font.glyf().map(|t| <dyn SomeTable>::serialize(&t)),
             b"gvar" => font.gvar().map(|t| <dyn SomeTable>::serialize(&t)),
-            // b"gasp" => {
-            //     let gasp: Result<tables::gasp::Gasp, _> = font.expect_table();
-            //     gasp.map(|t| <dyn SomeTable>::serialize(&t))
-            // }
-            // b"cmap" => font.cmap().map(|t| <dyn SomeTable>::serialize(&t)),
-            // b"GDEF" => font.gdef().map(|t| <dyn SomeTable>::serialize(&t)),
-            // b"GPOS" => font.gpos().map(|t| <dyn SomeTable>::serialize(&t)),
-            // b"GSUB" => font.gsub().map(|t| <dyn SomeTable>::serialize(&t)),
             b"COLR" => font.colr().map(|t| <dyn SomeTable>::serialize(&t)),
             b"CPAL" => font.cpal().map(|t| <dyn SomeTable>::serialize(&t)),
             b"STAT" => font.stat().map(|t| <dyn SomeTable>::serialize(&t)),
@@ -138,8 +142,9 @@ pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
             key,
             value.unwrap_or_else(|_| Value::String("Could not parse".to_string())),
         );
-        // }
     }
+
+    // Other tables require a bit of massaging to produce information which makes sense to diff.
     map.insert("name".to_string(), serialize_name_table(font));
     map.insert("cmap".to_string(), serialize_cmap_table(font, glyphmap));
     map.insert("hmtx".to_string(), serialize_hmtx_table(font, glyphmap));
@@ -149,6 +154,17 @@ pub fn font_to_json(font: &FontRef, glyphmap: Option<&NameMap>) -> Value {
     Value::Object(map)
 }
 
+/// Compare two fonts and return a JSON representation of the differences
+///
+/// This function compares two fonts and returns a JSON representation of the differences between
+/// them.
+///
+/// Arguments:
+///
+/// * `font_a` - The first font to compare
+/// * `font_b` - The second font to compare
+/// * `max_changes` - The maximum number of changes to report before giving up
+/// * `no_match` - Don't try to match glyph names between fonts
 pub fn table_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_match: bool) -> Value {
     let glyphmap_a = NameMap::new(font_a);
     let glyphmap_b = NameMap::new(font_b);
@@ -173,6 +189,14 @@ pub fn table_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_mat
     )
 }
 
+/// Compare two fonts and return a JSON representation of the differences in kerning
+///
+/// Arguments:
+///
+/// * `font_a` - The first font to compare
+/// * `font_b` - The second font to compare
+/// * `max_changes` - The maximum number of changes to report before giving up
+/// * `no_match` - Don't try to match glyph names between fonts
 pub fn kern_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_match: bool) -> Value {
     let glyphmap_a = NameMap::new(font_a);
     let glyphmap_b = NameMap::new(font_b);

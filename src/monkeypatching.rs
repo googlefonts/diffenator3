@@ -1,3 +1,4 @@
+/// Methods which other people's structs really should have but sadly don't.
 use std::collections::HashSet;
 
 use read_fonts::{
@@ -27,28 +28,13 @@ fn poor_mans_denormalize(peak: f32, axis: &VariationAxisRecord) -> f32 {
 }
 
 pub trait DenormalizeLocation {
-    fn denormalize_location(
-        &self,
-        tuple: &[f32],
-        // particular_axes: Option<&[usize]>,
-    ) -> Result<Vec<VariationSetting>, ReadError>;
+    /// Given a normalized location tuple, turn it back into a friendly representation in userspace
+    fn denormalize_location(&self, tuple: &[f32]) -> Result<Vec<VariationSetting>, ReadError>;
 }
 
 impl DenormalizeLocation for FontRef<'_> {
-    fn denormalize_location(
-        &self,
-        tuple: &[f32],
-        // particular_axes: Option<&[usize]>,
-    ) -> Result<Vec<VariationSetting>, ReadError> {
+    fn denormalize_location(&self, tuple: &[f32]) -> Result<Vec<VariationSetting>, ReadError> {
         let all_axes = self.fvar()?.axes()?;
-        // let axes: Vec<&VariationAxisRecord> = if let Some(these_axes) = particular_axes {
-        //     these_axes
-        //         .iter()
-        //         .map(|i| all_axes.get(*i).unwrap())
-        //         .collect()
-        // } else {
-        //     all_axes.into_iter().collect()
-        // };
         Ok(all_axes
             .iter()
             .zip(tuple)
@@ -62,6 +48,7 @@ impl DenormalizeLocation for FontRef<'_> {
 }
 
 pub trait MonkeyPatchClassDef {
+    /// Return a list of glyphs in this class
     fn class_glyphs(&self, class: u16, coverage: Option<CoverageTable>) -> Vec<GlyphId16>;
 }
 

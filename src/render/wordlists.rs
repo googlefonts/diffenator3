@@ -1,6 +1,5 @@
-// use harfruzz::{script, Direction, Script};
+use super::rustyruzz::{script, Direction, Script};
 use lazy_static::lazy_static;
-use rustybuzz::{script, Direction, Script};
 use std::io::{BufRead, BufReader};
 
 macro_rules! include_script {

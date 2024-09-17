@@ -1,3 +1,4 @@
+/// Speed up the drawing process by caching the outlines of glyphs.
 use std::collections::HashMap;
 
 use skrifa::{
@@ -10,7 +11,6 @@ use super::utils::RecordingPen;
 pub(crate) struct CachedOutlineGlyphCollection<'a> {
     source: OutlineGlyphCollection<'a>,
     cache: HashMap<GlyphId, Vec<Command>>,
-    // settings: DrawSettings<'a>,
     size: Size,
     location: LocationRef<'a>,
 }

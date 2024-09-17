@@ -1,7 +1,14 @@
+/// Show differences between two font files
+///
+/// This software can analyze two OpenType files for differences in rendering,
+/// and shaping. It does this by comparing images of glyphs and shaped text
+/// and looking for differences between the renderings.
+///
+/// Additionally, it can compare kerning table information and binary tables.
 use clap::builder::ArgAction;
 use clap::Parser;
 use diffenator3::dfont::DFont;
-use diffenator3::render::encodedglyphs::{modified_encoded_glyphs, new_missing_glyphs};
+use diffenator3::render::encodedglyphs::{modified_encoded_glyphs, CmapDiff};
 use diffenator3::render::test_font_words;
 use diffenator3::reporters::html::template_engine;
 use diffenator3::reporters::{self, LocationResult, Report};
@@ -167,7 +174,7 @@ fn main() {
         }
     }
     if cli.glyphs {
-        result.cmap_diff = Some(new_missing_glyphs(&font_a, &font_b));
+        result.cmap_diff = Some(CmapDiff::new(&font_a, &font_b));
     }
 
     // If there are no instances, location or cross-products, we set instances to "*"
@@ -229,6 +236,8 @@ fn test_at_location(font_a: &DFont, loc_name: String, cli: &Cli, font_b: &DFont)
     this_location_value
 }
 
+// Parse the various location-relation options and return a list of "settings", which
+// are locations to set the fonts to.
 fn generate_settings(args: &Cli, font_a: &DFont, font_b: &DFont) -> Vec<Setting> {
     let mut settings = vec![];
     for instance in &args.instance {
@@ -256,6 +265,7 @@ fn generate_settings(args: &Cli, font_a: &DFont, font_b: &DFont) -> Vec<Setting>
             }
         }
     }
+
     if args.cross_product {
         let mut axes: HashSet<Tag> = font_a.fontref().axes().iter().map(|a| a.tag()).collect();
         axes.extend(font_b.fontref().axes().iter().map(|a| a.tag()));
@@ -292,14 +302,18 @@ fn generate_settings(args: &Cli, font_a: &DFont, font_b: &DFont) -> Vec<Setting>
             ));
         }
     }
+
     if settings.is_empty() {
         // Add default setting
         settings.push(Setting::Default);
     }
+
     // Deduplicate
     settings.into_iter().unique().collect()
 }
 
+// Given an axis and a tuple of min/default/max, return a list of (axis, value) pairs
+// that split the axis into `split_count` parts.
 fn split_axis(axis: &Tag, tuple: (f32, f32, f32), split_count: usize) -> Vec<(Tag, f32)> {
     let (min, default, max) = tuple;
     let step = (default - min) / split_count as f32;

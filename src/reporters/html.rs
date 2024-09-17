@@ -48,6 +48,12 @@ pub fn report(
     std::process::exit(0);
 }
 
+/// Instantiate a Tera template engine
+///
+/// This function also takes care of working out which templates to use. If the user
+/// passes a directory for their own templates, these are used. Otherwise, the
+/// templates supplied in the binary are copied into the user's home directory,
+/// and this directory is used as the template root.
 pub fn template_engine(user_templates: Option<&String>, overwrite: bool) -> Tera {
     let homedir = create_user_home_templates_directory(overwrite);
     let mut tera = Tera::new(&format!("{}/*", homedir.to_str().unwrap())).unwrap_or_else(|e| {

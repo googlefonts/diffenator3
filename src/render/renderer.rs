@@ -1,3 +1,4 @@
+/// Turn some words into images
 use crate::render::rustyruzz::{
     shape_with_plan, Direction, Face, Script, ShapePlan, UnicodeBuffer, Variation,
 };
@@ -20,6 +21,9 @@ pub struct Renderer<'a> {
 }
 
 impl<'a> Renderer<'a> {
+    /// Create a new renderer for a font
+    ///
+    /// Direction and script are needed for correct shaping; no automatic detection is done.
     pub fn new(
         dfont: &'a DFont,
         font_size: f32,
@@ -33,6 +37,8 @@ impl<'a> Renderer<'a> {
                 dfont.family_name()
             );
         });
+
+        // Convert our location into a structure that rustybuzz/harfruzz can use
         let variations: Vec<_> = dfont
             .location
             .iter()
@@ -60,6 +66,12 @@ impl<'a> Renderer<'a> {
             outlines,
         }
     }
+
+    /// Render a string to a series of commands
+    ///
+    /// The commands can be used to render the string to an image. This routine also returns a
+    /// serialized buffer that can be used both for debugging purposes and also to detect
+    /// glyph sequences which have been rendered already (which helps to speed up the comparison).
     pub fn string_to_positioned_glyphs(&mut self, string: &str) -> Option<(String, Vec<Command>)> {
         let mut pen = RecordingPen::default();
 
@@ -67,13 +79,16 @@ impl<'a> Renderer<'a> {
         buffer.push_str(string);
         let output = shape_with_plan(&self.face, &self.plan, buffer);
         let upem = self.font.head().unwrap().units_per_em();
+        let factor = self.scale / upem as f32;
+
+        let mut cursor = 0.0;
 
         // The results of the shaping operation are stored in the `output` buffer.
         let positions = output.glyph_positions();
-        let mut serialized_buffer = String::new();
         let infos = output.glyph_infos();
-        let mut cursor = 0.0;
-        let factor = self.scale / upem as f32;
+
+        let mut serialized_buffer = String::new();
+
         for (position, info) in positions.iter().zip(infos) {
             pen.offset_x = cursor + (position.x_offset as f32 * factor);
             pen.offset_y = position.y_offset as f32 * factor;
@@ -92,6 +107,10 @@ impl<'a> Renderer<'a> {
         Some((serialized_buffer, pen.buffer))
     }
 
+    /// Render a series of commands to an image
+    ///
+    /// This routine takes a series of commands returned from [string_to_positioned_glyphs]
+    /// and renders them to an image.
     pub fn render_positioned_glyphs(&mut self, pen_buffer: &[Command]) -> GrayImage {
         let (min_x, min_y, max_x, max_y) = terrible_bounding_box(pen_buffer);
         let x_origin = min_x.min(0.0);

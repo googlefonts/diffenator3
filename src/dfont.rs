@@ -9,14 +9,20 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use ucd::Codepoint;
 
+/// A representation of everything we need to know about a font for diffenator purposes
 pub struct DFont {
+    /// The font binary data
     pub backing: Vec<u8>,
+    /// The location of the font we are interested in diffing
     pub location: Vec<VariationSetting>,
+    /// The normalized location of the font
     pub normalized_location: Location,
+    /// The set of encoded codepoints in the font
     pub codepoints: HashSet<u32>,
 }
 
 impl DFont {
+    /// Create a new DFont from a byte slice
     pub fn new(string: &[u8]) -> Self {
         let backing: Vec<u8> = string.to_vec();
 
@@ -31,16 +37,22 @@ impl DFont {
         fnt
     }
 
-    /// Must be called after the location is set
+    /// Normalize the location
+    ///
+    /// This method must be called after the location is changed.
+    /// (It's that or getters and setters, and nobody wants that.)
     pub fn normalize_location(&mut self) {
         self.normalized_location = self.fontref().axes().location(&self.location);
     }
 
+    /// Set the location of the font given a user-specified location string
     pub fn set_location(&mut self, variations: &str) -> Result<(), String> {
         self.location = parse_location(variations)?;
         self.normalize_location();
         Ok(())
     }
+
+    /// The names of the font's named instances
     pub fn instances(&self) -> Vec<String> {
         self.fontref()
             .named_instances()
@@ -53,6 +65,8 @@ impl DFont {
             .map(|s| s.to_string())
             .collect()
     }
+
+    /// Set the location of the font to a given named instance
     pub fn set_instance(&mut self, instance: &str) -> Result<(), String> {
         let instance = self
             .fontref()
@@ -94,25 +108,9 @@ impl DFont {
             .map_or_else(|| "Regular".to_string(), |s| s.chars().collect())
     }
 
-    pub fn is_color(&self) -> bool {
-        self.fontref()
-            .table_directory
-            .table_records()
-            .iter()
-            .any(|tr| {
-                let tag = tr.tag();
-                tag == "SVG " || tag == "COLR" || tag == "CBDT"
-            })
-    }
-
-    pub fn is_variable(&self) -> bool {
-        self.fontref()
-            .table_directory
-            .table_records()
-            .iter()
-            .any(|tr| tr.tag() == "fvar")
-    }
-
+    /// The axes of the font
+    ///
+    /// Returns a map from axis tag to (min, default, max) values
     pub fn axis_info(&self) -> HashMap<String, (f32, f32, f32)> {
         self.fontref()
             .axes()
@@ -126,17 +124,24 @@ impl DFont {
             .collect()
     }
 
+    /// Returns a list of scripts where the font has at least one encoded
+    /// character from that script.
     pub fn supported_scripts(&self) -> HashSet<String> {
         let cmap = self.fontref().charmap();
         let mut strings = HashSet::new();
         for (codepoint, _glyphid) in cmap.mappings() {
             if let Some(script) = char::from_u32(codepoint).and_then(|c| c.script()) {
+                // Would you believe, no Display, no .to_string(), we just have to grub around with Debug.
                 strings.insert(format!("{:?}", script));
             }
         }
         strings
     }
 
+    /// Returns a list of the master locations in the font
+    ///
+    /// This is derived heuristically from locations of shared tuples in the `gvar` table.
+    /// This should work well enough for most "normal" fonts.
     pub fn masters(&self) -> Result<Vec<Vec<VariationSetting>>, ReadError> {
         let gvar = self.fontref().gvar()?;
         let tuples = gvar.shared_tuples()?.tuples();

@@ -1,3 +1,8 @@
+/// Stand-alone application for comparing kerning tables.
+///
+/// This is a simple command-line tool that compares the kerning tables of two fonts.
+/// Normally you would use [diffenator3] instead, but this tool is useful for
+/// focusing on the kerning specifically.
 use clap::Parser;
 use diffenator3::dfont::DFont;
 use diffenator3::reporters::text::show_map_diff;
