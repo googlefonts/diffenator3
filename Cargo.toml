@@ -1,7 +1,24 @@
-[package]
-name = "diffenator3"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+members = [
+    "diffenator3-lib",
+    "diffenator3-cli",
+    "diffenator3-web",
+    "diff3proof",
+    "kerndiffer",
+    "rendertest",
+    "ttj",
+]
+default-members = ["diffenator3-cli"]
+
+[workspace.dependencies]
+read-fonts = { version = "0.21.0", features = ["serde"] }
+font-types = "0.7.0"
+skrifa = "0.21.0"
+indexmap = "1.9.3"
+serde_json = { version = "1.0.96", features = ["preserve_order"] }
+serde = { version = "*", features = ["derive"] }
+
 
 [profile.dev]
 # Rustybuzz debug-asserts that the provided script is the same as
@@ -11,54 +28,3 @@ debug-assertions = false
 [profile.release]
 opt-level = "z"
 lto = true
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-rayon = { version = "*" }
-indicatif = { version = "*", features = ["rayon"] }
-thread_local = "1.1"
-tera = "1"
-colored = "2.1.0"
-homedir = "0.3.3"
-walkdir = "2.5.0"
-clap = { version = "4.5.9", features = ["derive"] }
-itertools = "0.13.0"
-env_logger = "0.11"
-
-[target.'cfg(target_family = "wasm")'.dependencies]
-wasm-bindgen = { version = "0.2.63" }
-console_error_panic_hook = { version = "0.1.6" }
-js-sys = { version = "0.3.68" }
-
-[lib]
-crate-type = ["cdylib", "rlib"]
-path = "src/lib.rs"
-
-[[bin]]
-name = "diffenator3"
-path = "src/bin/diffenator3.rs"
-
-[[bin]]
-name = "ttj"
-path = "src/bin/ttj.rs"
-
-[dependencies]
-
-# Keep these in sync
-read-fonts = { version = "0.21.0", features = ["serde"] }
-font-types = "0.7.0"
-skrifa = "0.21.0"
-
-cfg-if = "1.0.0"
-serde_json = { version = "1.0.96", features = ["preserve_order"] }
-serde = { version = "*", features = ["derive"] }
-indexmap = "1.9.3"
-ab_glyph = "0.2.21"
-ab_glyph_rasterizer = "0.1.8"
-image = "0.24.6"
-rustybuzz = "0.18.0"
-ucd = "0.1.1"
-unicode_names2 = "0.6.0"
-brotli = "6.0.0"
-lazy_static = "1.4.0"
-zeno = "0.3.1"
-log = "0.4"

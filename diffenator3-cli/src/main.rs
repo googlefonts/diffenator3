@@ -5,16 +5,18 @@
 /// and looking for differences between the renderings.
 ///
 /// Additionally, it can compare kerning table information and binary tables.
+mod reporters;
+mod utils;
+use crate::reporters::html::template_engine;
+use crate::reporters::{LocationResult, Report};
 use clap::builder::ArgAction;
 use clap::Parser;
-use diffenator3::dfont::DFont;
-use diffenator3::render::encodedglyphs::{modified_encoded_glyphs, CmapDiff};
-use diffenator3::render::test_font_words;
-use diffenator3::reporters::html::template_engine;
-use diffenator3::reporters::{self, LocationResult, Report};
-use diffenator3::setting::{parse_location, Setting};
-use diffenator3::ttj::jsondiff::Substantial;
-use diffenator3::ttj::{kern_diff, table_diff};
+use diffenator3_lib::dfont::DFont;
+use diffenator3_lib::render::encodedglyphs::{modified_encoded_glyphs, CmapDiff};
+use diffenator3_lib::render::test_font_words;
+use diffenator3_lib::setting::{parse_location, Setting};
+use diffenator3_lib::ttj::jsondiff::Substantial;
+use diffenator3_lib::ttj::{kern_diff, table_diff};
 use env_logger::Env;
 use indexmap::IndexSet;
 use itertools::Itertools;

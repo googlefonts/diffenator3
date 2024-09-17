@@ -1,0 +1,34 @@
+[package]
+name = "diffenator3-lib"
+version = "0.1.0"
+edition = "2021"
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+rayon = { version = "*" }
+indicatif = { version = "*", features = ["rayon"] }
+thread_local = "1.1"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+
+[dependencies]
+read-fonts = { workspace = true }
+font-types = { workspace = true }
+skrifa = { workspace = true }
+indexmap = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+
+cfg-if = "1.0.0"
+ab_glyph = "0.2.21"
+ab_glyph_rasterizer = "0.1.8"
+image = "0.24.6"
+rustybuzz = "0.18.0"
+ucd = "0.1.1"
+unicode_names2 = "0.6.0"
+brotli = "6.0.0"
+lazy_static = "1.4.0"
+zeno = "0.3.1"
+log = "0.4"

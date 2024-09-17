@@ -1,6 +1,6 @@
 /// Dump a font file to json - useful for testing
 use clap::{Arg, Command};
-use diffenator3::ttj::font_to_json;
+use diffenator3_lib::ttj::font_to_json;
 use read_fonts::FontRef;
 
 fn main() {

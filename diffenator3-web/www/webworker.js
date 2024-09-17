@@ -1,4 +1,4 @@
-var module = import("../pkg/diffenator3.js");
+var module = import("../pkg/diffenator3_web.js");
 async function init() {
   let wasm = await module;
   self.postMessage({ type: "ready" });

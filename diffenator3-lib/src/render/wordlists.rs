@@ -16,51 +16,51 @@ macro_rules! include_script {
     };
 }
 
-include_script!(ADLAM, "../../test-data/Adlam.txt.br");
-include_script!(ARABIC, "../../test-data/Arabic.txt.br");
-include_script!(ARMENIAN, "../../test-data/Armenian.txt.br");
-include_script!(AVESTAN, "../../test-data/Avestan.txt.br");
-include_script!(BENGALI, "../../test-data/Bengali.txt.br");
-include_script!(BOPOMOFO, "../../test-data/Bopomofo.txt.br");
+include_script!(ADLAM, "../../wordlists/Adlam.txt.br");
+include_script!(ARABIC, "../../wordlists/Arabic.txt.br");
+include_script!(ARMENIAN, "../../wordlists/Armenian.txt.br");
+include_script!(AVESTAN, "../../wordlists/Avestan.txt.br");
+include_script!(BENGALI, "../../wordlists/Bengali.txt.br");
+include_script!(BOPOMOFO, "../../wordlists/Bopomofo.txt.br");
 include_script!(
     CANADIAN_ABORIGINAL,
-    "../../test-data/Canadian_Aboriginal.txt.br"
+    "../../wordlists/Canadian_Aboriginal.txt.br"
 );
-include_script!(CHAKMA, "../../test-data/Chakma.txt.br");
-include_script!(CHEROKEE, "../../test-data/Cherokee.txt.br");
-include_script!(COMMON, "../../test-data/Common.txt.br");
-include_script!(CYRILLIC, "../../test-data/Cyrillic.txt.br");
-include_script!(DEVANAGARI, "../../test-data/Devanagari.txt.br");
-include_script!(ETHIOPIC, "../../test-data/Ethiopic.txt.br");
-include_script!(GEORGIAN, "../../test-data/Georgian.txt.br");
-include_script!(GRANTHA, "../../test-data/Grantha.txt.br");
-include_script!(GREEK, "../../test-data/Greek.txt.br");
-include_script!(GUJARATI, "../../test-data/Gujarati.txt.br");
-include_script!(GURMUKHI, "../../test-data/Gurmukhi.txt.br");
-include_script!(HEBREW, "../../test-data/Hebrew.txt.br");
-include_script!(HIRAGANA, "../../test-data/Hiragana.txt.br");
-include_script!(JAPANESE, "../../test-data/Japanese.txt.br");
-include_script!(KANNADA, "../../test-data/Kannada.txt.br");
-include_script!(KATAKANA, "../../test-data/Katakana.txt.br");
-include_script!(KHMER, "../../test-data/Khmer.txt.br");
-include_script!(LAO, "../../test-data/Lao.txt.br");
-include_script!(LATIN, "../../test-data/Latin.txt.br");
-include_script!(LISU, "../../test-data/Lisu.txt.br");
-include_script!(MALAYALAM, "../../test-data/Malayalam.txt.br");
-include_script!(MONGOLIAN, "../../test-data/Mongolian.txt.br");
-include_script!(MYANMAR, "../../test-data/Myanmar.txt.br");
-include_script!(OL_CHIKI, "../../test-data/Ol_Chiki.txt.br");
-include_script!(ORIYA, "../../test-data/Oriya.txt.br");
-include_script!(OSAGE, "../../test-data/Osage.txt.br");
-include_script!(SINHALA, "../../test-data/Sinhala.txt.br");
-include_script!(SYRIAC, "../../test-data/Syriac.txt.br");
-include_script!(TAMIL, "../../test-data/Tamil.txt.br");
-include_script!(TELUGU, "../../test-data/Telugu.txt.br");
-include_script!(THAI, "../../test-data/Thai.txt.br");
-include_script!(THANAA, "../../test-data/Thanaa.txt.br");
-include_script!(TIBETAN, "../../test-data/Tibetan.txt.br");
-include_script!(TIFINAGH, "../../test-data/Tifinagh.txt.br");
-include_script!(VAI, "../../test-data/Vai.txt.br");
+include_script!(CHAKMA, "../../wordlists/Chakma.txt.br");
+include_script!(CHEROKEE, "../../wordlists/Cherokee.txt.br");
+include_script!(COMMON, "../../wordlists/Common.txt.br");
+include_script!(CYRILLIC, "../../wordlists/Cyrillic.txt.br");
+include_script!(DEVANAGARI, "../../wordlists/Devanagari.txt.br");
+include_script!(ETHIOPIC, "../../wordlists/Ethiopic.txt.br");
+include_script!(GEORGIAN, "../../wordlists/Georgian.txt.br");
+include_script!(GRANTHA, "../../wordlists/Grantha.txt.br");
+include_script!(GREEK, "../../wordlists/Greek.txt.br");
+include_script!(GUJARATI, "../../wordlists/Gujarati.txt.br");
+include_script!(GURMUKHI, "../../wordlists/Gurmukhi.txt.br");
+include_script!(HEBREW, "../../wordlists/Hebrew.txt.br");
+include_script!(HIRAGANA, "../../wordlists/Hiragana.txt.br");
+include_script!(JAPANESE, "../../wordlists/Japanese.txt.br");
+include_script!(KANNADA, "../../wordlists/Kannada.txt.br");
+include_script!(KATAKANA, "../../wordlists/Katakana.txt.br");
+include_script!(KHMER, "../../wordlists/Khmer.txt.br");
+include_script!(LAO, "../../wordlists/Lao.txt.br");
+include_script!(LATIN, "../../wordlists/Latin.txt.br");
+include_script!(LISU, "../../wordlists/Lisu.txt.br");
+include_script!(MALAYALAM, "../../wordlists/Malayalam.txt.br");
+include_script!(MONGOLIAN, "../../wordlists/Mongolian.txt.br");
+include_script!(MYANMAR, "../../wordlists/Myanmar.txt.br");
+include_script!(OL_CHIKI, "../../wordlists/Ol_Chiki.txt.br");
+include_script!(ORIYA, "../../wordlists/Oriya.txt.br");
+include_script!(OSAGE, "../../wordlists/Osage.txt.br");
+include_script!(SINHALA, "../../wordlists/Sinhala.txt.br");
+include_script!(SYRIAC, "../../wordlists/Syriac.txt.br");
+include_script!(TAMIL, "../../wordlists/Tamil.txt.br");
+include_script!(TELUGU, "../../wordlists/Telugu.txt.br");
+include_script!(THAI, "../../wordlists/Thai.txt.br");
+include_script!(THANAA, "../../wordlists/Thanaa.txt.br");
+include_script!(TIBETAN, "../../wordlists/Tibetan.txt.br");
+include_script!(TIFINAGH, "../../wordlists/Tifinagh.txt.br");
+include_script!(VAI, "../../wordlists/Vai.txt.br");
 
 pub(crate) fn get_wordlist(script: &str) -> Option<Vec<String>> {
     let compressed = match script {

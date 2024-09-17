@@ -8,7 +8,7 @@ import {
   setupAnimation,
   diffTables,
   diffKerns,
-} from "../src/templates/shared";
+} from "../../diffenator3-cli/templates/shared";
 
 jQuery.fn.shake = function (interval, distance, times) {
   interval = typeof interval == "undefined" ? 100 : interval;

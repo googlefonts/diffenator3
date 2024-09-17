@@ -8,7 +8,7 @@ crypto.createHash = (algorithm) =>
 module.exports = {
   entry: "./bootstrap.js",
   output: {
-    path: path.resolve(__dirname, "..", "docs"),
+    path: path.resolve(__dirname, "..", "..", "docs"),
     filename: "bootstrap.js",
   },
   mode: "development",
@@ -16,7 +16,7 @@ module.exports = {
     new CopyWebpackPlugin([
       "index.html",
       "AND-Regular.ttf",
-      "../src/templates/style.css",
+      "../../diffenator3-cli/templates/style.css",
     ]),
   ],
 };

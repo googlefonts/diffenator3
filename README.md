@@ -15,7 +15,7 @@ You can use the WASM version at https://googlefonts.github.io/diffenator3
 
 ## To rebuild the WASM version
 
-* wasm-pack build
+* cd diffenator3-web; wasm-pack build
 * cd www; npm run build
 
 The results appear in docs/
