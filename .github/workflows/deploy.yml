@@ -13,10 +13,10 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build
-        run: wasm-pack build
+        run: cd diffenator3-web; wasm-pack build
       - name: Build web site
         run: |
-          cd www
+          cd diffenator3-web/www
           npm install
           npm run build
       - name: Upload
