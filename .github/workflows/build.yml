@@ -47,11 +47,7 @@ jobs:
             echo "PROTOC='C:/Program Files/protoc/bin/proto'" >> $GITHUB_ENV
           fi
       - name: Build diffenator3/diff3proof
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --verbose --release --target ${{ matrix.target }}
+        run: cargo build --verbose --release --target ${{ matrix.target }}
       - name: Build archive
         shell: bash
         run: |
