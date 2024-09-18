@@ -33,6 +33,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
       - name: Install protoc for lang repo
+        shell: bash
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get update
