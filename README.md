@@ -18,7 +18,9 @@ for the first time. Additionally, you can supply a `--templates` directory for
 per-project templates.
 
 The _WASM_ version compares two font files over the web and displays a HTML
-report of the differences. You can use the WASM version at
+report of the differences. This runs the `diffenator3` code directly inside
+your web browser - the fonts are *not* transferred across the Internet.
+You can use the WASM version at
 https://googlefonts.github.io/diffenator3
 
 ## diff3proof
