@@ -34,18 +34,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
       - name: Install protoc for lang repo
-        shell: bash
-        run: |
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            sudo apt-get update
-            sudo apt-get install -y protobuf-compiler
-            echo "PROTOC=$(which protoc)" >> $GITHUB_ENV
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            brew install protobuf
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            choco install protoc
-            echo "PROTOC='C:/Program Files/protoc/bin/proto'" >> $GITHUB_ENV
-          fi
+        uses: arduino/setup-protoc@v3
       - name: Build diffenator3/diff3proof
         run: cargo build --verbose --release --target ${{ matrix.target }}
       - name: Build archive
@@ -65,5 +54,5 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.build }}
+          name: ${{ env.ASSET }}
           path: ${{ env.ASSET }}
