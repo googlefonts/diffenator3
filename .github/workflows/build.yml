@@ -1,7 +1,6 @@
 name: Build CLI binaries
 on:
   - push
-  -
 permissions:
   contents: write
 jobs:
