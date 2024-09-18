@@ -1,5 +1,7 @@
 name: Build CLI binaries
-on: push
+on:
+  - push
+  -
 permissions:
   contents: write
 jobs:
@@ -28,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -37,10 +39,23 @@ jobs:
         uses: arduino/setup-protoc@v3
       - name: Build diffenator3/diff3proof
         run: cargo build --verbose --release --target ${{ matrix.target }}
+      - name: Decide on our version name (tag or "dev")
+        id: version
+        run: |
+          if [ -n "$GITHUB_REF" ]; then
+              if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+                  echo "VERSION=${GITHUB_REF/refs\/tags\//}"
+              else
+                  echo "VERSION=dev"
+              fi
+          else
+              echo "VERSION=dev"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
       - name: Build archive
         shell: bash
         run: |
-          dirname="diffenator3-dev-${{ matrix.target }}"
+          dirname="diffenator3-${{ env.VERSION }}-${{ matrix.target }}"
           mkdir "$dirname"
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
               mv "target/${{ matrix.target }}/release/"*.exe "$dirname"
@@ -56,3 +71,10 @@ jobs:
         with:
           name: ${{ env.ASSET }}
           path: ${{ env.ASSET }}
+      - if: contains(github.ref, 'refs/tags/')
+        name: Create a release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.ASSET }}
+          tag_name: ${{ env.VERSION }}
+          token: ${{ secrets.GITHUB_TOKEN }}
