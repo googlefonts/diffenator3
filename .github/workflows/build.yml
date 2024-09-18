@@ -1,0 +1,59 @@
+on: push
+permissions:
+  contents: write
+jobs:
+  build-and-upload:
+    name: Build and upload
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - build: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+
+          - build: macos
+            os: macos-latest
+            target: x86_64-apple-darwin
+
+          - build: macos-m1
+            os: macos-latest
+            target: aarch64-apple-darwin
+
+          - build: windows-gnu
+            os: windows-latest
+            target: x86_64-pc-windows-gnu
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.target }}
+      - name: Build diffenator3/diff3proof
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --verbose --release --target ${{ matrix.target }}
+      - name: Build archive
+        shell: bash
+        run: |
+          dirname="diffenator3-dev-${{ matrix.target }}"
+          mkdir "$dirname"
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+              mv "target/${{ matrix.target }}/release/"*.exe "$dirname"
+              7z a "$dirname.zip" "$dirname"
+              echo "ASSET=$dirname.zip" >> $GITHUB_ENV
+          else
+              mv "target/${{ matrix.target }}/release/diffenator3" "$dirname"
+              mv "target/${{ matrix.target }}/release/diff3proof" "$dirname"
+              tar -czf "$dirname.tar.gz" "$dirname"
+              echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.build }}
+          path: ${{ env.ASSET }}
