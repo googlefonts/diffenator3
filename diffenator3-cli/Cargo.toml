@@ -4,17 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-diffenator3-lib = { path = "../diffenator3-lib" }
+diffenator3-lib = { path = "../diffenator3-lib", features = ["html"] }
 ttj = { path = "../ttj" }
 indexmap = { workspace = true }
 skrifa = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
 rayon = "*"
-tera = "1"
 colored = "2.1.0"
-homedir = "0.3.3"
-walkdir = "2.5.0"
+
 clap = { version = "4.5.9", features = ["derive"] }
 itertools = "0.13.0"
 env_logger = "0.11"

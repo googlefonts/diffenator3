@@ -160,3 +160,50 @@ impl DFont {
         Ok(peaks)
     }
 }
+
+type InstancePositions = Vec<(String, HashMap<String, f32>)>;
+type AxisDescription = HashMap<String, (f32, f32, f32)>;
+
+/// Compare two fonts and return the axes and instances they have in common
+pub fn shared_axes(f_a: &DFont, f_b: &DFont) -> (AxisDescription, InstancePositions) {
+    let mut axes = f_a.axis_info();
+    let b_axes = f_b.axis_info();
+    let a_axes_names: Vec<String> = axes.keys().cloned().collect();
+    for axis_tag in a_axes_names.iter() {
+        if !b_axes.contains_key(axis_tag) {
+            axes.remove(axis_tag);
+        }
+    }
+    for (axis_tag, values) in b_axes.iter() {
+        let (our_min, _our_default, our_max) = values;
+        axes.entry(axis_tag.clone())
+            .and_modify(|(their_min, _their_default, their_max)| {
+                // This looks upside-down but remember we are
+                // narrowing the axis ranges to the union of the
+                // two fonts.
+                *their_min = their_min.max(*our_min);
+                *their_max = their_max.min(*our_max);
+            });
+    }
+    let axis_names: Vec<String> = f_a
+        .fontref()
+        .axes()
+        .iter()
+        .map(|axis| axis.tag().to_string())
+        .collect();
+    let instances = f_a
+        .fontref()
+        .named_instances()
+        .iter()
+        .map(|ni| {
+            let name = f_a
+                .fontref()
+                .localized_strings(ni.subfamily_name_id())
+                .english_or_first()
+                .map_or_else(|| "Unknown".to_string(), |s| s.chars().collect());
+            let location_map = axis_names.iter().cloned().zip(ni.user_coords()).collect();
+            (name, location_map)
+        })
+        .collect::<Vec<(String, HashMap<String, f32>)>>();
+    (axes, instances)
+}

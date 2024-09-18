@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Diffenator3</title>
+    <script
+      src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct"
+      crossorigin="anonymous"
+    ></script>
+    <style type="text/css">
+      	@font-face {
+           font-family: "Font Before";
+           src: url();
+         }
+
+         @font-face {
+           font-family: "Font After";
+           src: url();
+         }
+
+         .font-before, .font-after {
+           font-variation-settings: "wght" 400, "wdth" 100;
+         }
+
+         .font-before {
+           font-family: "Font Before", "Adobe Notdef";
+         }
+
+         .font-after {
+           font-family: "Font After", "Adobe Notdef";
+         }
+
+      p {
+      font-size: {{ pt_size | int }}px;
+      background-color: #d4dffb;
+      padding: 15px;
+      }
+      .language {
+        font-size: 15px;
+        left: -100px;
+        margin-top: 1em;
+        width: 100px;
+        font-family: sans-serif;
+        display: block;
+        position: absolute;
+      }
+
+      {% include "style.css" %}
+    </style>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+      integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N"
+      crossorigin="anonymous"
+    />
+  </head>
+
+  <body>
+    <div id="ui-nav">
+      <div class="ui-nav-item" id="fonttoggle">Old</div>
+      <div class="ui-nav-item" id="fontanimate">Animate</div>
+      <div id="axes"></div>
+    </div>
+
+    <div class="row">
+      <div class="col-2">
+        <ul class="nav nav-pills" id="locationnav"></ul>
+      </div>
+      <div class="col-9 mt-3">
+        <div id="header">
+          <h1> Diffenator3 Proof</h1>
+          <h3> Font before: <code>{{old_filename | replace(from="old-", to="")}} </code></h3>
+          <h3> Font after: <code>{{new_filename | replace(from="new-", to="") }} </code></h3>
+        </div>
+        <div id="main">
+         {% if report.language_samples %}
+          {% for script, texts in report.language_samples %}
+          <h4>{{ script }}</h4>
+          <div class="font-before">
+            {% for language_text in texts %}
+              <p dir="auto"><span class="language text-secondary">{{language_text[0]}}</span>{{language_text[1]}}</p>
+            {% endfor %}
+          {% endfor %}
+          {% endif %}
+          {% if report.cover_sample %}
+            <div class="font-before">
+              <p> {{ report.cover_sample }} </p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <script type="module">
+         {% include "shared.js" %}
+
+  function beforeCssStyle() {
+    return document.styleSheets[0].cssRules[0].style;
+  }
+  function afterCssStyle() {
+    return document.styleSheets[0].cssRules[1].style;
+  }
+
+  function setVariationStyle(variations) {
+    let rule = document.styleSheets[0].cssRules[2].style;
+    rule.setProperty("font-variation-settings", variations);
+  }
+
+  function setVariations() {
+    let cssSetting = $("#axes input")
+      .map(function () {
+        return `"${this.id.replace("axis-", "")}" ${this.value}`;
+      })
+      .get()
+      .join(", ");
+    setVariationStyle(cssSetting);
+  }
+
+  function setupAxes(message) {
+    $("#axes").empty();
+    let { axes, instances } = message;
+    for (var [tag, limits] of Object.entries(axes)) {
+      console.log(tag, limits);
+      let [axis_min, axis_def, axis_max] = limits;
+      let axis = $(`<div class="axis">
+				${tag}
+				<input type="range" min="${axis_min}" max="${axis_max}" value="${axis_def}" class="slider" id="axis-${tag}">
+			`);
+      $("#axes").append(axis);
+      axis.on("input", setVariations);
+    }
+    if (Object.keys(instances).length > 0) {
+      let select = $("<select id='instance-select'></select>");
+      for (var [name, location] of instances) {
+        console.log(location);
+        let location_str = Object.entries(location)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(",");
+        let option = $(`<option value="${location_str}">${name}</option>`);
+        select.append(option);
+      }
+      select.on("change", function () {
+        let location = $(this).val();
+        let parts = location.split(",");
+        for (let [i, part] of parts.entries()) {
+          let [tag, value] = part.split("=");
+          console.log(tag, value);
+          $(`#axis-${tag}`).val(value);
+        }
+        $("#axes input").trigger("input");
+        $("#axes input").trigger("change");
+      });
+      $("#axes").append(select);
+    }
+  }
+
+  function variationLocation() {
+    // Return the current axis location as a string of the form
+    // tag=value,tag=value
+    return $("#axes input")
+      .map(function () {
+        return `${this.id.replace("axis-", "")}=${this.value}`;
+      })
+      .get()
+      .join(",");
+  }
+
+let axes_instances = {{ report.axes_instances | safe }};
+
+      $( ()=>{ 
+        document.styleSheets[0].cssRules[0].style.setProperty(
+          "src",
+          "url({{ old_filename | safe }})"
+        );
+        document.styleSheets[0].cssRules[1].style.setProperty(
+          "src",
+          "url({{ new_filename | safe }})"
+        );
+        setupAnimation()
+        setupAxes(axes_instances);
+        });
+    </script>
+  </body>
+</html>

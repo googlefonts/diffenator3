@@ -1,8 +1,6 @@
-use diffenator3_lib::dfont::DFont;
+use diffenator3_lib::dfont::{shared_axes, DFont};
 use diffenator3_lib::render::{encodedglyphs, encodedglyphs::CmapDiff, test_font_words};
 use serde_json::json;
-use skrifa::MetadataProvider;
-use std::collections::HashMap;
 use ttj::{kern_diff, table_diff};
 
 use wasm_bindgen::prelude::*;
@@ -16,49 +14,9 @@ pub fn debugging() {
 
 #[wasm_bindgen]
 pub fn axes(font_a: &[u8], font_b: &[u8]) -> String {
-    let f_a = DFont::new(font_a);
-    let f_b = DFont::new(font_b);
-    let mut axes = f_a.axis_info();
-    let b_axes = f_b.axis_info();
-    let a_axes_names: Vec<String> = axes.keys().cloned().collect();
-    for axis_tag in a_axes_names.iter() {
-        if !b_axes.contains_key(axis_tag) {
-            axes.remove(axis_tag);
-        }
-    }
-    for (axis_tag, values) in b_axes.iter() {
-        let (our_min, _our_default, our_max) = values;
-        axes.entry(axis_tag.clone())
-            .and_modify(|(their_min, _their_default, their_max)| {
-                // This looks upside-down but remember we are
-                // narrowing the axis ranges to the union of the
-                // two fonts.
-                *their_min = their_min.max(*our_min);
-                *their_max = their_max.min(*our_max);
-            });
-    }
-    let axis_names: Vec<String> = f_a
-        .fontref()
-        .axes()
-        .iter()
-        .map(|axis| axis.tag().to_string())
-        .collect();
-    let instances = f_a
-        .fontref()
-        .named_instances()
-        .iter()
-        .map(|ni| {
-            let name = f_a
-                .fontref()
-                .localized_strings(ni.subfamily_name_id())
-                .english_or_first()
-                .map_or_else(|| "Unknown".to_string(), |s| s.chars().collect());
-            let location_map = axis_names.iter().cloned().zip(ni.user_coords()).collect();
-            (name, location_map)
-        })
-        .collect::<Vec<(String, HashMap<String, f32>)>>();
+    let (axes, instances) = shared_axes(&DFont::new(font_a), &DFont::new(font_b));
     serde_json::to_string(&json!({
-        "axes": &axes,
+        "axes": axes,
         "instances": instances
     }))
     .unwrap_or("Couldn't do it".to_string())

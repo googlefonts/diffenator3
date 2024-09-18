@@ -6,12 +6,11 @@
 ///
 /// Additionally, it can compare kerning table information and binary tables.
 mod reporters;
-mod utils;
-use crate::reporters::html::template_engine;
 use crate::reporters::{LocationResult, Report};
 use clap::builder::ArgAction;
 use clap::Parser;
 use diffenator3_lib::dfont::DFont;
+use diffenator3_lib::html::template_engine;
 use diffenator3_lib::render::encodedglyphs::{modified_encoded_glyphs, CmapDiff};
 use diffenator3_lib::render::test_font_words;
 use diffenator3_lib::setting::{parse_location, Setting};
@@ -209,8 +208,8 @@ fn main() {
             &cli.font1,
             &cli.font2,
             Path::new(&cli.output),
-            result,
             tera.unwrap(),
+            &result,
         );
     } else if cli.json {
         reporters::json::report(result, cli.pretty);

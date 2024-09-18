@@ -16,7 +16,7 @@ module.exports = {
     new CopyWebpackPlugin([
       "index.html",
       "AND-Regular.ttf",
-      "../../diffenator3-cli/templates/style.css",
+      "../../templates/style.css",
     ]),
   ],
 };
