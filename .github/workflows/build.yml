@@ -42,6 +42,7 @@ jobs:
             brew install protobuf
           elif [ "${{ matrix.os }}" = "windows-latest" ]; then
             choco install protoc
+            echo 'C:\Program Files\protoc\bin' >> $GITHUB_PATH
           fi
       - name: Build diffenator3/diff3proof
         uses: actions-rs/cargo@v1
