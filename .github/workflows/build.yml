@@ -46,14 +46,13 @@ jobs:
         run: |
           if [ -n "$GITHUB_REF" ]; then
               if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-                  echo "VERSION=${GITHUB_REF/refs\/tags\//}"
+                  echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
               else
-                  echo "VERSION=dev"
+                  echo "VERSION=dev" >> $GITHUB_ENV
               fi
           else
-              echo "VERSION=dev"
+              echo "VERSION=dev" >> $GITHUB_ENV
           fi
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
       - name: Build archive
         shell: bash
         run: |
