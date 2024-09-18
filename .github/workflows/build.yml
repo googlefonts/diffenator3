@@ -1,3 +1,4 @@
+name: Build CLI binaries
 on: push
 permissions:
   contents: write
@@ -38,11 +39,12 @@ jobs:
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get update
             sudo apt-get install -y protobuf-compiler
+            echo "PROTOC=$(which protoc)" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             brew install protobuf
           elif [ "${{ matrix.os }}" = "windows-latest" ]; then
             choco install protoc
-            echo 'C:\Program Files\protoc\bin' >> $GITHUB_PATH
+            echo "PROTOC='C:/Program Files/protoc/bin/proto'" >> $GITHUB_ENV
           fi
       - name: Build diffenator3/diff3proof
         uses: actions-rs/cargo@v1
