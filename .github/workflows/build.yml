@@ -36,6 +36,8 @@ jobs:
           target: ${{ matrix.target }}
       - name: Install protoc for lang repo
         uses: arduino/setup-protoc@v3
+        with:
+            repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build diffenator3/diff3proof
         run: cargo build --verbose --release --target ${{ matrix.target }}
       - name: Decide on our version name (tag or "dev")
