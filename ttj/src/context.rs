@@ -15,7 +15,10 @@ pub(crate) struct SerializationContext<'a> {
 
 impl<'a> SerializationContext<'a> {
     pub fn new(font: &'a FontRef<'a>, names: NameMap) -> Result<Self, ReadError> {
-        let (gdef_regions, gdef_locations) = if let Some(Ok(ivs)) = font.gdef()?.item_var_store() {
+        let (gdef_regions, gdef_locations) = if let Ok(Some(ivs)) = font
+            .gdef()
+            .and_then(|gdef| gdef.item_var_store().transpose())
+        {
             let regions = ivs.variation_region_list()?.variation_regions();
 
             // Find all the peaks
