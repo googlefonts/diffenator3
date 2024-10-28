@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 skrifa = { workspace = true }
 read-fonts = { workspace = true }
-font-types = { workspace = true }
 serde_json = { workspace = true }
 clap = "*"
 indexmap = { workspace = true }

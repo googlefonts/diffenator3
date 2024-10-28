@@ -1,5 +1,4 @@
-use font_types::F2Dot14;
-use read_fonts::{ReadError, TableProvider};
+use read_fonts::{types::F2Dot14, ReadError, TableProvider};
 use skrifa::FontRef;
 
 use crate::monkeypatching::DenormalizeLocation;

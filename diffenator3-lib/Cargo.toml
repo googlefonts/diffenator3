@@ -17,7 +17,6 @@ html = ["dep:tera", "dep:homedir", "dep:walkdir"]
 
 [dependencies]
 read-fonts = { workspace = true }
-font-types = { workspace = true }
 skrifa = { workspace = true }
 indexmap = { workspace = true }
 serde_json = { workspace = true }

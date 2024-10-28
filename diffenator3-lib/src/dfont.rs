@@ -1,11 +1,10 @@
 use crate::setting::parse_location;
-use font_types::NameId;
-use read_fonts::{FontRef, ReadError, TableProvider};
-use skrifa::instance::Location;
-use skrifa::setting::VariationSetting;
-use skrifa::MetadataProvider;
-use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use read_fonts::{types::NameId, FontRef, ReadError, TableProvider};
+use skrifa::{instance::Location, setting::VariationSetting, MetadataProvider};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 use ttj::monkeypatching::DenormalizeLocation;
 use ucd::Codepoint;
 
