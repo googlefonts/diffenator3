@@ -728,8 +728,9 @@ dependencies = [
 
 [[package]]
 name = "google-fonts-languages"
-version = "0.6.3"
-source = "git+https://github.com/googlefonts/lang?branch=rust#297feb1dda9792d243afb464dbeb00e8de5b322b"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ed563fcbb8077c40e4874109d58a19f4ca9df54b37ae5eab43b40b28260e960"
 dependencies = [
  "bytes",
  "glob",
@@ -1307,8 +1308,9 @@ dependencies = [
 
 [[package]]
 name = "protobuf"
-version = "4.0.0-alpha.0"
-source = "git+https://github.com/cmyr/rust-protobuf?branch=parse-unicode-strings#59d6e61cfd6e6b7d5681cd454f4a5abbec8bd06b"
+version = "3.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3a7c64d9bf75b1b8d981124c14c179074e8caa7dfe7b6a12e6222ddcd0c8f72"
 dependencies = [
  "once_cell",
  "protobuf-support",
@@ -1317,8 +1319,9 @@ dependencies = [
 
 [[package]]
 name = "protobuf-parse"
-version = "4.0.0-alpha.0"
-source = "git+https://github.com/cmyr/rust-protobuf?branch=parse-unicode-strings#59d6e61cfd6e6b7d5681cd454f4a5abbec8bd06b"
+version = "3.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "322330e133eab455718444b4e033ebfac7c6528972c784fcde28d2cc783c6257"
 dependencies = [
  "anyhow",
  "indexmap 2.5.0",
@@ -1332,8 +1335,9 @@ dependencies = [
 
 [[package]]
 name = "protobuf-support"
-version = "4.0.0-alpha.0"
-source = "git+https://github.com/cmyr/rust-protobuf?branch=parse-unicode-strings#59d6e61cfd6e6b7d5681cd454f4a5abbec8bd06b"
+version = "3.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b088fd20b938a875ea00843b6faf48579462630015c3788d397ad6a786663252"
 dependencies = [
  "thiserror",
 ]

@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 diffenator3-lib = { path = "../diffenator3-lib", features = ["html"] }
-google-fonts-languages = { git = "https://github.com/googlefonts/lang", branch = "rust" }
+google-fonts-languages = "0"
 tera = "1"
 clap = { version = "4.5.9", features = ["derive"] }
 env_logger = "0.11"
