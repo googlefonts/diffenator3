@@ -22,6 +22,7 @@ function buildLocation_statichtml(loc) {
   $("#title").html(`<h4 class="mt-2">${textLocation}</h2>`);
 
   if (loc.glyphs) {
+    loc.glyphs.sort((ga, gb) => new Intl.Collator().compare(ga.string, gb.string));
     $("#main").append("<h4>Modified Glyphs</h4>");
     let glyphs = $("<div>");
     for (let glyph of loc.glyphs) {
