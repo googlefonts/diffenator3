@@ -231,6 +231,8 @@ body {
     white-space: wrap;
   }
 
+  #userdefined div { width: 100%; }
+  
 /* The following rules are used in the WASM version, not in the CLI version.
    But we keep them here so we can share them between the two versions. */
 
@@ -263,4 +265,9 @@ body {
   .dragging {
     background-image: linear-gradient(rgb(0 0 0/5%) 0 0);
     outline: 5px dashed #ffffffff;
+  }
+
+  #diffkerns {
+    max-height: 500px;
+    overflow-y: scroll;
   }

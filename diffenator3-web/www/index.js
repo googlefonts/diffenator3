@@ -1,5 +1,4 @@
-import Worker from "worker-loader!./webworker.js";
-const diffWorker = new Worker();
+const diffWorker = new Worker(new URL("./webworker.js", import.meta.url));
 
 import {
   addAGlyph,
