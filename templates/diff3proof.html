@@ -62,8 +62,10 @@
 
   <body>
     <div id="ui-nav">
+      {% if old_filename | replace(from="old-", to="") != new_filename | replace(from="new-", to="") %}
       <div class="ui-nav-item" id="fonttoggle">Old</div>
       <div class="ui-nav-item" id="fontanimate">Animate</div>
+      {% endif %}
       <div id="axes"></div>
     </div>
 
@@ -74,8 +76,12 @@
       <div class="col-9 mt-3">
         <div id="header">
           <h1> Diffenator3 Proof</h1>
+          {% if old_filename | replace(from="old-", to="") != new_filename | replace(from="new-", to="") %}
           <h3> Font before: <code>{{old_filename | replace(from="old-", to="")}} </code></h3>
           <h3> Font after: <code>{{new_filename | replace(from="new-", to="") }} </code></h3>
+          {% else %}
+          <h3> Font: <code>{{old_filename | replace(from="old-", to="") }} </code></h3>
+          {% endif %}
         </div>
         <div id="main">
          {% if report.language_samples %}

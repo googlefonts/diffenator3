@@ -48,7 +48,7 @@ struct Cli {
     /// The first font file to compare
     font1: PathBuf,
     /// The second font file to compare
-    font2: PathBuf,
+    font2: Option<PathBuf>,
 }
 
 fn main() {
@@ -56,18 +56,27 @@ fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
 
     let font_binary_a = std::fs::read(&cli.font1).expect("Couldn't open file");
-    let font_binary_b = std::fs::read(&cli.font2).expect("Couldn't open file");
 
     let tera = template_engine(cli.templates.as_ref(), cli.update_templates);
     let font_a = DFont::new(&font_binary_a);
-    let font_b = DFont::new(&font_binary_b);
 
-    let shared_codepoints: HashSet<u32> = font_a
-        .codepoints
-        .intersection(&font_b.codepoints)
-        .copied()
-        .collect();
-    let (axes, instances) = shared_axes(&font_a, &font_b);
+    let (shared_codepoints, axes, instances) = if let Some(font2) = &cli.font2 {
+        let font_binary_b = std::fs::read(&font2).expect("Couldn't open file");
+        let font_b = DFont::new(&font_binary_b);
+
+        let shared_codepoints: HashSet<u32> = font_a
+            .codepoints
+            .intersection(&font_b.codepoints)
+            .copied()
+            .collect();
+        let (axes, instances) = shared_axes(&font_a, &font_b);
+        (shared_codepoints, axes, instances)
+    } else {
+        let shared_codepoints = font_a.codepoints.clone();
+        let (axes, instances) = shared_axes(&font_a, &font_a);
+        (shared_codepoints, axes, instances)
+    };
+
     let axes_instances = serde_json::to_string(&json!({
         "axes": axes,
         "instances": instances
@@ -89,7 +98,7 @@ fn main() {
 
     gen_html(
         &cli.font1,
-        &cli.font2,
+        &cli.font2.unwrap_or_else(|| cli.font1.clone()),
         Path::new(&cli.output),
         tera,
         "diff3proof.html",
