@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 wasm-bindgen = { version = "0.2" }
+serde-wasm-bindgen = "0.6"
 console_error_panic_hook = { version = "0.1.6" }
 js-sys = { version = "0.3.68" }
 diffenator3-lib = { path = "../diffenator3-lib" }

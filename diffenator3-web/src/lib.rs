@@ -1,7 +1,9 @@
 use diffenator3_lib::dfont::{shared_axes, DFont};
 use diffenator3_lib::render::{encodedglyphs, encodedglyphs::CmapDiff, test_font_words};
 use serde_json::json;
+use ttj::font_to_json as underlying_font_to_json;
 use ttj::{kern_diff, table_diff};
+use wasm_bindgen::JsValue;
 
 use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;
@@ -98,4 +100,15 @@ pub fn diff_words(font_a: &[u8], font_b: &[u8], location: &str, f: &js_sys::Func
         &JsValue::from_str(&serde_json::to_string(&val).unwrap_or("Couldn't do it".to_string())),
     )
     .unwrap();
+}
+
+#[wasm_bindgen]
+pub fn font_to_json(font_a: &[u8]) -> JsValue {
+    let f_a = DFont::new(font_a);
+    let val = underlying_font_to_json(&f_a.fontref(), None);
+    serde_wasm_bindgen::to_value(&val).unwrap_or_else(|e| {
+        let obj = js_sys::Object::new();
+        let _ = js_sys::Reflect::set(&obj, &"error".into(), &e.to_string().into());
+        obj.into()
+    })
 }
