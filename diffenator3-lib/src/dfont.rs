@@ -9,6 +9,7 @@ use ttj::monkeypatching::DenormalizeLocation;
 use ucd::Codepoint;
 
 /// A representation of everything we need to know about a font for diffenator purposes
+#[derive(Debug, Clone)]
 pub struct DFont {
     /// The font binary data
     pub backing: Vec<u8>,
