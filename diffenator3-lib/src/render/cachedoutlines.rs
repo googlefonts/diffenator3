@@ -38,6 +38,8 @@ impl<'a> CachedOutlineGlyphCollection<'a> {
 
     pub fn draw(&mut self, glyph_id: GlyphId, pen: &mut RecordingPen) {
         let commands = self.get(glyph_id).unwrap();
-        pen.buffer.extend(commands.iter().cloned());
+        let matrix = zeno::Transform::translation(pen.offset_x, pen.offset_y);
+        pen.buffer
+            .extend(commands.iter().map(|c| c.transform(&matrix)));
     }
 }
