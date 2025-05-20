@@ -1,120 +1,55 @@
 use harfrust::{script, Direction, Script};
-use lazy_static::lazy_static;
-use std::io::{BufRead, BufReader};
+use static_lang_word_lists::WordList;
+use std::sync::LazyLock;
 
-macro_rules! include_script {
-    ($var:ident, $path:literal ) => {
-        lazy_static! {
-            pub static ref $var: Vec<u8> = {
-                let mut input: Vec<u8> = Vec::new();
-                let compressed = include_bytes!($path);
-                brotli::BrotliDecompress(&mut compressed.as_ref(), &mut input)
-                    .expect("Could not decompress");
-                input
-            };
-        }
-    };
-}
-
-include_script!(ADLAM, "../../wordlists/Adlam.txt.br");
-include_script!(ARABIC, "../../wordlists/Arabic.txt.br");
-include_script!(ARMENIAN, "../../wordlists/Armenian.txt.br");
-include_script!(AVESTAN, "../../wordlists/Avestan.txt.br");
-include_script!(BENGALI, "../../wordlists/Bengali.txt.br");
-include_script!(BOPOMOFO, "../../wordlists/Bopomofo.txt.br");
-include_script!(
-    CANADIAN_ABORIGINAL,
-    "../../wordlists/Canadian_Aboriginal.txt.br"
-);
-include_script!(CHAKMA, "../../wordlists/Chakma.txt.br");
-include_script!(CHEROKEE, "../../wordlists/Cherokee.txt.br");
-include_script!(COMMON, "../../wordlists/Common.txt.br");
-include_script!(CYRILLIC, "../../wordlists/Cyrillic.txt.br");
-include_script!(DEVANAGARI, "../../wordlists/Devanagari.txt.br");
-include_script!(ETHIOPIC, "../../wordlists/Ethiopic.txt.br");
-include_script!(GEORGIAN, "../../wordlists/Georgian.txt.br");
-include_script!(GRANTHA, "../../wordlists/Grantha.txt.br");
-include_script!(GREEK, "../../wordlists/Greek.txt.br");
-include_script!(GUJARATI, "../../wordlists/Gujarati.txt.br");
-include_script!(GURMUKHI, "../../wordlists/Gurmukhi.txt.br");
-include_script!(HEBREW, "../../wordlists/Hebrew.txt.br");
-include_script!(HIRAGANA, "../../wordlists/Hiragana.txt.br");
-include_script!(JAPANESE, "../../wordlists/Japanese.txt.br");
-include_script!(KANNADA, "../../wordlists/Kannada.txt.br");
-include_script!(KATAKANA, "../../wordlists/Katakana.txt.br");
-include_script!(KHMER, "../../wordlists/Khmer.txt.br");
-include_script!(LAO, "../../wordlists/Lao.txt.br");
-include_script!(LATIN, "../../wordlists/Latin.txt.br");
-include_script!(LISU, "../../wordlists/Lisu.txt.br");
-include_script!(MALAYALAM, "../../wordlists/Malayalam.txt.br");
-include_script!(MONGOLIAN, "../../wordlists/Mongolian.txt.br");
-include_script!(MYANMAR, "../../wordlists/Myanmar.txt.br");
-include_script!(OL_CHIKI, "../../wordlists/Ol_Chiki.txt.br");
-include_script!(ORIYA, "../../wordlists/Oriya.txt.br");
-include_script!(OSAGE, "../../wordlists/Osage.txt.br");
-include_script!(SINHALA, "../../wordlists/Sinhala.txt.br");
-include_script!(SYRIAC, "../../wordlists/Syriac.txt.br");
-include_script!(TAMIL, "../../wordlists/Tamil.txt.br");
-include_script!(TELUGU, "../../wordlists/Telugu.txt.br");
-include_script!(THAI, "../../wordlists/Thai.txt.br");
-include_script!(THANAA, "../../wordlists/Thanaa.txt.br");
-include_script!(TIBETAN, "../../wordlists/Tibetan.txt.br");
-include_script!(TIFINAGH, "../../wordlists/Tifinagh.txt.br");
-include_script!(VAI, "../../wordlists/Vai.txt.br");
-
-pub(crate) fn get_wordlist(script: &str) -> Option<Vec<String>> {
-    let compressed = match script {
-        "Adlam" => ADLAM.as_slice(),
-        "Arabic" => ARABIC.as_slice(),
-        "Armenian" => ARMENIAN.as_slice(),
-        "Avestan" => AVESTAN.as_slice(),
-        "Bengali" => BENGALI.as_slice(),
-        "Bopomofo" => BOPOMOFO.as_slice(),
-        "Canadian_Aboriginal" => CANADIAN_ABORIGINAL.as_slice(),
-        "Chakma" => CHAKMA.as_slice(),
-        "Cherokee" => CHEROKEE.as_slice(),
-        "Common" => COMMON.as_slice(),
-        "Cyrillic" => CYRILLIC.as_slice(),
-        "Devanagari" => DEVANAGARI.as_slice(),
-        "Ethiopic" => ETHIOPIC.as_slice(),
-        "Georgian" => GEORGIAN.as_slice(),
-        "Grantha" => GRANTHA.as_slice(),
-        "Greek" => GREEK.as_slice(),
-        "Gujarati" => GUJARATI.as_slice(),
-        "Gurmukhi" => GURMUKHI.as_slice(),
-        "Hebrew" => HEBREW.as_slice(),
-        "Hiragana" => HIRAGANA.as_slice(),
-        "Japanese" => JAPANESE.as_slice(),
-        "Kannada" => KANNADA.as_slice(),
-        "Katakana" => KATAKANA.as_slice(),
-        "Khmer" => KHMER.as_slice(),
-        "Lao" => LAO.as_slice(),
-        "Latin" => LATIN.as_slice(),
-        "Lisu" => LISU.as_slice(),
-        "Malayalam" => MALAYALAM.as_slice(),
-        "Mongolian" => MONGOLIAN.as_slice(),
-        "Myanmar" => MYANMAR.as_slice(),
-        "Ol_Chiki" => OL_CHIKI.as_slice(),
-        "Oriya" => ORIYA.as_slice(),
-        "Osage" => OSAGE.as_slice(),
-        "Sinhala" => SINHALA.as_slice(),
-        "Syriac" => SYRIAC.as_slice(),
-        "Tamil" => TAMIL.as_slice(),
-        "Telugu" => TELUGU.as_slice(),
-        "Thai" => THAI.as_slice(),
-        "Thanaa" => THANAA.as_slice(),
-        "Tibetan" => TIBETAN.as_slice(),
-        "Tifinagh" => TIFINAGH.as_slice(),
-        "Vai" => VAI.as_slice(),
+pub(crate) fn get_wordlist(script: &str) -> Option<&LazyLock<WordList>> {
+    let wl = match script {
+        "Adlam" => &static_lang_word_lists::DIFFENATOR_ADLAM,
+        "Arabic" => &static_lang_word_lists::DIFFENATOR_ARABIC,
+        "Armenian" => &static_lang_word_lists::DIFFENATOR_ARMENIAN,
+        "Avestan" => &static_lang_word_lists::DIFFENATOR_AVESTAN,
+        "Bengali" => &static_lang_word_lists::DIFFENATOR_BENGALI,
+        "Bopomofo" => &static_lang_word_lists::DIFFENATOR_BOPOMOFO,
+        "Canadian_Aboriginal" => &static_lang_word_lists::DIFFENATOR_CANADIAN_ABORIGINAL,
+        "Chakma" => &static_lang_word_lists::DIFFENATOR_CHAKMA,
+        "Cherokee" => &static_lang_word_lists::DIFFENATOR_CHEROKEE,
+        "Common" => &static_lang_word_lists::DIFFENATOR_COMMON,
+        "Cyrillic" => &static_lang_word_lists::DIFFENATOR_CYRILLIC,
+        "Devanagari" => &static_lang_word_lists::DIFFENATOR_DEVANAGARI,
+        "Ethiopic" => &static_lang_word_lists::DIFFENATOR_ETHIOPIC,
+        "Georgian" => &static_lang_word_lists::DIFFENATOR_GEORGIAN,
+        // "Grantha" => &static_lang_word_lists::DIFFENATOR_GRANTHA,
+        "Greek" => &static_lang_word_lists::DIFFENATOR_GREEK,
+        "Gujarati" => &static_lang_word_lists::DIFFENATOR_GUJARATI,
+        "Gurmukhi" => &static_lang_word_lists::DIFFENATOR_GURMUKHI,
+        "Hebrew" => &static_lang_word_lists::DIFFENATOR_HEBREW,
+        "Hiragana" => &static_lang_word_lists::DIFFENATOR_HIRAGANA,
+        "Japanese" => &static_lang_word_lists::DIFFENATOR_JAPANESE,
+        // "Kannada" => &static_lang_word_lists::DIFFENATOR_KANNADA,
+        "Katakana" => &static_lang_word_lists::DIFFENATOR_KATAKANA,
+        "Khmer" => &static_lang_word_lists::DIFFENATOR_KHMER,
+        "Lao" => &static_lang_word_lists::DIFFENATOR_LAO,
+        "Latin" => &static_lang_word_lists::DIFFENATOR_LATIN,
+        "Lisu" => &static_lang_word_lists::DIFFENATOR_LISU,
+        "Malayalam" => &static_lang_word_lists::DIFFENATOR_MALAYALAM,
+        "Mongolian" => &static_lang_word_lists::DIFFENATOR_MONGOLIAN,
+        "Myanmar" => &static_lang_word_lists::DIFFENATOR_MYANMAR,
+        "Ol_Chiki" => &static_lang_word_lists::DIFFENATOR_OL_CHIKI,
+        "Oriya" => &static_lang_word_lists::DIFFENATOR_ORIYA,
+        "Osage" => &static_lang_word_lists::DIFFENATOR_OSAGE,
+        "Sinhala" => &static_lang_word_lists::DIFFENATOR_SINHALA,
+        "Syriac" => &static_lang_word_lists::DIFFENATOR_SYRIAC,
+        "Tamil" => &static_lang_word_lists::DIFFENATOR_TAMIL,
+        "Telugu" => &static_lang_word_lists::DIFFENATOR_TELUGU,
+        "Thai" => &static_lang_word_lists::DIFFENATOR_THAI,
+        "Thanaa" => &static_lang_word_lists::DIFFENATOR_THANAA,
+        "Tibetan" => &static_lang_word_lists::DIFFENATOR_TIBETAN,
+        "Tifinagh" => &static_lang_word_lists::DIFFENATOR_TIFINAGH,
+        "Vai" => &static_lang_word_lists::DIFFENATOR_VAI,
 
         _ => return None,
     };
-    let buf = BufReader::new(compressed);
-    let wordlist: Vec<String> = buf
-        .lines()
-        .map(|l| l.expect("Could not parse line"))
-        .collect();
-    Some(wordlist)
+    Some(wl)
 }
 
 pub fn get_script_tag(script: &str) -> Option<Script> {

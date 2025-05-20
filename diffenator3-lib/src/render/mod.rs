@@ -84,7 +84,7 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont, custom_inputs: Vec<WordDi
             let direction = wordlists::get_script_direction(script);
             let script_tag = wordlists::get_script_tag(script);
             jobs.push(WordDiffInput {
-                wordlist,
+                wordlist: wordlist.iter().map(|x| x.to_string()).collect(),
                 direction: Some(direction),
                 script: script_tag,
                 title: script.to_string(),
