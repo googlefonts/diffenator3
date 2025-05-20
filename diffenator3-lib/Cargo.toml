@@ -35,6 +35,8 @@ lazy_static = "1.4.0"
 zeno = "0.3.1"
 log = "0.4"
 
+static-lang-word-lists = { version = "0.1.0", git = "https://github.com/googlefonts/fontheight" }
+
 # HTML reporter shared code
 tera = { version = "1", optional = true }
 homedir = { version = "0.3.3", optional = true }
