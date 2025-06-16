@@ -257,6 +257,8 @@ impl Slot {
         let mut result = String::new();
         if self.class_0 {
             result.push_str("@Any");
+        } else if self.glyphs.is_empty() {
+            result.push_str("[]");
         } else if self.glyphs.len() > 1 {
             result.push('[');
             result.push_str(
