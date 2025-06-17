@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+# maturin needs a manifest with a [package], can't just use the workspace's Cargo.toml
+manifest-path = "Cargo.toml"
+# treat the project as a Rust binary application: https://www.maturin.rs/bindings#bin
+bindings = "bin"
+
+
+[project]
+name = "diff3proof"

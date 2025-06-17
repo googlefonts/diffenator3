@@ -16,3 +16,5 @@ colored = "2.1.0"
 clap = { version = "4.5.9", features = ["derive"] }
 itertools = "0.13.0"
 env_logger = "0.11"
+
+pyo3 = { version = "0.21", features = ["extension-module"] }
