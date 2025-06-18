@@ -11,5 +11,3 @@ clap = { version = "4.5.9", features = ["derive"] }
 env_logger = "0.11"
 serde_json = { workspace = true }
 fancy-regex = "0.13"
-
-pyo3 = { version = "0.21", features = ["extension-module"] }
