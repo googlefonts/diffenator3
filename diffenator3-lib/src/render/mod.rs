@@ -213,6 +213,7 @@ pub(crate) fn diff_many_words(
             })
         })
         .collect();
+    println!("{}", wordlist.len());
     let mut diffs: Vec<Difference> = differences
         .into_iter()
         .flatten()

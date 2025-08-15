@@ -42,7 +42,7 @@ fn serialize_name_table<'a>(font: &(impl MetadataProvider<'a> + TableProvider<'a
     Value::Object(map)
 }
 
-fn serialize_cmap_table<'a>(font: &impl TableProvider<'a>, names: &NameMap) -> Value {
+fn serialize_cmap_table<'a>(font: &FontRef<'a>, names: &NameMap) -> Value {
     let charmap = Charmap::new(font);
     let mut map: Map<String, Value> = Map::new();
     for (codepoint, gid) in charmap.mappings() {
