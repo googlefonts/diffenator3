@@ -1,4 +1,4 @@
-use super::rustyruzz::{script, Direction, Script};
+use harfrust::{script, Direction, Script};
 use lazy_static::lazy_static;
 use std::io::{BufRead, BufReader};
 

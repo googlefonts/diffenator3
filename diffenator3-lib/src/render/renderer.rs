@@ -1,8 +1,7 @@
 /// Turn some words into images
-use crate::render::rustyruzz::{
-    Direction, Script, ShapePlan, ShaperInstance, UnicodeBuffer, Variation,
+use harfrust::{
+    Direction, Script, ShapePlan, ShaperData, ShaperInstance, UnicodeBuffer, Variation,
 };
-use harfrust::ShaperData;
 use image::{DynamicImage, GrayImage, Luma};
 use skrifa::instance::Size;
 use skrifa::raw::TableProvider;

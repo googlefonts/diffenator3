@@ -5,13 +5,12 @@
 mod cachedoutlines;
 pub mod encodedglyphs;
 pub mod renderer;
-pub(crate) mod rustyruzz;
 pub mod utils;
 pub mod wordlists;
 use crate::dfont::DFont;
-use crate::render::rustyruzz::{Direction, Script};
 use crate::render::utils::count_differences;
 use cfg_if::cfg_if;
+use harfrust::{Direction, Script};
 use renderer::Renderer;
 use serde::Serialize;
 use serde_json::{json, Value};
