@@ -7,7 +7,8 @@ async function init() {
   self.onmessage = async (event) => {
     // console.log("Worker received message");
     // console.log(event);
-    const { command, beforeFont, location, afterFont } = event.data;
+    const { command, beforeFont, location, afterFont, customWords } =
+      event.data;
     if (command == "axes") {
       let obj = JSON.parse(wasm.axes(beforeFont, afterFont));
       obj["type"] = "axes";
@@ -41,7 +42,7 @@ async function init() {
         });
       });
     } else if (command == "words") {
-      wasm.diff_words(beforeFont, afterFont, location, (words) => {
+      wasm.diff_words(beforeFont, afterFont, customWords, location, (words) => {
         self.postMessage({
           type: "words",
           words: JSON.parse(words)["words"],

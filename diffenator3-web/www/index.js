@@ -35,6 +35,7 @@ class Diffenator {
   constructor() {
     this.beforeFont = null;
     this.afterFont = null;
+    this.customWords = [];
   }
 
   get beforeCssStyle() {
@@ -79,6 +80,27 @@ class Diffenator {
       }
     };
     reader.readAsArrayBuffer(files[0]);
+  }
+
+  dropWordlist(files) {
+    var reader = new FileReader();
+    let that = this;
+    reader.onload = function (e) {
+      // Read file as text
+      let contents = e.target.result;
+      that.customWords = contents
+        .split("\n")
+        .map(function (line) {
+          return line.trim();
+        })
+        .filter(function (line) {
+          return line.length > 0 && !line.startsWith("#");
+        });
+      $("#wordlistlabel").text(
+        `${that.customWords.length} words loaded (you can drop more)`
+      );
+    };
+    reader.readAsText(files[0]);
   }
 
   setVariations() {
@@ -228,6 +250,7 @@ class Diffenator {
       command: "words",
       beforeFont: this.beforeFont,
       afterFont: this.afterFont,
+      customWords: this.customWords,
       location,
     });
   }
@@ -268,12 +291,12 @@ $(function () {
   diffWorker.onmessage = (e) => window.diffenator.progress_callback(e.data);
   $("#bigLoadingModal").show();
 
-  $(".fontdrop").on("dragover dragenter", function (e) {
+  $(".drop").on("dragover dragenter", function (e) {
     e.preventDefault();
     e.stopPropagation();
     $(this).addClass("dragging");
   });
-  $(".fontdrop").on("dragleave dragend", function (e) {
+  $(".drop").on("dragleave dragend", function (e) {
     $(this).removeClass("dragging");
   });
 
@@ -286,6 +309,18 @@ $(function () {
       e.preventDefault();
       e.stopPropagation();
       diffenator.dropFile(e.originalEvent.dataTransfer.files, this);
+    }
+  });
+
+  $("#worddrop").on("drop", function (e) {
+    $(this).removeClass("dragging");
+    if (
+      e.originalEvent.dataTransfer &&
+      e.originalEvent.dataTransfer.files.length
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      diffenator.dropWordlist(e.originalEvent.dataTransfer.files);
     }
   });
 

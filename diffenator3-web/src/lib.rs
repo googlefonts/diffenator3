@@ -1,4 +1,5 @@
 use diffenator3_lib::dfont::{shared_axes, DFont};
+use diffenator3_lib::render::WordDiffInput;
 use diffenator3_lib::render::{encodedglyphs, encodedglyphs::CmapDiff, test_font_words};
 use serde_json::json;
 use ttj::font_to_json as underlying_font_to_json;
@@ -86,14 +87,31 @@ pub fn new_missing_glyphs(font_a: &[u8], font_b: &[u8], f: &js_sys::Function) {
 }
 
 #[wasm_bindgen]
-pub fn diff_words(font_a: &[u8], font_b: &[u8], location: &str, f: &js_sys::Function) {
+pub fn diff_words(
+    font_a: &[u8],
+    font_b: &[u8],
+    custom_words: Vec<String>,
+    location: &str,
+    f: &js_sys::Function,
+) {
     let mut f_a = DFont::new(font_a);
     let mut f_b = DFont::new(font_b);
     let _hack = f_a.set_location(location);
     let _hack = f_b.set_location(location);
 
+    let custom_word_diff = if !custom_words.is_empty() {
+        vec![WordDiffInput {
+            title: "Custom words".to_string(),
+            wordlist: custom_words,
+            direction: None,
+            script: None,
+        }]
+    } else {
+        vec![]
+    };
+
     let val = json!({
-        "words": test_font_words(&f_a, &f_b)
+        "words": test_font_words(&f_a, &f_b, custom_word_diff)
     });
     f.call1(
         &JsValue::NULL,
