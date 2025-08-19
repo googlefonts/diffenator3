@@ -17,7 +17,7 @@ pub struct Renderer<'a> {
     shaper_data: ShaperData,
     scale: f32,
     font: skrifa::FontRef<'a>,
-    plan: ShapePlan,
+    plan: Option<ShapePlan>,
     instance: ShaperInstance,
     outlines: CachedOutlineGlyphCollection<'a>,
 }
@@ -29,7 +29,7 @@ impl<'a> Renderer<'a> {
     pub fn new(
         dfont: &'a DFont,
         font_size: f32,
-        direction: Direction,
+        direction: Option<Direction>,
         script: Option<Script>,
     ) -> Self {
         let font = harfrust::FontRef::new(&dfont.backing).unwrap_or_else(|_| {
@@ -51,7 +51,15 @@ impl<'a> Renderer<'a> {
         );
         let shaper = shaper_data.shaper(&font).instance(Some(&instance)).build();
 
-        let plan = ShapePlan::new(&shaper, direction, script, None, &[]);
+        let plan = if let Some(direction) = direction {
+            if script.is_some() {
+                Some(ShapePlan::new(&shaper, direction, script, None, &[]))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         let location = (&dfont.normalized_location).into();
         let outlines = CachedOutlineGlyphCollection::new(
             font.outline_glyphs(),
@@ -85,7 +93,14 @@ impl<'a> Renderer<'a> {
             .instance(Some(&self.instance))
             .build();
 
-        let output = shaper.shape_with_plan(&self.plan, buffer, &[]);
+        let output = if let Some(plan) = &self.plan {
+            // If we have a shaping plan, we can use it to shape the string
+            shaper.shape_with_plan(plan, buffer, &[])
+        } else {
+            // Otherwise, we guess segment properties
+            buffer.guess_segment_properties();
+            shaper.shape(buffer, &[])
+        };
         let upem = self.font.head().unwrap().units_per_em();
         let factor = self.scale / upem as f32;
 
@@ -184,7 +199,12 @@ mod tests {
         let path = "NotoSansArabic-NewRegular.ttf";
         let data = std::fs::read(path).unwrap();
         let font = DFont::new(&data);
-        let mut renderer = Renderer::new(&font, 40.0, Direction::RightToLeft, Some(script::ARABIC));
+        let mut renderer = Renderer::new(
+            &font,
+            40.0,
+            Some(Direction::RightToLeft),
+            Some(script::ARABIC),
+        );
         let (_serialized_buffer, commands) =
             renderer.string_to_positioned_glyphs("السلام عليكم").unwrap();
         let image = renderer.render_positioned_glyphs(&commands);

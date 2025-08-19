@@ -88,7 +88,7 @@ pub fn modified_encoded_glyphs(font_a: &DFont, font_b: &DFont) -> Vec<GlyphDiff>
         DEFAULT_GLYPHS_FONT_SIZE,
         word_list,
         DEFAULT_GLYPHS_THRESHOLD,
-        Direction::LeftToRight,
+        Some(Direction::LeftToRight),
         None,
     )
     .into_iter()

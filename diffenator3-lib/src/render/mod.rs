@@ -161,7 +161,7 @@ pub(crate) fn diff_many_words(
     font_size: f32,
     wordlist: Vec<String>,
     threshold: usize,
-    direction: Direction,
+    direction: Option<Direction>,
     script: Option<Script>,
 ) -> Vec<Difference> {
     let tl_a = ThreadLocal::new();
@@ -231,7 +231,7 @@ pub(crate) fn diff_many_words(
     font_size: f32,
     wordlist: Vec<String>,
     threshold: usize,
-    direction: Direction,
+    direction: Option<Direction>,
     script: Option<Script>,
 ) -> Vec<Difference> {
     let mut renderer_a = Renderer::new(font_a, font_size, direction, script);
