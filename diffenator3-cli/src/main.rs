@@ -12,7 +12,7 @@ use clap::Parser;
 use diffenator3_lib::dfont::DFont;
 use diffenator3_lib::html::template_engine;
 use diffenator3_lib::render::encodedglyphs::{modified_encoded_glyphs, CmapDiff};
-use diffenator3_lib::render::test_font_words;
+use diffenator3_lib::render::{test_font_words, WordDiffInput};
 use diffenator3_lib::setting::{parse_location, Setting};
 use env_logger::Env;
 use indexmap::IndexSet;
@@ -61,6 +61,10 @@ struct Cli {
     /// Show diffs in word images [default]
     #[clap(long = "words", overrides_with = "words", help_heading = Some("Tests to run"))]
     _no_words: bool,
+
+    /// Custom word list files for testing
+    #[clap(long = "custom-wordlists", help_heading = Some("Tests to run"))]
+    custom_wordlists: Vec<PathBuf>,
 
     /// Show diffs as JSON
     #[clap(long = "json", help_heading = Some("Report format"))]
@@ -149,6 +153,24 @@ fn main() {
 
     let mut result = Report::default();
 
+    let custom_wordlist_inputs: Vec<WordDiffInput> = cli
+        .custom_wordlists
+        .iter()
+        .map(|path| {
+            let data = std::fs::read_to_string(path).expect("Couldn't read custom wordlist");
+            WordDiffInput {
+                title: path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("custom")
+                    .to_string(),
+                wordlist: data.lines().map(String::from).collect(),
+                direction: None,
+                script: None,
+            }
+        })
+        .collect();
+
     // Location-independent tests
     if cli.tables {
         println!("Diffing binary tables");
@@ -192,7 +214,13 @@ fn main() {
             if let Err(e) = setting.set_on_fonts(&mut font_a, &mut font_b) {
                 LocationResult::from_error(setting.name(), e)
             } else {
-                test_at_location(&font_a, setting.name(), &cli, &font_b)
+                test_at_location(
+                    &font_a,
+                    setting.name(),
+                    &cli,
+                    &font_b,
+                    custom_wordlist_inputs.clone(),
+                )
             }
         })
         .collect();
@@ -218,7 +246,13 @@ fn main() {
     }
 }
 
-fn test_at_location(font_a: &DFont, loc_name: String, cli: &Cli, font_b: &DFont) -> LocationResult {
+fn test_at_location(
+    font_a: &DFont,
+    loc_name: String,
+    cli: &Cli,
+    font_b: &DFont,
+    wordlists: Vec<WordDiffInput>,
+) -> LocationResult {
     let mut this_location_value = LocationResult::default();
     let loc_coords: HashMap<String, f32> = font_a
         .location
@@ -232,7 +266,7 @@ fn test_at_location(font_a: &DFont, loc_name: String, cli: &Cli, font_b: &DFont)
         this_location_value.glyphs = modified_encoded_glyphs(font_a, font_b);
     }
     if cli.words {
-        this_location_value.words = Some(test_font_words(font_a, font_b));
+        this_location_value.words = Some(test_font_words(font_a, font_b, wordlists));
     }
     this_location_value
 }

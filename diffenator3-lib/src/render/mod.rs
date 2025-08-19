@@ -39,13 +39,44 @@ pub const DEFAULT_GLYPHS_THRESHOLD: usize = 16;
 /// Gray pixels which differ by less than this amount are considered the same
 pub const DEFAULT_GRAY_FUZZ: u8 = 8;
 
+/// A list of words to present to `diff_many_words`
+#[derive(Clone, Debug)]
+pub struct WordDiffInput {
+    pub wordlist: Vec<String>,
+    pub direction: Option<Direction>,
+    pub script: Option<Script>,
+    pub title: String,
+}
+
+impl WordDiffInput {
+    fn filtered(&mut self, shared_codepoints: &HashSet<u32>) -> Vec<String> {
+        self.wordlist
+            .iter()
+            .filter(|word| {
+                word.chars()
+                    .all(|c| shared_codepoints.contains(&(c as u32)))
+            })
+            .cloned()
+            .collect()
+    }
+}
+
 /// Compare two fonts by rendering a list of words and comparing the images
 ///
 /// Word lists are gathered for all scripts which are supported by both fonts.
 /// The return value is a JSON object where each key is a script tag and the
 /// value is a list of serialized [Difference] objects.
-pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
+pub fn test_font_words(font_a: &DFont, font_b: &DFont, custom_inputs: Vec<WordDiffInput>) -> Value {
     let mut map = serde_json::Map::new();
+    let mut jobs = vec![];
+
+    let shared_codepoints = font_a
+        .codepoints
+        .intersection(&font_b.codepoints)
+        .copied()
+        .collect();
+
+    // Create the jobs
     for script in font_a
         .supported_scripts()
         .intersection(&font_b.supported_scripts())
@@ -53,29 +84,28 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont) -> Value {
         if let Some(wordlist) = wordlists::get_wordlist(script) {
             let direction = wordlists::get_script_direction(script);
             let script_tag = wordlists::get_script_tag(script);
-            // Only bother rendering the words that have cmap entries in both fonts
-            let wordlist = wordlist
-                .iter()
-                .filter(|word| {
-                    word.chars().all(|c| {
-                        font_a.codepoints.contains(&(c as u32))
-                            && font_b.codepoints.contains(&(c as u32))
-                    })
-                })
-                .map(|s| s.to_string())
-                .collect();
-            let results = diff_many_words(
-                font_a,
-                font_b,
-                DEFAULT_WORDS_FONT_SIZE,
+            jobs.push(WordDiffInput {
                 wordlist,
-                DEFAULT_WORDS_THRESHOLD,
-                direction,
-                script_tag,
-            );
-            if !results.is_empty() {
-                map.insert(script.to_string(), serde_json::to_value(results).unwrap());
-            }
+                direction: Some(direction),
+                script: script_tag,
+                title: script.to_string(),
+            });
+        }
+    }
+    jobs.extend(custom_inputs);
+    // Process the jobs
+    for job in jobs.iter_mut() {
+        let results = diff_many_words(
+            font_a,
+            font_b,
+            DEFAULT_WORDS_FONT_SIZE,
+            job.filtered(&shared_codepoints),
+            DEFAULT_WORDS_THRESHOLD,
+            job.direction,
+            job.script,
+        );
+        if !results.is_empty() {
+            map.insert(job.title.clone(), serde_json::to_value(results).unwrap());
         }
     }
     json!(map)
@@ -213,7 +243,6 @@ pub(crate) fn diff_many_words(
             })
         })
         .collect();
-    println!("{}", wordlist.len());
     let mut diffs: Vec<Difference> = differences
         .into_iter()
         .flatten()
