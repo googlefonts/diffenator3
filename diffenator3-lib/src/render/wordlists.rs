@@ -52,59 +52,90 @@ pub(crate) fn get_wordlist(script: &str) -> Option<&LazyLock<WordList>> {
     Some(wl)
 }
 
-pub fn get_script_tag(script: &str) -> Option<Script> {
-    match script {
-        "Adlam" => Some(script::ADLAM),
-        "Arabic" => Some(script::ARABIC),
-        "Armenian" => Some(script::ARMENIAN),
-        "Avestan" => Some(script::AVESTAN),
-        "Bengali" => Some(script::BENGALI),
-        "Bopomofo" => Some(script::BOPOMOFO),
-        "Canadian_Aboriginal" => Some(script::CANADIAN_SYLLABICS),
-        "Chakma" => Some(script::CHAKMA),
-        "Cherokee" => Some(script::CHEROKEE),
-        "Common" => Some(script::COMMON),
-        "Cyrillic" => Some(script::CYRILLIC),
-        "Devanagari" => Some(script::DEVANAGARI),
-        "Ethiopic" => Some(script::ETHIOPIC),
-        "Georgian" => Some(script::GEORGIAN),
-        "Grantha" => Some(script::GRANTHA),
-        "Greek" => Some(script::GREEK),
-        "Gujarati" => Some(script::GUJARATI),
-        "Gurmukhi" => Some(script::GURMUKHI),
-        "Hebrew" => Some(script::HEBREW),
-        "Hiragana" => Some(script::HIRAGANA),
-        "Kannada" => Some(script::KANNADA),
-        "Katakana" => Some(script::KATAKANA),
-        "Khmer" => Some(script::KHMER),
-        "Lao" => Some(script::LAO),
-        "Latin" => Some(script::LATIN),
-        "Lisu" => Some(script::LISU),
-        "Malayalam" => Some(script::MALAYALAM),
-        "Mongolian" => Some(script::MONGOLIAN),
-        "Myanmar" => Some(script::MYANMAR),
-        "Ol_Chiki" => Some(script::OL_CHIKI),
-        "Oriya" => Some(script::ORIYA),
-        "Osage" => Some(script::OSAGE),
-        "Sinhala" => Some(script::SINHALA),
-        "Syriac" => Some(script::SYRIAC),
-        "Tamil" => Some(script::TAMIL),
-        "Telugu" => Some(script::TELUGU),
-        "Thai" => Some(script::THAI),
-        "Tibetan" => Some(script::TIBETAN),
-        "Tifinagh" => Some(script::TIFINAGH),
-        "Vai" => Some(script::VAI),
-        _ => None,
-    }
-}
+// pub(crate) in harfrust, annoyingly.
+pub fn direction_from_script(script: Script) -> Option<Direction> {
+    // https://docs.google.com/spreadsheets/d/1Y90M0Ie3MUJ6UVCRDOypOtijlMDLNNyyLk36T6iMu0o
 
-pub fn get_script_direction(script: &str) -> Direction {
     match script {
-        "Arabic" => Direction::RightToLeft,
-        "Avestan" => Direction::RightToLeft,
-        "Hebrew" => Direction::RightToLeft,
-        "Syriac" => Direction::RightToLeft,
-        "Thanaa" => Direction::RightToLeft,
-        _ => Direction::LeftToRight,
-    }
+            // Unicode-1.1 additions
+            script::ARABIC |
+            script::HEBREW |
+
+            // Unicode-3.0 additions
+            script::SYRIAC |
+            script::THAANA |
+
+            // Unicode-4.0 additions
+            script::CYPRIOT |
+
+            // Unicode-4.1 additions
+            script::KHAROSHTHI |
+
+            // Unicode-5.0 additions
+            script::PHOENICIAN |
+            script::NKO |
+
+            // Unicode-5.1 additions
+            script::LYDIAN |
+
+            // Unicode-5.2 additions
+            script::AVESTAN |
+            script::IMPERIAL_ARAMAIC |
+            script::INSCRIPTIONAL_PAHLAVI |
+            script::INSCRIPTIONAL_PARTHIAN |
+            script::OLD_SOUTH_ARABIAN |
+            script::OLD_TURKIC |
+            script::SAMARITAN |
+
+            // Unicode-6.0 additions
+            script::MANDAIC |
+
+            // Unicode-6.1 additions
+            script::MEROITIC_CURSIVE |
+            script::MEROITIC_HIEROGLYPHS |
+
+            // Unicode-7.0 additions
+            script::MANICHAEAN |
+            script::MENDE_KIKAKUI |
+            script::NABATAEAN |
+            script::OLD_NORTH_ARABIAN |
+            script::PALMYRENE |
+            script::PSALTER_PAHLAVI |
+
+            // Unicode-8.0 additions
+            script::HATRAN |
+
+            // Unicode-9.0 additions
+            script::ADLAM |
+
+            // Unicode-11.0 additions
+            script::HANIFI_ROHINGYA |
+            script::OLD_SOGDIAN |
+            script::SOGDIAN |
+
+            // Unicode-12.0 additions
+            script::ELYMAIC |
+
+            // Unicode-13.0 additions
+            script::CHORASMIAN |
+            script::YEZIDI |
+
+            // Unicode-14.0 additions
+            script::OLD_UYGHUR |
+
+            // Unicode-16.0 additions
+            script::GARAY => {
+                Some(Direction::RightToLeft)
+            }
+
+            // https://github.com/harfbuzz/harfbuzz/issues/1000
+            script::OLD_HUNGARIAN |
+            script::OLD_ITALIC |
+            script::RUNIC |
+            script::TIFINAGH => {
+                None
+            }
+
+            _ => Some(Direction::LeftToRight),
+        }
 }

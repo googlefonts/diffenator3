@@ -9,17 +9,20 @@ pub mod utils;
 pub mod wordlists;
 use crate::dfont::DFont;
 use crate::render::utils::count_differences;
+use crate::render::wordlists::direction_from_script;
 use cfg_if::cfg_if;
-use harfrust::{Direction, Script};
+use harfrust::Script;
 use renderer::Renderer;
 use serde::Serialize;
 use serde_json::{json, Value};
+use static_lang_word_lists::WordList;
 use std::collections::HashSet;
+use std::str::FromStr;
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
         use indicatif::ParallelProgressIterator;
-        use rayon::{iter::ParallelIterator, prelude::IntoParallelRefIterator};
+        use rayon::iter::ParallelIterator;
         use thread_local::ThreadLocal;
         use std::cell::RefCell;
         use std::sync::RwLock;
@@ -38,36 +41,14 @@ pub const DEFAULT_GLYPHS_THRESHOLD: usize = 16;
 /// Gray pixels which differ by less than this amount are considered the same
 pub const DEFAULT_GRAY_FUZZ: u8 = 8;
 
-/// A list of words to present to `diff_many_words`
-#[derive(Clone, Debug)]
-pub struct WordDiffInput {
-    pub wordlist: Vec<String>,
-    pub direction: Option<Direction>,
-    pub script: Option<Script>,
-    pub title: String,
-}
-
-impl WordDiffInput {
-    fn filtered(&mut self, shared_codepoints: &HashSet<u32>) -> Vec<String> {
-        self.wordlist
-            .iter()
-            .filter(|word| {
-                word.chars()
-                    .all(|c| shared_codepoints.contains(&(c as u32)))
-            })
-            .cloned()
-            .collect()
-    }
-}
-
 /// Compare two fonts by rendering a list of words and comparing the images
 ///
 /// Word lists are gathered for all scripts which are supported by both fonts.
 /// The return value is a JSON object where each key is a script tag and the
 /// value is a list of serialized [Difference] objects.
-pub fn test_font_words(font_a: &DFont, font_b: &DFont, custom_inputs: Vec<WordDiffInput>) -> Value {
+pub fn test_font_words(font_a: &DFont, font_b: &DFont, custom_inputs: &[WordList]) -> Value {
     let mut map = serde_json::Map::new();
-    let mut jobs = vec![];
+    let mut jobs: Vec<&WordList> = vec![];
 
     let shared_codepoints = font_a
         .codepoints
@@ -75,36 +56,31 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont, custom_inputs: Vec<WordDi
         .copied()
         .collect();
 
+    let supported_a = font_a.supported_scripts();
+    let supported_b = font_b.supported_scripts();
+
     // Create the jobs
-    for script in font_a
-        .supported_scripts()
-        .intersection(&font_b.supported_scripts())
-    {
+    for script in supported_a.intersection(&supported_b) {
         if let Some(wordlist) = wordlists::get_wordlist(script) {
-            let direction = wordlists::get_script_direction(script);
-            let script_tag = wordlists::get_script_tag(script);
-            jobs.push(WordDiffInput {
-                wordlist: wordlist.iter().map(|x| x.to_string()).collect(),
-                direction: Some(direction),
-                script: script_tag,
-                title: script.to_string(),
-            });
+            jobs.push(wordlist);
         }
     }
-    jobs.extend(custom_inputs);
+    jobs.extend(custom_inputs.iter());
     // Process the jobs
     for job in jobs.iter_mut() {
         let results = diff_many_words(
             font_a,
             font_b,
             DEFAULT_WORDS_FONT_SIZE,
-            job.filtered(&shared_codepoints),
+            job,
+            Some(&shared_codepoints),
             DEFAULT_WORDS_THRESHOLD,
-            job.direction,
-            job.script,
         );
         if !results.is_empty() {
-            map.insert(job.title.clone(), serde_json::to_value(results).unwrap());
+            map.insert(
+                job.name().to_string(),
+                serde_json::to_value(results).unwrap(),
+            );
         }
     }
     json!(map)
@@ -188,18 +164,24 @@ pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
     font_size: f32,
-    wordlist: Vec<String>,
+    wordlist: &WordList,
+    shared_codepoints: Option<&HashSet<u32>>,
     threshold: usize,
-    direction: Option<Direction>,
-    script: Option<Script>,
 ) -> Vec<Difference> {
     let tl_a = ThreadLocal::new();
     let tl_b = ThreadLocal::new();
+    let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
+    let direction = script.and_then(direction_from_script);
     // The cache should not be thread local
     let seen_glyphs = RwLock::new(HashSet::new());
     let differences: Vec<Option<Difference>> = wordlist
         .par_iter()
         .progress()
+        .filter(|word| {
+            shared_codepoints
+                .as_ref()
+                .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
+        })
         .map(|word| {
             let renderer_a =
                 tl_a.get_or(|| RefCell::new(Renderer::new(font_a, font_size, direction, script)));
@@ -257,17 +239,23 @@ pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
     font_size: f32,
-    wordlist: Vec<String>,
+    wordlist: &WordList,
+    shared_codepoints: Option<&HashSet<u32>>,
     threshold: usize,
-    direction: Option<Direction>,
-    script: Option<Script>,
 ) -> Vec<Difference> {
+    let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
+    let direction = script.and_then(|s| direction_from_script(s));
     let mut renderer_a = Renderer::new(font_a, font_size, direction, script);
     let mut renderer_b = Renderer::new(font_b, font_size, direction, script);
     let mut seen_glyphs: HashSet<String> = HashSet::new();
 
     let mut differences: Vec<Difference> = vec![];
-    for word in wordlist {
+    for word in wordlist.iter() {
+        if let Some(scp) = shared_codepoints {
+            if !word.chars().all(|c| scp.contains(&(c as u32))) {
+                continue;
+            }
+        }
         let result_a = renderer_a.string_to_positioned_glyphs(&word);
         if result_a.is_none() {
             continue;

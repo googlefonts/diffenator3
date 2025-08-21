@@ -24,7 +24,7 @@ struct Args {
     #[clap(short, long, default_value = "64.0")]
     size: f32,
     /// Script
-    #[clap(short, long, default_value = "Latin")]
+    #[clap(short, long, default_value = "Latn")]
     script: String,
 
     /// Verbose debugging
@@ -46,8 +46,8 @@ fn main() {
             .expect("Couldn't set location");
     }
 
+    let script_tag = harfrust::Script::from(&args.script);
     let direction = wordlists::get_script_direction(&args.script);
-    let script_tag = wordlists::get_script_tag(&args.script);
 
     let mut renderer_a = Renderer::new(&dfont_a, args.size, direction, script_tag);
     let mut renderer_b = Renderer::new(&dfont_b, args.size, direction, script_tag);

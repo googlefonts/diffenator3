@@ -5,6 +5,7 @@ use crate::dfont::DFont;
 use crate::render::{diff_many_words, GlyphDiff};
 pub use harfrust::Direction;
 use serde::Serialize;
+use static_lang_word_lists::WordList;
 
 use super::{DEFAULT_GLYPHS_FONT_SIZE, DEFAULT_GLYPHS_THRESHOLD};
 
@@ -82,14 +83,14 @@ pub fn modified_encoded_glyphs(font_a: &DFont, font_b: &DFont) -> Vec<GlyphDiff>
         .filter_map(|i| char::from_u32(*i))
         .map(|c| c.to_string())
         .collect();
+    let wl = WordList::define("Encoded glyphs", word_list);
     let mut result: Vec<GlyphDiff> = diff_many_words(
         font_a,
         font_b,
         DEFAULT_GLYPHS_FONT_SIZE,
-        word_list,
-        DEFAULT_GLYPHS_THRESHOLD,
-        Some(Direction::LeftToRight),
+        &wl,
         None,
+        DEFAULT_GLYPHS_THRESHOLD,
     )
     .into_iter()
     .map(|x| x.into())
