@@ -1,6 +1,6 @@
 use diffenator3_lib::dfont::{shared_axes, DFont};
-use diffenator3_lib::render::WordDiffInput;
 use diffenator3_lib::render::{encodedglyphs, encodedglyphs::CmapDiff, test_font_words};
+use diffenator3_lib::WordList;
 use serde_json::json;
 use ttj::font_to_json as underlying_font_to_json;
 use ttj::{kern_diff, table_diff};
@@ -100,18 +100,13 @@ pub fn diff_words(
     let _hack = f_b.set_location(location);
 
     let custom_word_diff = if !custom_words.is_empty() {
-        vec![WordDiffInput {
-            title: "Custom words".to_string(),
-            wordlist: custom_words,
-            direction: None,
-            script: None,
-        }]
+        vec![WordList::define("Custom words".to_string(), custom_words)]
     } else {
         vec![]
     };
 
     let val = json!({
-        "words": test_font_words(&f_a, &f_b, custom_word_diff)
+        "words": test_font_words(&f_a, &f_b, &custom_word_diff)
     });
     f.call1(
         &JsValue::NULL,

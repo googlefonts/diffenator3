@@ -61,7 +61,7 @@ fn main() {
     let font_a = DFont::new(&font_binary_a);
 
     let (shared_codepoints, axes, instances) = if let Some(font2) = &cli.font2 {
-        let font_binary_b = std::fs::read(&font2).expect("Couldn't open file");
+        let font_binary_b = std::fs::read(font2).expect("Couldn't open file");
         let font_b = DFont::new(&font_binary_b);
 
         let shared_codepoints: HashSet<u32> = font_a

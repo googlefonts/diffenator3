@@ -27,13 +27,15 @@ cfg-if = "1.0.0"
 ab_glyph = "0.2.21"
 ab_glyph_rasterizer = "0.1.8"
 image = { version = "0.24.6", default-features = false }
-harfrust = { version = "0.1.0" }
+harfrust = { version = "0.1.1" }
 ucd = "0.1.1"
 unicode_names2 = "0.6.0"
 brotli = "6.0.0"
 lazy_static = "1.4.0"
 zeno = "0.3.1"
 log = "0.4"
+
+static-lang-word-lists = { version = "0.1.0", features = ["rayon"] }
 
 # HTML reporter shared code
 tera = { version = "1", optional = true }

@@ -12,8 +12,9 @@ use clap::Parser;
 use diffenator3_lib::dfont::DFont;
 use diffenator3_lib::html::template_engine;
 use diffenator3_lib::render::encodedglyphs::{modified_encoded_glyphs, CmapDiff};
-use diffenator3_lib::render::{test_font_words, WordDiffInput};
+use diffenator3_lib::render::test_font_words;
 use diffenator3_lib::setting::{parse_location, Setting};
+use diffenator3_lib::WordList;
 use env_logger::Env;
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -153,21 +154,17 @@ fn main() {
 
     let mut result = Report::default();
 
-    let custom_wordlist_inputs: Vec<WordDiffInput> = cli
+    let custom_wordlist_inputs: Vec<WordList> = cli
         .custom_wordlists
         .iter()
         .map(|path| {
             let data = std::fs::read_to_string(path).expect("Couldn't read custom wordlist");
-            WordDiffInput {
-                title: path
-                    .file_name()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("custom")
-                    .to_string(),
-                wordlist: data.lines().map(String::from).collect(),
-                direction: None,
-                script: None,
-            }
+            let name: String = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("custom")
+                .to_string();
+            WordList::define(name, data.lines().map(String::from))
         })
         .collect();
 
@@ -219,7 +216,7 @@ fn main() {
                     setting.name(),
                     &cli,
                     &font_b,
-                    custom_wordlist_inputs.clone(),
+                    &custom_wordlist_inputs,
                 )
             }
         })
@@ -251,7 +248,7 @@ fn test_at_location(
     loc_name: String,
     cli: &Cli,
     font_b: &DFont,
-    wordlists: Vec<WordDiffInput>,
+    wordlists: &[WordList],
 ) -> LocationResult {
     let mut this_location_value = LocationResult::default();
     let loc_coords: HashMap<String, f32> = font_a
