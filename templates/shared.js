@@ -127,6 +127,10 @@ function diffFeatures(report) {
 }
 function diffKerns(report) {
   $("#diffkerns").empty();
+  if (!report["kerns"] || Object.keys(report["kerns"]).length == 0) {
+    $("#diffkerns").append(`<p>No changes to kerning</p>`);
+    return;
+  }
   $("#diffkerns").append(`<h4 class="mt-2">Modified Kerns</h4>`);
   $("#diffkerns").append(
     `<table class="table table-striped" id="diffkerns"><tr><th>Pair</th><th>Old</old><th>New</th></table>`
