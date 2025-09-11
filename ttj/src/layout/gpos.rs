@@ -81,7 +81,9 @@ impl SerializeSubtable for PairPos<'_> {
                 let mut classes = Map::new();
                 let mut kerns = Map::new();
                 for left_class in 0..s.class1_count() {
-                    let left_class_glyphs = class1.class_glyphs(left_class, Some(s.coverage()?));
+                    let mut left_class_glyphs =
+                        class1.class_glyphs(left_class, Some(s.coverage()?));
+                    left_class_glyphs.sort();
                     classes.insert(
                         format!("@CLASS_L_{}", left_class),
                         Value::Array(
@@ -93,7 +95,8 @@ impl SerializeSubtable for PairPos<'_> {
                     );
                 }
                 for right_class in 1..s.class2_count() {
-                    let right_class_glyphs = class2.class_glyphs(right_class, None);
+                    let mut right_class_glyphs = class2.class_glyphs(right_class, None);
+                    right_class_glyphs.sort();
                     classes.insert(
                         format!("@CLASS_R_{}", right_class),
                         Value::Array(
