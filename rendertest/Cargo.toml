@@ -8,3 +8,4 @@ diffenator3-lib = { path = "../diffenator3-lib" }
 clap = { version = "4.5.9", features = ["derive"] }
 image = { version = "0.24.6", features = ["png"] }
 zeno = "0.3.1"
+harfrust = { workspace = true }

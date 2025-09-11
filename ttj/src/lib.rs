@@ -169,7 +169,7 @@ pub fn table_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_mat
 
     #[cfg(not(target_family = "wasm"))]
     if big_difference {
-        println!("Glyph names differ dramatically between fonts, using font names from font A");
+        log::info!("Glyph names differ dramatically between fonts, using font names from font A");
     }
 
     diff(
@@ -201,7 +201,7 @@ pub fn kern_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_matc
 
     #[cfg(not(target_family = "wasm"))]
     if big_difference {
-        println!("Glyph names differ dramatically between fonts, using font names from font A");
+        log::info!("Glyph names differ dramatically between fonts, using font names from font A");
     }
 
     let kerns_a = just_kerns(font_to_json(font_a, None));

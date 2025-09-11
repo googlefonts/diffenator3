@@ -20,7 +20,8 @@ skrifa = "0.35.0"
 indexmap = "1.9.3"
 serde_json = { version = "1.0.96", features = ["preserve_order"] }
 serde = { version = "*", features = ["derive"] }
-
+harfrust = { version = "0.1.1" }
+log = "0.4.28"
 
 [profile.dev]
 # Rustybuzz debug-asserts that the provided script is the same as

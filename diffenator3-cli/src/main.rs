@@ -129,6 +129,10 @@ struct Cli {
     #[clap(long = "no-match", help_heading = Some("Report format"))]
     no_match: bool,
 
+    /// Show diffs as JSON
+    #[clap(long = "quiet")]
+    quiet: bool,
+
     /// The first font file to compare
     font1: PathBuf,
     /// The second font file to compare
@@ -137,7 +141,12 @@ struct Cli {
 
 fn main() {
     let mut cli = Cli::parse();
-    env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or(if cli.quiet {
+        "error"
+    } else {
+        "info"
+    }))
+    .init();
 
     if let Some(threads) = cli.jobs {
         rayon::ThreadPoolBuilder::new()
@@ -174,7 +183,7 @@ fn main() {
 
     // Location-independent tests
     if cli.tables {
-        println!("Diffing binary tables");
+        log::info!("Diffing binary tables");
         let table_diff = table_diff(
             &font_a.fontref(),
             &font_b.fontref(),
@@ -186,7 +195,7 @@ fn main() {
         }
     }
     if cli.kerns {
-        println!("Diffing kerning");
+        log::info!("Diffing kerning");
         let kern_diff = kern_diff(
             &font_a.fontref(),
             &font_b.fontref(),
@@ -211,7 +220,7 @@ fn main() {
     result.locations = settings
         .into_iter()
         .map(|setting| {
-            println!("Testing {}", setting.name());
+            log::info!("Testing {}", setting.name());
             if let Err(e) = setting.set_on_fonts(&mut font_a, &mut font_b) {
                 LocationResult::from_error(setting.name(), e)
             } else {

@@ -9,3 +9,4 @@ read-fonts = { workspace = true }
 serde_json = { workspace = true }
 clap = "*"
 indexmap = { workspace = true }
+log.workspace = true
