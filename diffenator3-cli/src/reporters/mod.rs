@@ -6,8 +6,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use diffenator3_lib::render::encodedglyphs::CmapDiff;
-use diffenator3_lib::render::GlyphDiff;
+use diffenator3_lib::render::{encodedglyphs::CmapDiff, GlyphDiff};
 use ttj::jsondiff::Substantial;
 
 #[derive(Serialize, Default)]

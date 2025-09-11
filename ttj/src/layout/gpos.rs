@@ -1,17 +1,13 @@
-use super::variable_scalars::SerializeValueRecordLike;
-use super::SerializeSubtable;
-use crate::context::SerializationContext;
-use crate::monkeypatching::MonkeyPatchClassDef;
-use read_fonts::tables::gpos::CursivePosFormat1;
-use read_fonts::tables::gpos::MarkBasePosFormat1;
-use read_fonts::tables::gpos::MarkLigPosFormat1;
-use read_fonts::tables::gpos::MarkMarkPosFormat1;
-use read_fonts::tables::gpos::PairPos;
-use read_fonts::tables::gpos::SinglePos;
-use read_fonts::ReadError;
-use serde_json::json;
-use serde_json::Map;
-use serde_json::Value;
+use super::{variable_scalars::SerializeValueRecordLike, SerializeSubtable};
+use crate::{context::SerializationContext, monkeypatching::MonkeyPatchClassDef};
+use read_fonts::{
+    tables::gpos::{
+        CursivePosFormat1, MarkBasePosFormat1, MarkLigPosFormat1, MarkMarkPosFormat1, PairPos,
+        SinglePos,
+    },
+    ReadError,
+};
+use serde_json::{json, Map, Value};
 
 impl SerializeSubtable for SinglePos<'_> {
     fn serialize_subtable(&self, context: &SerializationContext) -> Result<Value, ReadError> {

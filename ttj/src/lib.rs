@@ -7,16 +7,12 @@ pub mod monkeypatching;
 pub mod namemap;
 mod serializefont;
 
-use crate::jsondiff::diff;
-use crate::serializefont::ToValue;
+use crate::{jsondiff::diff, serializefont::ToValue};
 use context::SerializationContext;
 use namemap::NameMap;
-use read_fonts::traversal::SomeTable;
-use read_fonts::{FontRef, TableProvider};
+use read_fonts::{traversal::SomeTable, FontRef, TableProvider};
 use serde_json::{Map, Value};
-use skrifa::charmap::Charmap;
-use skrifa::string::StringId;
-use skrifa::MetadataProvider;
+use skrifa::{charmap::Charmap, string::StringId, MetadataProvider};
 
 pub use layout::gpos::just_kerns;
 

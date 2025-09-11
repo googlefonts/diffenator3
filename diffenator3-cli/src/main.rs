@@ -7,22 +7,26 @@
 /// Additionally, it can compare kerning table information and binary tables.
 mod reporters;
 use crate::reporters::{LocationResult, Report};
-use clap::builder::ArgAction;
-use clap::Parser;
-use diffenator3_lib::dfont::DFont;
-use diffenator3_lib::html::template_engine;
-use diffenator3_lib::render::encodedglyphs::{modified_encoded_glyphs, CmapDiff};
-use diffenator3_lib::render::test_font_words;
-use diffenator3_lib::setting::{parse_location, Setting};
-use diffenator3_lib::WordList;
+use clap::{builder::ArgAction, Parser};
+use diffenator3_lib::{
+    dfont::DFont,
+    html::template_engine,
+    render::{
+        encodedglyphs::{modified_encoded_glyphs, CmapDiff},
+        test_font_words,
+    },
+    setting::{parse_location, Setting},
+    WordList,
+};
 use env_logger::Env;
 use indexmap::IndexSet;
 use itertools::Itertools;
 use skrifa::{MetadataProvider, Tag};
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
-use ttj::jsondiff::Substantial;
-use ttj::{kern_diff, table_diff};
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+};
+use ttj::{jsondiff::Substantial, kern_diff, table_diff};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

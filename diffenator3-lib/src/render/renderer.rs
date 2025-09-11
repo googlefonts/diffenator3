@@ -3,13 +3,13 @@ use harfrust::{
     Direction, Script, ShapePlan, ShaperData, ShaperInstance, UnicodeBuffer, Variation,
 };
 use image::{DynamicImage, GrayImage, Luma};
-use skrifa::instance::Size;
-use skrifa::raw::TableProvider;
-use skrifa::{GlyphId, MetadataProvider};
+use skrifa::{instance::Size, raw::TableProvider, GlyphId, MetadataProvider};
 use zeno::Command;
 
-use super::cachedoutlines::CachedOutlineGlyphCollection;
-use super::utils::{terrible_bounding_box, RecordingPen};
+use super::{
+    cachedoutlines::CachedOutlineGlyphCollection,
+    utils::{terrible_bounding_box, RecordingPen},
+};
 use crate::dfont::DFont;
 
 pub struct Renderer<'a> {

@@ -1,9 +1,13 @@
 /// Debug rendering differences between fonts
 use clap::Parser;
-use diffenator3_lib::render::renderer::Renderer;
-use diffenator3_lib::render::utils::{count_differences, make_same_size};
-use diffenator3_lib::render::{wordlists, DEFAULT_GRAY_FUZZ};
-use diffenator3_lib::setting::{parse_location, Setting};
+use diffenator3_lib::{
+    render::{
+        renderer::Renderer,
+        utils::{count_differences, make_same_size},
+        wordlists, DEFAULT_GRAY_FUZZ,
+    },
+    setting::{parse_location, Setting},
+};
 use image::{Pixel, Rgba, RgbaImage};
 use zeno::Command;
 

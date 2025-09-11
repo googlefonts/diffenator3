@@ -1,9 +1,10 @@
-use diffenator3_lib::dfont::{shared_axes, DFont};
-use diffenator3_lib::render::{encodedglyphs, encodedglyphs::CmapDiff, test_font_words};
-use diffenator3_lib::WordList;
+use diffenator3_lib::{
+    dfont::{shared_axes, DFont},
+    render::{encodedglyphs, encodedglyphs::CmapDiff, test_font_words},
+    WordList,
+};
 use serde_json::json;
-use ttj::font_to_json as underlying_font_to_json;
-use ttj::{kern_diff, table_diff};
+use ttj::{font_to_json as underlying_font_to_json, kern_diff, table_diff};
 use wasm_bindgen::JsValue;
 
 use wasm_bindgen::prelude::*;

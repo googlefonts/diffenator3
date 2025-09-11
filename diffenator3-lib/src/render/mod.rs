@@ -7,17 +7,17 @@ pub mod encodedglyphs;
 pub mod renderer;
 pub mod utils;
 pub mod wordlists;
-use crate::dfont::DFont;
-use crate::render::utils::count_differences;
-use crate::render::wordlists::direction_from_script;
+use crate::{
+    dfont::DFont,
+    render::{utils::count_differences, wordlists::direction_from_script},
+};
 use cfg_if::cfg_if;
 use harfrust::Script;
 use renderer::Renderer;
 use serde::Serialize;
 use serde_json::{json, Value};
 use static_lang_word_lists::WordList;
-use std::collections::HashSet;
-use std::str::FromStr;
+use std::{collections::HashSet, str::FromStr};
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
