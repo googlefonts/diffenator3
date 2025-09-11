@@ -79,6 +79,52 @@ function diffTables(report) {
     e.stopPropagation();
   });
 }
+
+function diffFeatures(report) {
+  $("#difffeatures").empty();
+  const isAllNull = (arr) => arr.every((v) => v === null || v === undefined);
+  let changes = [];
+  for (var table of ["GPOS", "GSUB"]) {
+    if (
+      table in report["tables"] &&
+      "feature_list" in report["tables"][table]
+    ) {
+      let features = report["tables"][table]["feature_list"];
+      for (var [feature_name, lookups] of Object.entries(features)) {
+        if (typeof lookups == "array") {
+          lookups = { 0: lookups };
+        }
+        let left_lookups = Object.values(lookups).map((l) => l && l[0]);
+        let right_lookups = Object.values(lookups).map((l) => l && l[1]);
+        console.log(table, feature_name, left_lookups, right_lookups);
+        let status = isAllNull(left_lookups)
+          ? "added"
+          : isAllNull(right_lookups)
+          ? "removed"
+          : left_lookups.length != right_lookups.length
+          ? `modified (${left_lookups.length} → ${right_lookups.length})`
+          : "modified";
+        changes[`${table} ${feature_name}`] = status;
+      }
+    }
+  }
+  $("#difffeatures").append(
+    `<h4 class="mt-2 box-title">Modified Features</h4>`
+  );
+  if (Object.keys(changes).length == 0) {
+    $("#difffeatures").append(`<p>No changes to features</p>`);
+    return;
+  }
+  $("#difffeatures").append(
+    `<table class="table table-striped" id="difffeatures"><tr><th>Feature</th><th>Status</th></table>`
+  );
+  for (let [feature, status] of Object.entries(changes)) {
+    let row = $("<tr>");
+    row.append(`<td>${feature}</td>`);
+    row.append(`<td>${status}</td>`);
+    $("#difffeatures table").append(row);
+  }
+}
 function diffKerns(report) {
   $("#diffkerns").empty();
   $("#diffkerns").append(`<h4 class="mt-2">Modified Kerns</h4>`);
@@ -222,5 +268,6 @@ export {
   cmapDiff,
   diffTables,
   diffKerns,
+  diffFeatures,
   setupAnimation,
 };

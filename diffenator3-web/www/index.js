@@ -7,6 +7,7 @@ import {
   setupAnimation,
   diffTables,
   diffKerns,
+  diffFeatures,
 } from "../../templates/shared";
 
 jQuery.fn.shake = function (interval, distance, times) {
@@ -165,6 +166,7 @@ class Diffenator {
       // console.log("Hiding spinner")
       $("#spinnerModal").hide();
       diffTables(message);
+      diffKerns(message);
     } else if (message.type == "kerns") {
       // console.log("Hiding spinner")
       $("#spinnerModal").hide();
