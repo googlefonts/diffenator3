@@ -12,15 +12,15 @@ members = [
 default-members = ["diffenator3-cli", "diff3proof"]
 
 [workspace.dependencies]
-read-fonts = { version = "0.33.0", features = [
+read-fonts = { version = "0.34.0", features = [
     "serde",
     "experimental_traverse",
 ] }
-skrifa = "0.35.0"
+skrifa = "0.36.0"
 indexmap = "1.9.3"
 serde_json = { version = "1.0.96", features = ["preserve_order"] }
 serde = { version = "*", features = ["derive"] }
-harfrust = { version = "0.1.1" }
+harfrust = { version = "0.2.0" }
 log = "0.4.28"
 
 [profile.dev]
