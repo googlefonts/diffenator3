@@ -94,6 +94,13 @@ impl<'a> Renderer<'a> {
 
         let output = if let Some(plan) = &self.plan {
             // If we have a shaping plan, we can use it to shape the string
+            if let Some(script) = plan.script() {
+                buffer.set_script(script);
+            } 
+            buffer.set_direction(plan.direction());
+            if let Some(lang) = plan.language() {
+                buffer.set_language(lang.clone());
+            }
             shaper.shape_with_plan(plan, buffer, &[])
         } else {
             // Otherwise, we guess segment properties
