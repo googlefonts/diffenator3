@@ -47,4 +47,6 @@ pub struct Report {
     pub cmap_diff: Option<CmapDiff>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub locations: Vec<LocationResult>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub languages: Option<serde_json::Value>,
 }
