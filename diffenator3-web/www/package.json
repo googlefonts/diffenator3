@@ -30,7 +30,11 @@
     "diffenator3": "file:../pkg"
   },
   "devDependencies": {
+    "@types/bootstrap": "^5.2.10",
+    "@types/jquery": "^3.5.33",
     "copy-webpack-plugin": "^5.0.0",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.2",
     "webpack": "^5",
     "webpack-cli": "^6",
     "webpack-dev-server": "^5"

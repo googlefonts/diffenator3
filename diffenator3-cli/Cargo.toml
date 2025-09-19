@@ -3,6 +3,17 @@ name = "diffenator3"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "diffenator3"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[features]
+typescript = ["dep:typescript-type-def"]
+
 [dependencies]
 diffenator3-lib = { path = "../diffenator3-lib", features = ["html"] }
 ttj = { path = "../ttj" }
@@ -17,5 +28,9 @@ clap = { version = "4.5.9", features = ["derive"] }
 itertools = "0.13.0"
 env_logger = "0.11"
 log = { workspace = true }
-shaperglot = { version = "1.1.2" }
+shaperglot = { workspace = true }
 tabled = "0.20.0"
+
+# Code for emitting TypeScript types
+typescript-type-def = { version = "0.5.13", optional = true, features=["json_value"] }
+

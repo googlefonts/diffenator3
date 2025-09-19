@@ -1,9 +1,27 @@
-function renderTableDiff(node, toplevel) {
+import {
+  isSimpleDiff,
+  isValue,
+  type CmapDiff,
+  type EncodedGlyph,
+  type Diff,
+  type Difference,
+  type GlyphDiff,
+  type ObjectDiff,
+  type Report,
+  type SimpleDiff,
+  type Value,
+  type ValueRecord,
+} from "./types";
+
+function renderTableDiff(
+  node: Diff | Value | Record<string, Diff>,
+  toplevel: boolean
+) {
   var wrapper = $("<div> </div>");
   if (!node) {
     return wrapper;
   }
-  if (Array.isArray(node) && node.length == 2) {
+  if (isSimpleDiff(node)) {
     var before = $("<span/>");
     before.addClass("attr-before");
     before.html(" " + node[0] + " ");
@@ -14,9 +32,9 @@ function renderTableDiff(node, toplevel) {
     wrapper.append(after);
     return wrapper;
   }
-  if (node.constructor != Object) {
+  if (isValue(node)) {
     var thing = $("<span/>");
-    thing.html(node);
+    thing.html(node as string);
     wrapper.append(thing);
     return wrapper;
   }
@@ -36,25 +54,32 @@ function renderTableDiff(node, toplevel) {
   return wrapper;
 }
 
-function addAGlyph(glyph, where) {
+function addAGlyph(
+  glyph: GlyphDiff | EncodedGlyph,
+  where: JQuery<HTMLElement>
+) {
   let title = "";
   if (glyph.name) {
     title = "name: " + glyph.name;
   }
   let cp =
     "<br>U+" +
-    glyph.string.codePointAt(0).toString(16).padStart(4, "0").toUpperCase();
+    glyph.string.codePointAt(0)!.toString(16).padStart(4, "0").toUpperCase();
+  let pixeldiff_title = "";
+  if ("differing_pixels" in glyph) {
+    pixeldiff_title = `${glyph.differing_pixels} pixels`;
+  }
   where.append(`
         <div class="cell-glyph font-before">
-        <div data-toggle="tooltip" data-html="true" data-title="${glyph.differing_pixels} pixels"> ${glyph.string}
-        <div class="codepoint" data-toggle="tooltip" data-html="true" data-title="${title}">
-		${cp}
+        <div data-bs-toggle="tooltip" data-bs-html="true" title="${pixeldiff_title}"> ${glyph.string}
+        <div class="codepoint" data-bs-toggle="tooltip" data-bs-html="true" title="${title}">
+        ${cp}
         </div>
         </div>
     `);
 }
 
-function addAWord(diff, where) {
+function addAWord(diff: Difference, where: JQuery<HTMLElement>) {
   if (!diff.buffer_b) {
     diff.buffer_b = diff.buffer_a;
   }
@@ -67,11 +92,11 @@ function addAWord(diff, where) {
 	`);
 }
 
-function diffTables(report) {
+function diffTables(report: Report) {
   $("#difftable").empty();
   $("#difftable").append(`<h4 class="mt-2 box-title">Table-level details</h4>`);
   $("#difftable").append(
-    renderTableDiff({ tables: report["tables"] }, true).children()
+    renderTableDiff({ tables: report.tables as Diff }, true).children()
   );
   $("#difftable .node").on("click", function (e) {
     $(this).toggleClass("closed open");
@@ -80,22 +105,31 @@ function diffTables(report) {
   });
 }
 
-function diffFeatures(report) {
+function diffFeatures(report: Report) {
   $("#difffeatures").empty();
-  const isAllNull = (arr) => arr.every((v) => v === null || v === undefined);
-  let changes = [];
+  let tables = report.tables as Record<string, Diff>;
+  if (!tables) {
+    $("#difffeatures").append(`<p>No changes to features</p>`);
+    return;
+  }
+  const isAllNull = <T>(arr: T[]) =>
+    arr.every((v) => v === null || v === undefined);
+  let changes: Record<string, string> = {};
   for (var table of ["GPOS", "GSUB"]) {
-    if (
-      table in report["tables"] &&
-      "feature_list" in report["tables"][table]
-    ) {
-      let features = report["tables"][table]["feature_list"];
+    let layout_table = tables[table]! as ObjectDiff;
+    if (table in tables && "feature_list" in layout_table) {
+      let features = layout_table.feature_list as ObjectDiff;
       for (var [feature_name, lookups] of Object.entries(features)) {
-        if (typeof lookups == "array") {
+        if (isSimpleDiff(lookups)) {
           lookups = { 0: lookups };
         }
-        let left_lookups = Object.values(lookups).map((l) => l && l[0]);
-        let right_lookups = Object.values(lookups).map((l) => l && l[1]);
+        let lookupsNew = lookups as Record<number, SimpleDiff>;
+        let left_lookups: Value[] = Object.values(lookupsNew).map(
+          (l: SimpleDiff) => l && l[0]
+        );
+        let right_lookups: Value[] = Object.values(lookupsNew).map(
+          (l: SimpleDiff) => l && l[1]
+        );
         console.log(table, feature_name, left_lookups, right_lookups);
         let status = isAllNull(left_lookups)
           ? "added"
@@ -125,7 +159,7 @@ function diffFeatures(report) {
     $("#difffeatures table").append(row);
   }
 }
-function diffKerns(report) {
+function diffKerns(report: Report) {
   $("#diffkerns").empty();
   if (!report["kerns"] || Object.keys(report["kerns"]).length == 0) {
     $("#diffkerns").append(`<p>No changes to kerning</p>`);
@@ -149,21 +183,21 @@ function diffKerns(report) {
   }
 }
 
-function serializeKernBefore(kern) {
-  if (Array.isArray(kern)) {
-    return serializeKern(kern[0], -1);
+function serializeKernBefore(kern: Diff) {
+  if (isSimpleDiff(kern)) {
+    return serializeKern(kern[0] as ValueRecord, -1);
   }
-  return serializeKern(kern, 0);
+  return serializeKern(kern as ValueRecord, 0);
 }
 
-function serializeKernAfter(kern) {
-  if (Array.isArray(kern)) {
-    return serializeKern(kern[1], -1);
+function serializeKernAfter(kern: Diff) {
+  if (isSimpleDiff(kern)) {
+    return serializeKern(kern[1] as ValueRecord, -1);
   }
-  return serializeKern(kern, 1);
+  return serializeKern(kern as ValueRecord, 1);
 }
 
-function serializeKern(kern, index) {
+function serializeKern(kern: ValueRecord, index: number) {
   let string = "";
   if (kern === null || kern === undefined) {
     return "(null)";
@@ -192,7 +226,10 @@ function serializeKern(kern, index) {
   return string;
 }
 
-function serializeKernValue(kern, index) {
+function serializeKernValue(
+  kern: Value | Record<string, number>,
+  index: number
+) {
   if (typeof kern == "number") {
     return kern;
   }
@@ -211,24 +248,24 @@ function serializeKernValue(kern, index) {
   return string.trim() + ")";
 }
 
-function cmapDiff(report) {
-  if (report.cmap_diff && (report.cmap_diff.new || report.cmap_diff.missing)) {
+function cmapDiff(cmap_diff: CmapDiff | undefined) {
+  if (cmap_diff && (cmap_diff.new || cmap_diff.missing)) {
     $("#cmapdiff").append(
       `<h4 class="mt-2">Added and Removed Encoded Glyphs</h4>`
     );
-    if (report["cmap_diff"]["new"]) {
+    if (cmap_diff.new) {
       $("#cmapdiff").append(`<h4 class="box-title">Added Glyphs</h4>`);
       let added = $("<div>");
-      for (let glyph of report["cmap_diff"]["new"]) {
+      for (let glyph of cmap_diff.new) {
         addAGlyph(glyph, added);
       }
       $("#cmapdiff").append(added);
     }
 
-    if (report["cmap_diff"]["missing"]) {
+    if (cmap_diff.missing) {
       $("#cmapdiff").append(`<h4 class="box-title">Removed Glyphs</h4>`);
       let missing = $("<div>");
-      for (let glyph of report["cmap_diff"]["missing"]) {
+      for (let glyph of cmap_diff.missing) {
         addAGlyph(glyph, missing);
       }
       $("#cmapdiff").append(missing);
@@ -249,7 +286,7 @@ function setupAnimation() {
     }
   });
 
-  let animationHandle;
+  let animationHandle: number;
   function animate() {
     $("#fonttoggle").click();
     animationHandle = setTimeout(animate, 1000);
