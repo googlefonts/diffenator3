@@ -1,4 +1,5 @@
 pub mod dfont;
+pub mod structs;
 // Shared HTML rendering/templating code
 #[cfg(feature = "html")]
 pub mod html;

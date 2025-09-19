@@ -1,8 +1,7 @@
 use harfrust::{script, Direction, Script};
 use static_lang_word_lists::WordList;
-use std::sync::LazyLock;
 
-pub(crate) fn get_wordlist(script: &str) -> Option<&LazyLock<WordList>> {
+pub(crate) fn get_wordlist(script: &str) -> Option<&WordList> {
     let wl = match script {
         "Adlam" => &static_lang_word_lists::DIFFENATOR_ADLAM,
         "Arabic" => &static_lang_word_lists::DIFFENATOR_ARABIC,

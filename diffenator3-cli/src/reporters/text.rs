@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use super::{LocationResult, Report};
 
 use colored::Colorize;
@@ -91,8 +93,8 @@ pub fn report(result: Report, succinct: bool) {
 
     if let Some(lang) = result.languages.as_ref() {
         println!("\n# Language Support Differences\n");
-        if let Some(map) = lang.as_object() {
-            report_language_support(map, succinct);
+        if !lang.is_empty() {
+            report_language_support(lang, succinct);
         } else {
             println!("\nNo differences found");
         }
@@ -117,16 +119,15 @@ fn report_location(locationresult: LocationResult) {
         }
     }
 
-    if let Some(words) = locationresult.words {
+    if !locationresult.words.is_empty() {
         println!("# Words");
-        let map = words.as_object().unwrap();
-        for (script, script_diff) in map.iter() {
+        for (script, script_diff) in locationresult.words.iter() {
             println!("\n## {}", script);
-            for difference in script_diff.as_array().unwrap().iter() {
+            for difference in script_diff.iter() {
                 println!(
                     "  - {} ({:.3}%)",
-                    difference["word"].as_str().unwrap(),
-                    difference["differing_pixels"].as_i64().unwrap()
+                    difference.word.as_str(),
+                    difference.differing_pixels
                 );
             }
         }
@@ -147,7 +148,7 @@ struct DetailsRow {
     glyphs_needed: u64,
 }
 
-fn report_language_support(map: &Map<String, serde_json::Value>, succinct: bool) {
+fn report_language_support(map: &BTreeMap<String, crate::languages::LanguageDiff>, succinct: bool) {
     // Supported status table
     let mut builder = tabled::builder::Builder::default();
     builder.push_record(vec!["Support Level", "Font A", "Font B"]);
@@ -160,14 +161,8 @@ fn report_language_support(map: &Map<String, serde_json::Value>, succinct: bool)
         "None",
         "Indeterminate",
     ] {
-        let count_a = map
-            .values()
-            .filter(|v| v.get("level_a").and_then(|x| x.as_str()) == Some(level))
-            .count();
-        let count_b = map
-            .values()
-            .filter(|v| v.get("level_b").and_then(|x| x.as_str()) == Some(level))
-            .count();
+        let count_a = map.values().filter(|v| v.level_a == level).count();
+        let count_b = map.values().filter(|v| v.level_b == level).count();
         if count_a == count_b && succinct {
             continue;
         }
@@ -180,23 +175,21 @@ fn report_language_support(map: &Map<String, serde_json::Value>, succinct: bool)
     println!("\nLanguage differences:\n");
     let mut rows: Vec<DetailsRow> = vec![];
     for (lang, details) in map.iter() {
-        if succinct && details["level_a"] == details["level_b"] {
+        if succinct && details.level_a == details.level_b {
             continue;
         }
-        if details["level_a"] == "None" && details["level_b"] == "None" {
+        if details.level_a == "None" && details.level_b == "None" {
             continue;
         }
-        if details["level_a"] == "Indeterminate" && details["level_b"] == "Indeterminate" {
+        if details.level_a == "Indeterminate" && details.level_b == "Indeterminate" {
             continue;
         }
-        let level_a = details["level_a"].as_str().unwrap();
-        let level_b = details["level_b"].as_str().unwrap();
-        let score_a = details["score_a"].as_f64().unwrap_or_default();
-        let score_b = details["score_b"].as_f64().unwrap_or_default();
+        let score_a = details.score_a;
+        let score_b = details.score_b;
         rows.push(DetailsRow {
             language: lang.clone(),
-            support_a: level_a.to_string(),
-            support_b: level_b.to_string(),
+            support_a: details.level_a.clone(),
+            support_b: details.level_b.clone(),
             same: if score_a == score_b {
                 "Same"
             } else if score_b > score_a {
@@ -205,7 +198,7 @@ fn report_language_support(map: &Map<String, serde_json::Value>, succinct: bool)
                 "Worse"
             }
             .to_string(),
-            glyphs_needed: details["fixes_b"].as_u64().unwrap(),
+            glyphs_needed: details.fixes_b as u64,
         });
     }
     let mut table = Table::new(rows);

@@ -1,24 +1,14 @@
 /// Find and represent differences between encoded glyphs in the fonts.
 use std::fmt::Display;
 
+use super::{DEFAULT_GLYPHS_FONT_SIZE, DEFAULT_GLYPHS_THRESHOLD};
+pub use crate::structs::{CmapDiff, EncodedGlyph};
 use crate::{
     dfont::DFont,
     render::{diff_many_words, GlyphDiff},
 };
 pub use harfrust::Direction;
-use serde::Serialize;
 use static_lang_word_lists::WordList;
-
-use super::{DEFAULT_GLYPHS_FONT_SIZE, DEFAULT_GLYPHS_THRESHOLD};
-
-#[derive(Serialize)]
-pub struct EncodedGlyph {
-    /// The character, as a string
-    pub string: String,
-    /// Name of the character from the Unicode database, if available
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-}
 
 impl From<char> for EncodedGlyph {
     fn from(c: char) -> Self {
@@ -49,15 +39,6 @@ impl Display for EncodedGlyph {
             Ok(())
         }
     }
-}
-
-/// Represents changes to the cmap table - added or removed glyphs
-#[derive(Serialize)]
-pub struct CmapDiff {
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub missing: Vec<EncodedGlyph>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub new: Vec<EncodedGlyph>,
 }
 
 impl CmapDiff {

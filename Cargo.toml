@@ -22,6 +22,8 @@ serde_json = { version = "1.0.96", features = ["preserve_order"] }
 serde = { version = "*", features = ["derive"] }
 harfrust = { version = "0.3.1" }
 log = "0.4.28"
+shaperglot = { version = "1.1.2" }
+
 
 [profile.dev]
 # Rustybuzz debug-asserts that the provided script is the same as

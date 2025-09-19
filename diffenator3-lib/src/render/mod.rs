@@ -7,6 +7,7 @@ pub mod encodedglyphs;
 pub mod renderer;
 pub mod utils;
 pub mod wordlists;
+pub use crate::structs::{Difference, GlyphDiff};
 use crate::{
     dfont::DFont,
     render::{utils::count_differences, wordlists::direction_from_script},
@@ -14,10 +15,11 @@ use crate::{
 use cfg_if::cfg_if;
 use harfrust::Script;
 use renderer::Renderer;
-use serde::Serialize;
-use serde_json::{json, Value};
 use static_lang_word_lists::WordList;
-use std::{collections::HashSet, str::FromStr};
+use std::{
+    collections::{BTreeMap, HashSet},
+    str::FromStr,
+};
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
@@ -44,10 +46,14 @@ pub const DEFAULT_GRAY_FUZZ: u8 = 8;
 /// Compare two fonts by rendering a list of words and comparing the images
 ///
 /// Word lists are gathered for all scripts which are supported by both fonts.
-/// The return value is a JSON object where each key is a script tag and the
-/// value is a list of serialized [Difference] objects.
-pub fn test_font_words(font_a: &DFont, font_b: &DFont, custom_inputs: &[WordList]) -> Value {
-    let mut map = serde_json::Map::new();
+/// The return value is a BTreeMap where each key is a script tag and the
+/// value is a list of  [Difference] objects.
+pub fn test_font_words(
+    font_a: &DFont,
+    font_b: &DFont,
+    custom_inputs: &[WordList],
+) -> BTreeMap<String, Vec<Difference>> {
+    let mut map: BTreeMap<String, Vec<Difference>> = BTreeMap::new();
     let mut jobs: Vec<&WordList> = vec![];
 
     let shared_codepoints = font_a
@@ -77,26 +83,10 @@ pub fn test_font_words(font_a: &DFont, font_b: &DFont, custom_inputs: &[WordList
             DEFAULT_WORDS_THRESHOLD,
         );
         if !results.is_empty() {
-            map.insert(
-                job.name().to_string(),
-                serde_json::to_value(results).unwrap(),
-            );
+            map.insert(job.name().to_string(), results);
         }
     }
-    json!(map)
-}
-
-/// Represents a difference between two encoded glyphs
-#[derive(Debug, Serialize)]
-pub struct GlyphDiff {
-    /// The string representation of the glyph
-    pub string: String,
-    /// The Unicode name of the glyph
-    pub name: String,
-    /// The Unicode codepoint of the glyph
-    pub unicode: String,
-    /// The number of differing pixels
-    pub differing_pixels: usize,
+    map
 }
 
 impl From<Difference> for GlyphDiff {
@@ -119,26 +109,6 @@ impl From<Difference> for GlyphDiff {
             }
         }
     }
-}
-
-/// Represents a difference between two renderings, whether words or glyphs
-#[derive(Debug, Serialize)]
-pub struct Difference {
-    /// The text string which was rendered
-    pub word: String,
-    /// A string representation of the shaped buffer in the first font
-    pub buffer_a: String,
-    /// A string representation of the shaped buffer in the second font, if different
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub buffer_b: Option<String>,
-    /// The number of differing pixels
-    pub differing_pixels: usize,
-    /// The OpenType features applied to the text
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub ot_features: String,
-    /// The OpenType language tag applied to the text
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub lang: String,
 }
 
 // A fast but complicated version

@@ -12,6 +12,13 @@ diffenator3-lib = { path = "../diffenator3-lib" }
 ttj = { path = "../ttj" }
 serde_json = { workspace = true }
 skrifa = { workspace = true }
+shaperglot = { workspace = true }
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
+
+[build-dependencies]
+diffenator3-lib = { path = "../diffenator3-lib", features = ["typescript"] }
+diffenator3 = { path = "../diffenator3-cli", features = ["typescript"] }
+typescript-type-def = "0.5.13"

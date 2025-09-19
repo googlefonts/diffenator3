@@ -247,7 +247,7 @@ body {
     display: flex;
   }
 
-  .fontdrop {
+  .drop {
     padding: 30px;
     border-radius: 20px;
     outline: 3px dashed #ffffffff;
@@ -260,6 +260,10 @@ body {
 
   #fontafter {
     background-color: #ffdddddd;
+  }
+
+  #worddrop {
+    background-color: #ddffffdd;
   }
 
   .dragging {

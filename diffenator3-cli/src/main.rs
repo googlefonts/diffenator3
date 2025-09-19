@@ -176,7 +176,7 @@ fn test_at_location(
         this_location_value.glyphs = modified_encoded_glyphs(font_a, font_b);
     }
     if cli.words {
-        this_location_value.words = Some(test_font_words(font_a, font_b, wordlists));
+        this_location_value.words = test_font_words(font_a, font_b, wordlists);
     }
     this_location_value
 }

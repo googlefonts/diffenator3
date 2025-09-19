@@ -120,7 +120,7 @@ pub fn create_user_home_templates_directory(force: bool) -> PathBuf {
     }
     let all_templates = [
         ["script.js", include_str!("../../templates/script.js")],
-        ["shared.js", include_str!("../../templates/shared.js")],
+        // ["shared.js", include_str!("../../templates/shared.js")],
         ["style.css", include_str!("../../templates/style.css")],
         [
             "diffenator.html",
