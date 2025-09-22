@@ -6,12 +6,18 @@ crypto.createHash = (algorithm) =>
   crypto_orig_createHash(algorithm == "md4" ? "sha256" : algorithm);
 
 module.exports = {
-  entry: "./bootstrap.js",
   output: {
     path: path.resolve(__dirname, "..", "..", "docs"),
-    filename: "bootstrap.js",
+  },
+  entry: {
+    bootstrap: "./bootstrap.js",
+    static: {
+      import: "./ts/d3web-static.ts",
+      filename: "../templates/script.js",
+    },
   },
   mode: "development",
+  devtool: "source-map",
   experiments: { asyncWebAssembly: true },
   plugins: [
     new CopyWebpackPlugin([
