@@ -1,19 +1,113 @@
-name: Build CLI binaries
+name: Rust
+
 on:
   - push
-permissions:
-  contents: write
-jobs:
-  build-and-upload:
-    name: Build and upload
-    runs-on: ${{ matrix.os }}
+  - pull_request
+  - merge_group
 
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  GH_TOKEN: ${{ github.token }}
+  PROJECT_NAME: diffenator3
+  CARGO_PUBLISH_ARGS: "-p ttj -p diffenator3 -p diff3proof"
+  CRATE_PATTERN: "ttj|diffenator3|diff3proof"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        name: Set up Rust for caching
+      - name: Install protoc for lang repo
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        run: cargo build
+      # - name: Run tests
+      #   run: |
+      #     cargo test --verbose --workspace 
+      #     pip install maturin pytest
+      #     cd shaperglot-py
+      #     maturin build
+      #     pip install ../target/wheels/shaperglot*.whl
+      #     #pytest --verbose
+
+  formatting:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        name: Set up Rust for caching
+      - name: Install protoc for lang repo
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Lint for formatting
+        run: cargo fmt --all -- --check
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        name: Set up Rust for caching
+      - name: Install protoc for lang repo
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Lint for warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  check-for-release:
+    name: Create release if needed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+      - if: contains(github.ref, 'refs/tags/v')
+        run:
+          python3 scripts/check_versions.py
+        env:
+          CRATE_PATTERN: ${{ env.CRATE_PATTERN }}
+      - if: contains(github.ref, 'refs/tags/v')
+        name: Check for release
+        id: create_release
+        run: |
+          if ! gh release view ${{ github.ref_name }}; then
+          git show -s --format=%B ${{ github.ref_name }} | tail -n +4 | gh release create ${{ github.ref_name }} -t ${{ github.ref_name }} -F -
+          fi
+
+  deploy-binaries:
+    name: Build and upload binaries
+    permissions:
+      contents: write
+      id-token: write
+    needs: [build, check-for-release]
+    runs-on: ${{ matrix.os.os }}
+    # Only build on main or tag
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
     strategy:
+      fail-fast: false
       matrix:
-        include:
+        os:
           - build: linux
-            os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
 
           - build: macos
             os: macos-latest
@@ -26,27 +120,31 @@ jobs:
           - build: windows-gnu
             os: windows-latest
             target: x86_64-pc-windows-gnu
+        # python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          target: ${{ matrix.target }}
+          target: ${{ matrix.os.target }}
+          cache-key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
       - name: Install protoc for lang repo
         uses: arduino/setup-protoc@v3
         with:
-            repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build diffenator3/diff3proof
-        run: cargo build --verbose --release --target ${{ matrix.target }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        run: cargo build --verbose --release --target ${{ matrix.os.target }}
       - name: Decide on our version name (tag or "dev")
         id: version
         shell: bash
         run: |
           if [ -n "$GITHUB_REF" ]; then
-              if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-                  echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+              if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+                  echo "VERSION=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_ENV
               else
                   echo "VERSION=dev" >> $GITHUB_ENV
               fi
@@ -56,15 +154,15 @@ jobs:
       - name: Build archive
         shell: bash
         run: |
-          dirname="diffenator3-${{ env.VERSION }}-${{ matrix.target }}"
+          # dirname="${{env.PROJECT_NAME}}-${{ env.VERSION }}-${{ matrix.os.target }}-py${{ matrix.python }}"
+          dirname="${{env.PROJECT_NAME}}-${{ env.VERSION }}-${{ matrix.os.target }}"
           mkdir "$dirname"
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-              mv "target/${{ matrix.target }}/release/"*.exe "$dirname"
+          if [ "${{ matrix.os.os }}" = "windows-latest" ]; then
+              mv "target/${{ matrix.os.target }}/release/"*.exe "$dirname"
               7z a "$dirname.zip" "$dirname"
               echo "ASSET=$dirname.zip" >> $GITHUB_ENV
           else
-              mv "target/${{ matrix.target }}/release/diffenator3" "$dirname"
-              mv "target/${{ matrix.target }}/release/diff3proof" "$dirname"
+              mv "target/${{ matrix.os.target }}/release/${{env.PROJECT_NAME}}" "$dirname"
               tar -czf "$dirname.tar.gz" "$dirname"
               echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
           fi
@@ -72,10 +170,28 @@ jobs:
         with:
           name: ${{ env.ASSET }}
           path: ${{ env.ASSET }}
-      - if: contains(github.ref, 'refs/tags/')
-        name: Create a release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ env.ASSET }}
-          tag_name: ${{ env.VERSION }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - if: contains(github.ref, 'refs/tags/v')
+        name: Add artefact to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload v${{ env.VERSION }} ${{ env.ASSET }}
+
+  publish-crate:
+    needs: deploy-binaries
+    runs-on: ubuntu-latest
+    if: contains(github.ref, 'refs/tags/v')
+
+    steps:
+        - uses: actions/checkout@v3
+        - uses: actions-rs/toolchain@v1
+          with:
+            toolchain: stable
+            override: true
+        - name: Install protoc for lang repo
+          uses: arduino/setup-protoc@v3
+          with:
+            repo-token: ${{ secrets.GITHUB_TOKEN }}
+        - run:
+            cargo publish ${{ env.CARGO_PUBLISH_ARGS }} --no-verify
+          env:
+              CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
