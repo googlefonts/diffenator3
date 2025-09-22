@@ -15,6 +15,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   cmapDiff: () => (/* binding */ cmapDiff),
 /* harmony export */   diffFeatures: () => (/* binding */ diffFeatures),
 /* harmony export */   diffKerns: () => (/* binding */ diffKerns),
+/* harmony export */   diffLanguages: () => (/* binding */ diffLanguages),
 /* harmony export */   diffTables: () => (/* binding */ diffTables),
 /* harmony export */   renderTableDiff: () => (/* binding */ renderTableDiff),
 /* harmony export */   setupAnimation: () => (/* binding */ setupAnimation)
@@ -143,6 +144,23 @@ function diffFeatures(report) {
         row.append(`<td>${feature}</td>`);
         row.append(`<td>${status}</td>`);
         $("#difffeatures table").append(row);
+    }
+}
+function diffLanguages(report) {
+    $("#difflanguages").empty();
+    $("#difflanguages").append(`<h4>Modified Languages</h4>`);
+    let notSame = Object.entries(report).filter(([name, diff]) => diff.score_a !== diff.score_b || diff.level_a !== diff.level_b);
+    if (notSame.length === 0) {
+        $("#difflanguages").append(`<p>No changes to languages</p>`);
+        return;
+    }
+    $("#difflanguages").append(`<table class="table table-striped" id="difflanguages"><tr><th>Language</th><th>Old</th><th>New</th></tr></table>`);
+    for (let [name, diff] of notSame) {
+        let row = $("<tr>");
+        row.append(`<td>${name}</td>`);
+        row.append(`<td>${diff.level_a} (${diff.score_a}%)</td>`);
+        row.append(`<td>${diff.level_b} (${diff.score_b}%)</td>`);
+        $("#difflanguages table").append(row);
     }
 }
 function diffKerns(report) {
@@ -424,6 +442,9 @@ $(function () {
     }
     if (report["kerns"]) {
         (0,_shared__WEBPACK_IMPORTED_MODULE_0__.diffKerns)(report);
+    }
+    if (report["languages"]) {
+        (0,_shared__WEBPACK_IMPORTED_MODULE_0__.diffLanguages)(report["languages"]);
     }
     (0,_shared__WEBPACK_IMPORTED_MODULE_0__.cmapDiff)(report.cmap_diff);
     $('[data-toggle="tooltip"]').tooltip();
