@@ -1,4 +1,4 @@
-import type { Difference, CmapDiff, GlyphDiff } from "./api";
+import type { Difference, CmapDiff, GlyphDiff, LanguageDiff } from "./api";
 export type {
   GlyphDiff,
   CmapDiff,
@@ -6,6 +6,7 @@ export type {
   LocationResult,
   Difference,
   EncodedGlyph,
+  LanguageDiff,
 } from "./api";
 
 export type Value = string | number | boolean;
@@ -36,6 +37,10 @@ type InstancePosition = [string, Location];
 type CmapDiffMessage = { type: "new_missing_glyphs"; cmap_diff: CmapDiff };
 type ReadyMessage = { type: "ready" };
 type TablesMessage = { type: "tables"; tables: Record<string, Diff> };
+type LanguagesMessage = {
+  type: "languages";
+  languages: Record<string, LanguageDiff>;
+};
 export type ModifiedGlyphsMessage = {
   type: "modified_glyphs";
   modified_glyphs: GlyphDiff[];
@@ -55,7 +60,8 @@ export type Message =
   | TablesMessage
   | KernDiffMessage
   | ModifiedGlyphsMessage
-  | CmapDiffMessage;
+  | CmapDiffMessage
+  | LanguagesMessage;
 export type AxesMessage = {
   type: "axes";
   axes: Record<string, [number, number, number]>;

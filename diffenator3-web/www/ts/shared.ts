@@ -11,6 +11,7 @@ import {
   type SimpleDiff,
   type Value,
   type ValueRecord,
+  type LanguageDiff,
 } from "./types";
 
 function renderTableDiff(
@@ -159,6 +160,30 @@ function diffFeatures(report: Report) {
     $("#difffeatures table").append(row);
   }
 }
+
+function diffLanguages(report: Record<string, LanguageDiff>) {
+  $("#difflanguages").empty();
+  $("#difflanguages").append(`<h4>Modified Languages</h4>`);
+  let notSame = Object.entries(report).filter(
+    ([name, diff]) =>
+      diff.score_a !== diff.score_b || diff.level_a !== diff.level_b
+  );
+  if (notSame.length === 0) {
+    $("#difflanguages").append(`<p>No changes to languages</p>`);
+    return;
+  }
+  $("#difflanguages").append(
+    `<table class="table table-striped" id="difflanguages"><tr><th>Language</th><th>Old</th><th>New</th></tr></table>`
+  );
+  for (let [name, diff] of notSame) {
+    let row = $("<tr>");
+    row.append(`<td>${name}</td>`);
+    row.append(`<td>${diff.level_a} (${diff.score_a}%)</td>`);
+    row.append(`<td>${diff.level_b} (${diff.score_b}%)</td>`);
+    $("#difflanguages table").append(row);
+  }
+}
+
 function diffKerns(report: Report) {
   $("#diffkerns").empty();
   if (!report["kerns"] || Object.keys(report["kerns"]).length == 0) {
@@ -310,5 +335,6 @@ export {
   diffTables,
   diffKerns,
   diffFeatures,
+  diffLanguages,
   setupAnimation,
 };
