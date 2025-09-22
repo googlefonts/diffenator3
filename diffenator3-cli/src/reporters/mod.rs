@@ -54,4 +54,5 @@ pub struct Report {
 }
 
 #[cfg(feature = "typescript")]
+#[allow(dead_code)]
 pub type Api = (LocationResult, Report);
