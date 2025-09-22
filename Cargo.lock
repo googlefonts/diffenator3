@@ -546,7 +546,7 @@ checksum = "abd57806937c9cc163efc8ea3910e00a62e2aeb0b8119f1793a978088f8f6b04"
 
 [[package]]
 name = "diff3proof"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "clap",
  "diffenator3-lib",
@@ -559,7 +559,7 @@ dependencies = [
 
 [[package]]
 name = "diffenator3"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "clap",
  "colored",
@@ -580,7 +580,7 @@ dependencies = [
 
 [[package]]
 name = "diffenator3-lib"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "ab_glyph",
  "ab_glyph_rasterizer",
@@ -2239,7 +2239,7 @@ checksum = "d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31"
 
 [[package]]
 name = "ttj"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "clap",
  "indexmap 1.9.3",
