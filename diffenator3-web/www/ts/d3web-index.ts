@@ -8,6 +8,7 @@ import {
   diffTables,
   diffKerns,
   diffFeatures,
+  diffLanguages,
 } from "./shared";
 
 import type {
@@ -218,6 +219,11 @@ class Diffenator {
       for (var [script, words] of Object.entries(diffs)) {
         this.renderWordDiff(script, words);
       }
+    } else if (message.type == "languages") {
+      $("#spinnerModal").hide();
+      diffLanguages(message.languages);
+    } else {
+      console.log("Unknown message", message);
     }
   }
 
@@ -252,6 +258,11 @@ class Diffenator {
     });
     diffWorker.postMessage({
       command: "new_missing_glyphs",
+      beforeFont: this.beforeFont,
+      afterFont: this.afterFont,
+    });
+    diffWorker.postMessage({
+      command: "languages",
       beforeFont: this.beforeFont,
       afterFont: this.afterFont,
     });

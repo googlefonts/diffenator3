@@ -8,6 +8,7 @@ import {
   diffKerns,
   diffFeatures,
   setupAnimation,
+  diffLanguages,
 } from "./shared";
 
 declare var report: Report;
@@ -69,6 +70,9 @@ $(function () {
   }
   if (report["kerns"]) {
     diffKerns(report);
+  }
+  if (report["languages"]) {
+    diffLanguages(report["languages"]);
   }
   cmapDiff(report.cmap_diff);
   $('[data-toggle="tooltip"]').tooltip();
