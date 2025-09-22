@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [features]
-typescript = ["dep:typescript-type-def"]
+typescript = ["dep:typescript-type-def", "diffenator3-lib/typescript"]
 
 [dependencies]
 diffenator3-lib = { path = "../diffenator3-lib", version = "1", features = ["html"] }
