@@ -12,8 +12,8 @@ env:
   CARGO_TERM_COLOR: always
   GH_TOKEN: ${{ github.token }}
   PROJECT_NAME: diffenator3
-  CARGO_PUBLISH_ARGS: "-p ttj -p diffenator3 -p diff3proof"
-  CRATE_PATTERN: "ttj|diffenator3|diff3proof"
+  CARGO_PUBLISH_ARGS: "-p ttj -p diffenator3-lib -p diffenator3 -p diff3proof"
+  CRATE_PATTERN: "ttj|diffenator3(-lib)?|diff3proof"
 
 jobs:
   build:

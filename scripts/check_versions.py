@@ -16,7 +16,7 @@ metadata = json.loads(
 members = {
     k["name"]: k["version"]
     for k in metadata["packages"]
-    if re.match("^" + crate_pattern + "$", k["name"])
+    if re.match("^(?:" + crate_pattern + ")$", k["name"])
 }
 if len(set(members.values())) > 1:
     print("Crates have different versions:")
