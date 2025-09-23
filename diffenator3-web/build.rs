@@ -14,19 +14,4 @@ fn main() {
         String::from_utf8(buf).unwrap()
     };
     std::fs::write("www/ts/api.d.ts", ts_module).unwrap();
-
-    // Run npm install / npm build
-    let status = std::process::Command::new("npm")
-        .arg("install")
-        .current_dir("www")
-        .status()
-        .expect("failed to run npm install");
-    assert!(status.success());
-    let status = std::process::Command::new("npm")
-        .arg("run")
-        .arg("build")
-        .current_dir("www")
-        .status()
-        .expect("failed to run npm run build");
-    assert!(status.success());
 }
