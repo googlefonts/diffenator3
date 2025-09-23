@@ -12,6 +12,6 @@ license = "Apache-2.0"
 skrifa = { workspace = true }
 read-fonts = { workspace = true }
 serde_json = { workspace = true }
-clap = "*"
+clap = "4.5.0"
 indexmap = { workspace = true }
 log.workspace = true

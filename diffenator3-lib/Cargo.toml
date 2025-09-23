@@ -9,8 +9,8 @@ description = "A font comparison tool that will not stop until your fonts are ex
 license = "Apache-2.0"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-rayon = { version = "*" }
-indicatif = { version = "*", features = ["rayon"] }
+rayon = { version = "1.11.0" }
+indicatif = { version = "0.18.0", features = ["rayon"] }
 thread_local = "1.1"
 
 [lib]

@@ -19,7 +19,7 @@ read-fonts = { version = "0.35.0", features = [
 skrifa = "0.37.0"
 indexmap = "1.9.3"
 serde_json = { version = "1.0.96", features = ["preserve_order"] }
-serde = { version = "*", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 harfrust = { version = "0.3.1" }
 log = "0.4.28"
 shaperglot = { version = "1.1.2" }
