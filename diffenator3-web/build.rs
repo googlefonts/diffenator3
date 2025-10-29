@@ -14,4 +14,16 @@ fn main() {
         String::from_utf8(buf).unwrap()
     };
     std::fs::write("www/ts/api.d.ts", ts_module).unwrap();
+
+    // Rebuild the Typescript
+    std::process::Command::new("npm")
+        .args(["install"])
+        .current_dir("www")
+        .status()
+        .unwrap();
+    std::process::Command::new("npm")
+        .args(["run", "build"])
+        .current_dir("www")
+        .status()
+        .unwrap();
 }
