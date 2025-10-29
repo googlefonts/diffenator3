@@ -76,27 +76,33 @@ $(function () {
   }
   cmapDiff(report.cmap_diff);
   $('[data-toggle="tooltip"]').tooltip();
-  if (!report["locations"]) {
+  if (
+    !report["locations"] &&
+    !report["cmap_diff"] &&
+    !report["tables"] &&
+    !report["kerns"]
+  ) {
     $("#title").html("<h4 class='mt-2'>No differences found</h4>");
-    $("#ui-nav").hide();
     return;
   }
 
-  for (var [index, loc] of report["locations"].entries()) {
-    var loc_nav = $(`<li class="nav-item">
+  if (report["locations"]) {
+    for (var [index, loc] of report["locations"].entries()) {
+      var loc_nav = $(`<li class="nav-item">
 		<a class="nav-link text-secondary" href="#" data-index="${index}">${loc.location.replaceAll(
-      ",",
-      ",\u200b"
-    )}</a>
+        ",",
+        ",\u200b"
+      )}</a>
 	</li>`);
-    $("#locationnav").append(loc_nav);
+      $("#locationnav").append(loc_nav);
+    }
+    $("#locationnav li a").on("click", function (e) {
+      $("#locationnav li a").removeClass("active");
+      $(this).addClass("active");
+      buildLocation_statichtml(report.locations![$(this).data("index")]!);
+    });
+    $("#locationnav li a").eq(0).click();
   }
-  $("#locationnav li a").on("click", function (e) {
-    $("#locationnav li a").removeClass("active");
-    $(this).addClass("active");
-    buildLocation_statichtml(report.locations![$(this).data("index")]!);
-  });
-  $("#locationnav li a").eq(0).click();
 
   (document.styleSheets[0]!.cssRules[0]! as CSSStyleRule).style.setProperty(
     "src",

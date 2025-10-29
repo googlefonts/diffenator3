@@ -34,7 +34,10 @@ export type WordDiffs = Record<string, Difference[]>;
 type WordDiffMessage = { type: "words"; words: WordDiffs };
 type Location = Record<string, number>;
 type InstancePosition = [string, Location];
-type CmapDiffMessage = { type: "new_missing_glyphs"; cmap_diff: CmapDiff };
+type CmapDiffMessage = {
+  type: "cmap_diff";
+  cmap_diff: CmapDiff;
+};
 type ReadyMessage = { type: "ready" };
 type TablesMessage = { type: "tables"; tables: Record<string, Diff> };
 type LanguagesMessage = {
@@ -53,7 +56,7 @@ export interface ValueRecord {
   x_placement?: number | Record<string, number>;
   y_placement?: number | Record<string, number>;
 }
-export type Message =
+export type ReceivedMessage =
   | ReadyMessage
   | WordDiffMessage
   | AxesMessage
@@ -67,3 +70,24 @@ export type AxesMessage = {
   axes: Record<string, [number, number, number]>;
   instances: InstancePosition[];
 };
+
+export type SimpleCommand = "tables" | "kerns" | "cmap_diff" | "languages";
+export type SentMessage =
+  | {
+      command: "tables" | "kerns" | "cmap_diff" | "languages" | "axes";
+      beforeFont: Uint8Array<ArrayBufferLike>;
+      afterFont: Uint8Array<ArrayBufferLike>;
+    }
+  | {
+      command: "modified_glyphs";
+      beforeFont: Uint8Array<ArrayBufferLike>;
+      afterFont: Uint8Array<ArrayBufferLike>;
+      location: string;
+    }
+  | {
+      command: "words";
+      beforeFont: Uint8Array<ArrayBufferLike>;
+      afterFont: Uint8Array<ArrayBufferLike>;
+      customWords: string[];
+      location: string;
+    };

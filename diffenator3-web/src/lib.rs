@@ -110,11 +110,11 @@ pub fn modified_glyphs(font_a: &[u8], font_b: &[u8], location: &str, f: &js_sys:
 }
 
 #[wasm_bindgen]
-pub fn new_missing_glyphs(font_a: &[u8], font_b: &[u8], f: &js_sys::Function) {
+pub fn cmap_diff(font_a: &[u8], font_b: &[u8], f: &js_sys::Function) {
     let f_a = DFont::new(font_a);
     let f_b = DFont::new(font_b);
     let val = json!({
-        "new_missing_glyphs": CmapDiff::new(&f_a, &f_b)
+        "cmap_diff": CmapDiff::new(&f_a, &f_b)
     });
     f.call1(
         &JsValue::NULL,

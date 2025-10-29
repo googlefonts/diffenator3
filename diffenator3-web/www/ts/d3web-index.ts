@@ -13,11 +13,12 @@ import {
 
 import type {
   AxesMessage,
-  Message,
+  ReceivedMessage,
   WordDiffs,
   CmapDiff,
   GlyphDiff,
   Difference,
+  SentMessage,
 } from "./types";
 
 declare global {
@@ -181,7 +182,7 @@ class Diffenator {
     }
   }
 
-  progress_callback(message: Message) {
+  progress_callback(message: ReceivedMessage) {
     console.log("Got json ", message);
     if ("type" in message && message.type == "ready") {
       $("#bigLoadingModal").hide();
@@ -205,7 +206,7 @@ class Diffenator {
         $(this).children().toggle();
         event.stopPropagation();
       });
-    } else if (message.type == "new_missing_glyphs") {
+    } else if (message.type == "cmap_diff") {
       $("#spinnerModal").hide();
       this.renderCmapDiff(message.cmap_diff);
       $(".node").on("click", function (event) {
@@ -241,31 +242,14 @@ class Diffenator {
   letsDoThis() {
     $("#startModal").hide();
     $("#spinnerModal").show();
-    diffWorker.postMessage({
-      command: "axes",
-      beforeFont: this.beforeFont,
-      afterFont: this.afterFont,
-    });
-    diffWorker.postMessage({
-      command: "tables",
-      beforeFont: this.beforeFont,
-      afterFont: this.afterFont,
-    });
-    diffWorker.postMessage({
-      command: "kerns",
-      beforeFont: this.beforeFont,
-      afterFont: this.afterFont,
-    });
-    diffWorker.postMessage({
-      command: "new_missing_glyphs",
-      beforeFont: this.beforeFont,
-      afterFont: this.afterFont,
-    });
-    diffWorker.postMessage({
-      command: "languages",
-      beforeFont: this.beforeFont,
-      afterFont: this.afterFont,
-    });
+    for (let command of ["axes", "tables", "kerns", "cmap_diff", "languages"]) {
+      console.log("Sending command", command);
+      diffWorker.postMessage({
+        command,
+        beforeFont: this.beforeFont!,
+        afterFont: this.afterFont!,
+      } as SentMessage);
+    }
     this.updateGlyphs();
     this.updateWords();
   }
@@ -277,7 +261,7 @@ class Diffenator {
       beforeFont: this.beforeFont,
       afterFont: this.afterFont,
       location,
-    });
+    } as SentMessage);
   }
 
   updateWords() {
@@ -290,7 +274,7 @@ class Diffenator {
       afterFont: this.afterFont,
       customWords: this.customWords,
       location,
-    });
+    } as SentMessage);
   }
 
   renderCmapDiff(cmap_diff: CmapDiff) {

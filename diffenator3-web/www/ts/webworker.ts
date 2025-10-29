@@ -1,8 +1,7 @@
 import type { CmapDiff, GlyphDiff } from "./api.js";
+import type { SimpleCommand } from "./types.js";
 
 var module = import("../../pkg/diffenator3_web.js");
-
-type Command = "tables" | "kerns" | "new_missing_glyphs";
 
 async function init() {
   let wasm = await module;
@@ -12,7 +11,7 @@ async function init() {
   let commands = {
     tables: wasm.diff_tables,
     kerns: wasm.diff_kerns,
-    new_missing_glyphs: wasm.new_missing_glyphs,
+    cmap_diff: wasm.cmap_diff,
     languages: wasm.diff_languages,
   };
 
@@ -22,7 +21,7 @@ async function init() {
     const { command, beforeFont, location, afterFont, customWords } =
       event.data;
 
-    let simpleWasmDiff = (command: Command) => {
+    let simpleWasmDiff = (command: SimpleCommand) => {
       let post = (result: string) => {
         self.postMessage({
           type: command,
@@ -39,7 +38,7 @@ async function init() {
     } else if (
       command == "tables" ||
       command == "kerns" ||
-      command == "new_missing_glyphs" ||
+      command == "cmap_diff" ||
       command == "languages"
     ) {
       simpleWasmDiff(command);
