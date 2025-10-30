@@ -15,3 +15,4 @@ serde_json = { workspace = true }
 clap = "4.5.0"
 indexmap = { workspace = true }
 log.workspace = true
+fontdrasil = "0.2.3"
