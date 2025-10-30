@@ -16,12 +16,16 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   diffFeatures: () => (/* binding */ diffFeatures),
 /* harmony export */   diffKerns: () => (/* binding */ diffKerns),
 /* harmony export */   diffLanguages: () => (/* binding */ diffLanguages),
+/* harmony export */   diffSignificantTables: () => (/* binding */ diffSignificantTables),
 /* harmony export */   diffTables: () => (/* binding */ diffTables),
 /* harmony export */   renderTableDiff: () => (/* binding */ renderTableDiff),
 /* harmony export */   setupAnimation: () => (/* binding */ setupAnimation)
 /* harmony export */ });
 /* harmony import */ var _types__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./types */ "./ts/types.ts");
 
+function toTitleCase(str) {
+    return str.replace(/\w\S*/g, (text) => text.charAt(0).toUpperCase() + text.substring(1).toLowerCase());
+}
 function renderTableDiff(node, toplevel) {
     var wrapper = $("<div> </div>");
     if (!node) {
@@ -163,6 +167,140 @@ function diffLanguages(report) {
         $("#difflanguages table").append(row);
     }
 }
+function diffSignificantTables(report) {
+    // Pull things we care about out of the table diff
+    let tables = report.tables;
+    if (!tables) {
+        return;
+    }
+    let result = $("<tbody/>");
+    let table = $("<table/>").addClass("table table-striped");
+    table.append(result);
+    if ("name" in tables) {
+        let name_table = tables["name"];
+        result.append(`<tr><th colspan="3">Name Table Changes</th></tr>`);
+        for (let [name_id, thing] of Object.entries(name_table)) {
+            name_id = toTitleCase(name_id.replaceAll("_", " "));
+            if (name_id.startsWith("Nameid ")) {
+                continue;
+            }
+            for (let [language, entry] of Object.entries(thing)) {
+                if (!(0,_types__WEBPACK_IMPORTED_MODULE_0__.isSimpleDiff)(entry)) {
+                    let element = renderTableDiff(entry, true);
+                    let row = $("<tr/>");
+                    row.append(`<td>${name_id} (${language})</td>`);
+                    let after_td = $("<td/>");
+                    after_td.append(element.children());
+                    row.append(after_td);
+                    table.children().first().append(row);
+                    continue;
+                }
+                let [before, after] = entry;
+                let row = $("<tr/>");
+                row.append(`<td>${name_id} (${language})</td>`);
+                let before_td = $("<td/>").addClass("attr-before").text(before);
+                let after_td = $("<td/>").addClass("attr-after").text(after);
+                row.append(before_td);
+                row.append(after_td);
+                table.children().first().append(row);
+            }
+        }
+    }
+    // Vertical metrics
+    let vmetricsRows = [];
+    const vMetricsFields = [
+        ["hhea", "ascent"],
+        ["hhea", "descent"],
+        ["hhea", "line_gap"],
+        ["OS/2", "s_typo_ascender"],
+        ["OS/2", "s_typo_descender"],
+        ["OS/2", "s_typo_line_gap"],
+        ["OS/2", "us_win_ascent"],
+        ["OS/2", "us_win_descent"],
+    ];
+    for (let [table_name, field_name] of vMetricsFields) {
+        if (table_name in tables) {
+            let table = tables[table_name];
+            if (field_name in table) {
+                let entry = table[field_name];
+                if ((0,_types__WEBPACK_IMPORTED_MODULE_0__.isSimpleDiff)(entry)) {
+                    let [before, after] = entry;
+                    let row = $("<tr/>");
+                    row.append(`<td>${table_name}.${toTitleCase(field_name.replaceAll("_", " ")).replaceAll(" ", "")}</td>`);
+                    let before_td = $("<td/>").addClass("attr-before").text(before);
+                    let after_td = $("<td/>").addClass("attr-after").text(after);
+                    row.append(before_td);
+                    row.append(after_td);
+                    vmetricsRows.push(row);
+                }
+            }
+        }
+    }
+    if (vmetricsRows.length > 0) {
+        result.append(`<tr><th colspan="3">Vertical Metrics Changes</th></tr>`);
+        result.append(vmetricsRows);
+    }
+    // fvar, avar
+    if ("fvar" in tables) {
+        result.append(`<tr><th colspan="3">fvar Table Changes</th></tr>`);
+        result.append(`<tr><td colspan="3">The fvar table has changed. See the full table diff below.</td></tr>`);
+    }
+    if ("avar" in tables) {
+        result.append(`<tr><th colspan="3">avar Table Changes</th></tr>`);
+        result.append(`<tr><td colspan="3">The avar table has changed. See the full table diff below.</td></tr>`);
+    }
+    // Other stuff.
+    let lookIn = [
+        ["head", "units_per_em"],
+        ["head", "font_revision"],
+        ["head", "flags"],
+        ["head", "mac_style"],
+        ["os/2", "fs_type"],
+        ["os/2", "fs_selection"],
+    ];
+    let otherChanges = [];
+    for (let [table_name, field_name] of lookIn) {
+        if (table_name in tables) {
+            let table = tables[table_name];
+            if (field_name in table) {
+                let entry = table[field_name];
+                if ((0,_types__WEBPACK_IMPORTED_MODULE_0__.isSimpleDiff)(entry)) {
+                    let [before, after] = entry;
+                    let row = $("<tr/>");
+                    row.append(`<td>${table_name}.${toTitleCase(field_name.replaceAll("_", " ")).replaceAll(" ", "")}</td>`);
+                    if (field_name == "font_revision") {
+                        before = parseFloat(before).toFixed(3);
+                        after = parseFloat(after).toFixed(3);
+                    }
+                    else if (field_name == "flags" ||
+                        field_name == "mac_style" ||
+                        field_name == "fs_type" ||
+                        field_name == "fs_selection") {
+                        before = "0b" + before.toString(2).toUpperCase();
+                        after = "0b" + after.toString(2).toUpperCase();
+                    }
+                    let before_td = $("<td/>").addClass("attr-before").text(before);
+                    let after_td = $("<td/>").addClass("attr-after").text(after);
+                    row.append(before_td);
+                    row.append(after_td);
+                    otherChanges.push(row);
+                }
+            }
+        }
+    }
+    if (otherChanges.length > 0) {
+        result.append(`<tr><th colspan="3">Other Significant Changes</th></tr>`);
+        result.append(otherChanges);
+    }
+    $("#diffsignificanttables").empty();
+    $("#diffsignificanttables").append(`<h3 class="border-top pt-2 border-dark-subtle">Significant Table Changes</h3>`);
+    if (result.children().length == 0) {
+        $("#diffsignificanttables").append(`<tr><th>No significant table changes</th></tr>`);
+    }
+    else {
+        $("#diffsignificanttables").append(table);
+    }
+}
 function diffKerns(report) {
     $("#diffkerns").empty();
     if (!report["kerns"] || Object.keys(report["kerns"]).length == 0) {
@@ -246,8 +384,9 @@ function serializeKernValue(kern, index) {
     return string.trim() + ")";
 }
 function cmapDiff(cmap_diff) {
+    $("#cmapdiff").empty();
+    $("#cmapdiff").append(`<h3 class="border-top pt-2 border-dark-subtle">Added and Removed Encoded Glyphs</h3>`);
     if (cmap_diff && (cmap_diff.new || cmap_diff.missing)) {
-        $("#cmapdiff").append(`<h3 class="border-top pt-2 border-dark-subtle">Added and Removed Encoded Glyphs</h3>`);
         if (cmap_diff.new) {
             $("#cmapdiff").append(`<h4>Added Glyphs</h4>`);
             let added = $("<div>");
@@ -438,6 +577,7 @@ function buildLocation_statichtml(loc) {
 $(function () {
     if (report["tables"]) {
         (0,_shared__WEBPACK_IMPORTED_MODULE_0__.diffTables)(report);
+        (0,_shared__WEBPACK_IMPORTED_MODULE_0__.diffSignificantTables)(report);
         (0,_shared__WEBPACK_IMPORTED_MODULE_0__.diffFeatures)(report);
     }
     if (report["kerns"]) {

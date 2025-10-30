@@ -1,82 +1,86 @@
 <!DOCTYPE html>
 <html lang="en" dir="auto">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Diffenator3</title>
+    <script
+      src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct"
+      crossorigin="anonymous"
+    ></script>
+    <style type="text/css">
+      	@font-face {
+           font-family: "Font Before";
+           src: url({{ old_filename }});
+         }
 
-<head>
-	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-	<title>Diffenator3</title>
-	<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" crossorigin="anonymous"></script>
-	<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"
-		integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct"
-		crossorigin="anonymous"></script>
-	<style type="text/css">
-		@font-face {
-      font-family: "Font Before";
-      src: url({{ old_filename }});
-    }
+         @font-face {
+           font-family: "Font After";
+           src: url({{ new_filename }});
+         }
 
-    @font-face {
-      font-family: "Font After";
-      src: url({{ new_filename }});
-    }
+         .font-before, .font-after {
+           font-variation-settings: "wght" 400, "wdth" 100;
+         }
 
-    .font-before, .font-after {
-      font-variation-settings: "wght" 400, "wdth" 100;
-    }
+         .font-before {
+           font-family: "Font Before", "Adobe Notdef";
+         }
 
-    .font-before {
-      font-family: "Font Before", "Adobe Notdef";
-    }
+         .font-after {
+           font-family: "Font After", "Adobe Notdef";
+         }
 
-    .font-after {
-      font-family: "Font After", "Adobe Notdef";
-    }
+      :root {
+      --node-pt-size: {{ pt_size | int }}px;
+      }
 
-	:root {
-	--node-pt-size: {{ pt_size | int }}px;
-	}
+      {% include "style.css" %}
+    </style>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+      integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N"
+      crossorigin="anonymous"
+    />
+  </head>
 
-	{% include "style.css" %}
-		</style>
-	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
-	integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+  <body>
+    <div id="ui-nav">
+      <div class="ui-nav-item" id="fonttoggle">Old</div>
+      <div class="ui-nav-item" id="fontanimate">Animate</div>
+      <div id="axes"></div>
+    </div>
 
-</head>
-
-<body>
-
-		<div id="ui-nav">
-		  <div class="ui-nav-item" id="fonttoggle">Old</div>
-		  <div class="ui-nav-item" id="fontanimate">Animate</div>
-		  <div id="axes">
-		  </div>
-		</div>
-	
-	<div class="row">
-		<div class="col-2">
-			<ul class="nav nav-pills" id="locationnav">
-			</ul>
-		</div>
-		<div class="col-9 mt-3">
-			<div id="title"></div>
-			<div id="cmapdiff"> </div>
-			<div id="difflanguages">Modified Languages</div>
-			<div id="main"></div>
-			<div id="userdefined">
-				<h4>User defined sample text</h4>
-				<div contenteditable="true" class="font-before cell-word">
-					You can type your own text here to see it previewed in the fonts.
-				</div>
-				<div style="clear: both"></div>
-			</div>
-			<div id="difffeatures"> </div>
-			<div id="diffkerns"> </div>
-			<div id="difftable"> </div>
-		</div>
-	</div>
-	<script type="module">
-	var report = {{ report | json_encode | safe }};
-		{% include "script.js" %}
-	</script>
-</body>
-
+    <div class="row">
+      <div class="col-2">
+        <ul class="nav nav-pills" id="locationnav"></ul>
+      </div>
+      <div class="col-9 mt-3">
+        <div id="title"></div>
+        <div id="diffsignificanttables"></div>
+        <div id="cmapdiff"></div>
+        <div id="difflanguages">Modified Languages</div>
+        <div id="main"></div>
+        <div id="userdefined">
+          <h4>User defined sample text</h4>
+          <div contenteditable="true" class="font-before cell-word">
+            You can type your own text here to see it previewed in the fonts.
+          </div>
+          <div style="clear: both"></div>
+        </div>
+        <div id="difffeatures"></div>
+        <div id="diffkerns"></div>
+        <div id="difftable"></div>
+      </div>
+    </div>
+    <script type="module">
+      var report = {{ report | json_encode | safe }};
+      	{% include "script.js" %}
+    </script>
+  </body>
 </html>

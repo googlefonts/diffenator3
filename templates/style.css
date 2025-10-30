@@ -93,13 +93,13 @@ body {
 }
 
 .attr-before {
-    color: green;
+    color: green !important;
     cursor: text;
 }
 
 .attr-after {
     color: red;
-    cursor: text;
+    cursor: text !important;
 }
 
 .leaf {

@@ -7,6 +7,7 @@ import {
   diffTables,
   diffKerns,
   diffFeatures,
+  diffSignificantTables,
   setupAnimation,
   diffLanguages,
 } from "./shared";
@@ -70,6 +71,7 @@ function buildLocation_statichtml(loc: LocationResult) {
 $(function () {
   if (report["tables"]) {
     diffTables(report);
+    diffSignificantTables(report);
     diffFeatures(report);
   }
   if (report["kerns"]) {

@@ -9,6 +9,7 @@ import {
   diffKerns,
   diffFeatures,
   diffLanguages,
+  diffSignificantTables,
 } from "./shared";
 
 import type {
@@ -194,6 +195,9 @@ class Diffenator {
       $("#spinnerModal").hide();
       diffTables(message);
       diffFeatures(message);
+      // @ts-ignore
+      window["tables"] = message;
+      diffSignificantTables(message);
     } else if (message.type == "kerns") {
       // console.log("Hiding spinner")
       $("#spinnerModal").hide();
