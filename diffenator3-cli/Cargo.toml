@@ -1,6 +1,6 @@
 [package]
 name = "diffenator3"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["The Diffenator3 Authors"]
 homepage = "https://github.com/googlefonts/diffenator3"
@@ -20,8 +20,10 @@ path = "src/lib.rs"
 typescript = ["dep:typescript-type-def", "diffenator3-lib/typescript"]
 
 [dependencies]
-diffenator3-lib = { path = "../diffenator3-lib", version = "1", features = ["html"] }
-ttj = {  version = "1", path = "../ttj" }
+diffenator3-lib = { path = "../diffenator3-lib", version = "1", features = [
+    "html",
+] }
+ttj = { version = "1", path = "../ttj" }
 indexmap = { workspace = true }
 skrifa = { workspace = true }
 serde_json = { workspace = true }
@@ -37,5 +39,6 @@ shaperglot = { workspace = true }
 tabled = "0.20.0"
 
 # Code for emitting TypeScript types
-typescript-type-def = { version = "0.5.13", optional = true, features=["json_value"] }
-
+typescript-type-def = { version = "0.5.13", optional = true, features = [
+    "json_value",
+] }
