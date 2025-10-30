@@ -289,10 +289,10 @@ class Diffenator {
 
   renderGlyphDiff(glyph_diff: GlyphDiff[]) {
     $("#glyphdiff").empty();
+    $("#glyphdiff").append(
+      `<h3 class="border-top pt-2 border-dark-subtle">Modified Glyphs</h3>`
+    );
     if (glyph_diff.length > 0) {
-      $("#glyphdiff").append(
-        $(`<h3 class="border-top pt-2 border-dark-subtle">Modified glyphs</h3>`)
-      );
       let place = $('<div class="glyphgrid"/>');
       $("#glyphdiff").append(place);
 
@@ -300,6 +300,8 @@ class Diffenator {
         addAGlyph(glyph, place);
       });
       $('[data-bs-toggle="tooltip"]').tooltip();
+    } else {
+      $("#glyphdiff").append(`<p>No changes to glyphs</p>`);
     }
   }
 
