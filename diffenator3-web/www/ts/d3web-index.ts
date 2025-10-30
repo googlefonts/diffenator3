@@ -193,7 +193,7 @@ class Diffenator {
       // console.log("Hiding spinner")
       $("#spinnerModal").hide();
       diffTables(message);
-      diffKerns(message);
+      diffFeatures(message);
     } else if (message.type == "kerns") {
       // console.log("Hiding spinner")
       $("#spinnerModal").hide();
@@ -217,6 +217,10 @@ class Diffenator {
       $("#spinnerModal").hide();
       $("#wordspinner").hide();
       let diffs: WordDiffs = message.words;
+      if (Object.keys(diffs).length == 0) {
+        $("#worddiffinner").append(`<p>No changes to words</p>`);
+        return;
+      }
       for (var [script, words] of Object.entries(diffs)) {
         this.renderWordDiff(script, words);
       }
@@ -286,7 +290,9 @@ class Diffenator {
   renderGlyphDiff(glyph_diff: GlyphDiff[]) {
     $("#glyphdiff").empty();
     if (glyph_diff.length > 0) {
-      $("#glyphdiff").append($(`<h4>Modified glyphs</h4>`));
+      $("#glyphdiff").append(
+        $(`<h3 class="border-top pt-2 border-dark-subtle">Modified glyphs</h3>`)
+      );
       let place = $('<div class="glyphgrid"/>');
       $("#glyphdiff").append(place);
 

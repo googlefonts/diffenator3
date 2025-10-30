@@ -133,7 +133,7 @@ function diffFeatures(report) {
             }
         }
     }
-    $("#difffeatures").append(`<h4 class="mt-2 box-title">Modified Features</h4>`);
+    $("#difffeatures").append(`<h3 class="border-top pt-2 border-dark-subtle">Modified Features</h3>`);
     if (Object.keys(changes).length == 0) {
         $("#difffeatures").append(`<p>No changes to features</p>`);
         return;
@@ -148,7 +148,7 @@ function diffFeatures(report) {
 }
 function diffLanguages(report) {
     $("#difflanguages").empty();
-    $("#difflanguages").append(`<h4>Modified Languages</h4>`);
+    $("#difflanguages").append(`<h3 class="border-top pt-2 border-dark-subtle">Modified Languages</h3>`);
     let notSame = Object.entries(report).filter(([name, diff]) => diff.score_a !== diff.score_b || diff.level_a !== diff.level_b);
     if (notSame.length === 0) {
         $("#difflanguages").append(`<p>No changes to languages</p>`);
@@ -169,8 +169,8 @@ function diffKerns(report) {
         $("#diffkerns").append(`<p>No changes to kerning</p>`);
         return;
     }
-    $("#diffkerns").append(`<h4 class="mt-2">Modified Kerns</h4>`);
-    $("#diffkerns").append(`<table class="table table-striped" id="diffkerns"><tr><th>Pair</th><th>Old</old><th>New</th></table>`);
+    $("#diffkerns").append(`<h3 class="border-top pt-2 border-dark-subtle">Modified Kerns</h3>`);
+    $("#diffkerns").append(`<table class="table table-striped" id="diffkerns"><tr><th>Pair</th><th>Old</th><th>New</th></tr></table>`);
     for (let [pair, value] of Object.entries(report["kerns"])) {
         if (pair == "error") {
             $("#diffkerns").append(`<p class="text-danger">Error: ${value}</p>`);
@@ -247,9 +247,9 @@ function serializeKernValue(kern, index) {
 }
 function cmapDiff(cmap_diff) {
     if (cmap_diff && (cmap_diff.new || cmap_diff.missing)) {
-        $("#cmapdiff").append(`<h4 class="mt-2">Added and Removed Encoded Glyphs</h4>`);
+        $("#cmapdiff").append(`<h3 class="border-top pt-2 border-dark-subtle">Added and Removed Encoded Glyphs</h3>`);
         if (cmap_diff.new) {
-            $("#cmapdiff").append(`<h4 class="box-title">Added Glyphs</h4>`);
+            $("#cmapdiff").append(`<h4>Added Glyphs</h4>`);
             let added = $("<div>");
             for (let glyph of cmap_diff.new) {
                 addAGlyph(glyph, added);
@@ -257,7 +257,7 @@ function cmapDiff(cmap_diff) {
             $("#cmapdiff").append(added);
         }
         if (cmap_diff.missing) {
-            $("#cmapdiff").append(`<h4 class="box-title">Removed Glyphs</h4>`);
+            $("#cmapdiff").append(`<h4>Removed Glyphs</h4>`);
             let missing = $("<div>");
             for (let glyph of cmap_diff.missing) {
                 addAGlyph(glyph, missing);
@@ -411,10 +411,10 @@ function buildLocation_statichtml(loc) {
         rule.setProperty("font-variation-settings", cssSetting);
     }
     $("#main").empty();
-    $("#title").html(`<h4 class="mt-2">${textLocation}</h2>`);
+    $("#title").html(`<h2 class="mt-2">${textLocation}</h2>`);
     if (loc.glyphs) {
         loc.glyphs.sort((ga, gb) => new Intl.Collator().compare(ga.string, gb.string));
-        $("#main").append("<h4>Modified Glyphs</h4>");
+        $("#main").append("<h3 class='border-top pt-2 border-dark-subtle'>Modified Glyphs</h3>");
         let glyphs = $("<div>");
         for (let glyph of loc.glyphs) {
             (0,_shared__WEBPACK_IMPORTED_MODULE_0__.addAGlyph)(glyph, glyphs);
@@ -422,7 +422,7 @@ function buildLocation_statichtml(loc) {
         $("#main").append(glyphs);
     }
     if (loc.words) {
-        $("#main").append("<h4>Modified Words</h4>");
+        $("#main").append("<h3 class='border-top pt-2 border-dark-subtle'>Modified Words</h3>");
         for (let [script, words] of Object.entries(loc.words)) {
             let scriptTitle = $(`<h6>${script}</h6>`);
             $("#main").append(scriptTitle);
@@ -452,7 +452,7 @@ $(function () {
         !report["cmap_diff"] &&
         !report["tables"] &&
         !report["kerns"]) {
-        $("#title").html("<h4 class='mt-2'>No differences found</h4>");
+        $("#title").html("<h3>No differences found</h3>");
         return;
     }
     if (report["locations"]) {

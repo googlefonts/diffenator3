@@ -34,13 +34,15 @@ function buildLocation_statichtml(loc: LocationResult) {
 
   $("#main").empty();
 
-  $("#title").html(`<h4 class="mt-2">${textLocation}</h2>`);
+  $("#title").html(`<h2 class="mt-2">${textLocation}</h2>`);
 
   if (loc.glyphs) {
     loc.glyphs.sort((ga, gb) =>
       new Intl.Collator().compare(ga.string, gb.string)
     );
-    $("#main").append("<h4>Modified Glyphs</h4>");
+    $("#main").append(
+      "<h3 class='border-top pt-2 border-dark-subtle'>Modified Glyphs</h3>"
+    );
     let glyphs = $("<div>");
     for (let glyph of loc.glyphs) {
       addAGlyph(glyph, glyphs);
@@ -49,7 +51,9 @@ function buildLocation_statichtml(loc: LocationResult) {
   }
 
   if (loc.words) {
-    $("#main").append("<h4>Modified Words</h4>");
+    $("#main").append(
+      "<h3 class='border-top pt-2 border-dark-subtle'>Modified Words</h3>"
+    );
     for (let [script, words] of Object.entries(loc.words)) {
       let scriptTitle = $(`<h6>${script}</h6>`);
       $("#main").append(scriptTitle);
@@ -82,7 +86,7 @@ $(function () {
     !report["tables"] &&
     !report["kerns"]
   ) {
-    $("#title").html("<h4 class='mt-2'>No differences found</h4>");
+    $("#title").html("<h3>No differences found</h3>");
     return;
   }
 

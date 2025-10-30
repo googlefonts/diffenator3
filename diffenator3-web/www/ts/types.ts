@@ -74,7 +74,7 @@ export type AxesMessage = {
 export type SimpleCommand = "tables" | "kerns" | "cmap_diff" | "languages";
 export type SentMessage =
   | {
-      command: "tables" | "kerns" | "cmap_diff" | "languages" | "axes";
+      command: SimpleCommand | "axes";
       beforeFont: Uint8Array<ArrayBufferLike>;
       afterFont: Uint8Array<ArrayBufferLike>;
     }
