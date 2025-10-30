@@ -172,18 +172,23 @@ pub fn table_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_mat
         log::info!("Glyph names differ dramatically between fonts, using font names from font A");
     }
 
-    diff(
-        &font_to_json(font_a, Some(&glyphmap_a)),
-        &font_to_json(
-            font_b,
-            Some(if big_difference {
-                &glyphmap_a
-            } else {
-                &glyphmap_b
-            }),
-        ),
-        max_changes,
-    )
+    let mut font_a_json = font_to_json(font_a, Some(&glyphmap_a));
+    let mut font_b_json = font_to_json(
+        font_b,
+        Some(if big_difference {
+            &glyphmap_a
+        } else {
+            &glyphmap_b
+        }),
+    );
+
+    // Remove some tables which aren't useful
+    font_a_json.as_object_mut().unwrap().remove("glyf");
+    font_b_json.as_object_mut().unwrap().remove("glyf");
+    font_a_json.as_object_mut().unwrap().remove("loca");
+    font_b_json.as_object_mut().unwrap().remove("loca");
+
+    diff(&font_a_json, &font_b_json, max_changes)
 }
 
 /// Compare two fonts and return a JSON representation of the differences in kerning
