@@ -91,7 +91,7 @@ impl DFont {
         Ok(())
     }
 
-    pub fn fontref(&self) -> FontRef {
+    pub fn fontref(&self) -> FontRef<'_> {
         FontRef::new(&self.backing).expect("Couldn't parse font")
     }
     pub fn family_name(&self) -> String {
