@@ -477,12 +477,15 @@ dependencies = [
  "colored",
  "diffenator3-lib",
  "env_logger",
+ "fancy-regex",
+ "google-fonts-languages",
  "indexmap 1.9.3",
  "itertools 0.13.0",
  "rayon",
  "serde",
  "serde_json",
  "skrifa",
+ "tera",
  "ttj",
 ]
 

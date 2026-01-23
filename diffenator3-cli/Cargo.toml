@@ -2,6 +2,18 @@
 name = "diffenator3"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
+description = "A utility for comparing two font files"
+repository = "https://github.com/googlefonts/diffenator3"
+readme = "../README.md"
+
+[[bin]]
+name = "diffenator3"
+path = "src/main.rs"
+
+[[bin]]
+name = "diff3proof"
+path = "src/bin/diff3proof.rs"
 
 [dependencies]
 diffenator3-lib = { path = "../diffenator3-lib", features = ["html"] }
@@ -16,3 +28,8 @@ colored = "2.1.0"
 clap = { version = "4.5.9", features = ["derive"] }
 itertools = "0.13.0"
 env_logger = "0.11"
+
+# diff3proof dependencies
+google-fonts-languages = "0"
+tera = "1"
+fancy-regex = "0.13"

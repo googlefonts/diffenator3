@@ -1,0 +1,20 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+manifest-path = "diffenator3-cli/Cargo.toml"
+bindings = "bin"
+include = [
+  { path = "README.md", format = "sdist" },
+  { path = "LICENSE.md", format = "sdist" },
+]
+exclude = [
+  { path = "diffenator3-cli/**/*", format = "wheel" },
+]
+
+[project]
+name = "diffenator3"
+description = "A utility for comparing two font files"
+dynamic = ["version"]
+readme = "README.md"
