@@ -4,7 +4,7 @@ use diffenator3_lib::html::{gen_html, Tera};
 
 use super::Report;
 
-pub(crate) fn report(
+pub fn report(
     font1_pb: &PathBuf,
     font2_pb: &PathBuf,
     output_dir: &Path,

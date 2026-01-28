@@ -1,22 +1,23 @@
 /// Turn some words into images
-use crate::render::rustyruzz::{
-    shape_with_plan, Direction, Face, Script, ShapePlan, UnicodeBuffer, Variation,
+use harfrust::{
+    Direction, Script, ShapePlan, ShaperData, ShaperInstance, UnicodeBuffer, Variation,
 };
 use image::{DynamicImage, GrayImage, Luma};
-use skrifa::instance::Size;
-use skrifa::raw::TableProvider;
-use skrifa::{GlyphId, MetadataProvider};
+use skrifa::{instance::Size, raw::TableProvider, GlyphId, MetadataProvider};
 use zeno::Command;
 
-use super::cachedoutlines::CachedOutlineGlyphCollection;
-use super::utils::{terrible_bounding_box, RecordingPen};
+use super::{
+    cachedoutlines::CachedOutlineGlyphCollection,
+    utils::{terrible_bounding_box, RecordingPen},
+};
 use crate::dfont::DFont;
 
 pub struct Renderer<'a> {
-    face: Face<'a>,
+    shaper_data: ShaperData,
     scale: f32,
     font: skrifa::FontRef<'a>,
-    plan: ShapePlan,
+    plan: Option<ShapePlan>,
+    instance: ShaperInstance,
     outlines: CachedOutlineGlyphCollection<'a>,
 }
 
@@ -27,30 +28,37 @@ impl<'a> Renderer<'a> {
     pub fn new(
         dfont: &'a DFont,
         font_size: f32,
-        direction: Direction,
+        direction: Option<Direction>,
         script: Option<Script>,
     ) -> Self {
-        let mut face = Face::from_slice(&dfont.backing, 0).expect("Foo");
-        let font = skrifa::FontRef::new(&dfont.backing).unwrap_or_else(|_| {
+        let font = harfrust::FontRef::new(&dfont.backing).unwrap_or_else(|_| {
             panic!(
                 "error constructing a Font from data for {:}",
                 dfont.family_name()
             );
         });
+        let shaper_data = ShaperData::new(&font);
 
         // Convert our location into a structure that rustybuzz/harfruzz can use
-        let variations: Vec<_> = dfont
-            .location
-            .iter()
-            .map(|setting| {
+        let instance = ShaperInstance::from_variations(
+            &font,
+            dfont.location.iter().map(|setting| {
                 let tag = setting.selector;
-                let tag = rustybuzz::ttf_parser::Tag::from_bytes(&tag.into_bytes());
                 let value = setting.value;
                 Variation { tag, value }
-            })
-            .collect();
-        face.set_variations(&variations);
-        let plan = ShapePlan::new(&face, direction, script, None, &[]);
+            }),
+        );
+        let shaper = shaper_data.shaper(&font).instance(Some(&instance)).build();
+
+        let plan = if let Some(direction) = direction {
+            if script.is_some() {
+                Some(ShapePlan::new(&shaper, direction, script, None, &[]))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         let location = (&dfont.normalized_location).into();
         let outlines = CachedOutlineGlyphCollection::new(
             font.outline_glyphs(),
@@ -59,9 +67,10 @@ impl<'a> Renderer<'a> {
         );
 
         Self {
-            face,
+            shaper_data,
             font,
             plan,
+            instance,
             scale: font_size,
             outlines,
         }
@@ -77,7 +86,27 @@ impl<'a> Renderer<'a> {
 
         let mut buffer = UnicodeBuffer::new();
         buffer.push_str(string);
-        let output = shape_with_plan(&self.face, &self.plan, buffer);
+        let shaper = self
+            .shaper_data
+            .shaper(&self.font)
+            .instance(Some(&self.instance))
+            .build();
+
+        let output = if let Some(plan) = &self.plan {
+            // If we have a shaping plan, we can use it to shape the string
+            if let Some(script) = plan.script() {
+                buffer.set_script(script);
+            }
+            buffer.set_direction(plan.direction());
+            if let Some(lang) = plan.language() {
+                buffer.set_language(lang.clone());
+            }
+            shaper.shape_with_plan(plan, buffer, &[])
+        } else {
+            // Otherwise, we guess segment properties
+            buffer.guess_segment_properties();
+            shaper.shape(buffer, &[])
+        };
         let upem = self.font.head().unwrap().units_per_em();
         let factor = self.scale / upem as f32;
 
@@ -169,17 +198,21 @@ impl<'a> Renderer<'a> {
 mod tests {
     use super::*;
     // use harfruzz::script;
-    use rustybuzz::script;
+    use harfrust::script;
 
     #[test]
     fn test_zeno_path() {
         let path = "NotoSansArabic-NewRegular.ttf";
         let data = std::fs::read(path).unwrap();
         let font = DFont::new(&data);
-        let mut renderer = Renderer::new(&font, 40.0, Direction::RightToLeft, Some(script::ARABIC));
-        let (_serialized_buffer, commands) = renderer
-            .string_to_positioned_glyphs("السلام عليكم")
-            .unwrap();
+        let mut renderer = Renderer::new(
+            &font,
+            40.0,
+            Some(Direction::RightToLeft),
+            Some(script::ARABIC),
+        );
+        let (_serialized_buffer, commands) =
+            renderer.string_to_positioned_glyphs("السلام عليكم").unwrap();
         let image = renderer.render_positioned_glyphs(&commands);
         image.save("test.png").unwrap();
     }

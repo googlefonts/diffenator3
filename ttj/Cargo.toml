@@ -1,11 +1,18 @@
 [package]
 name = "ttj"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
+authors = ["The Diffenator3 Authors"]
+homepage = "https://github.com/googlefonts/diffenator3"
+repository = "https://github.com/googlefonts/diffenator3"
+description = "Serialize OpenType tables to JSON"
+license = "Apache-2.0"
 
 [dependencies]
 skrifa = { workspace = true }
 read-fonts = { workspace = true }
 serde_json = { workspace = true }
-clap = "*"
+clap = "4.5.0"
 indexmap = { workspace = true }
+log.workspace = true
+fontdrasil = "0.2.3"

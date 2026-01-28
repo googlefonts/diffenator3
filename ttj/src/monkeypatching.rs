@@ -1,5 +1,5 @@
 /// Methods which other people's structs really should have but sadly don't.
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use read_fonts::{
     tables::{fvar::VariationAxisRecord, gsub::ClassDef, varc::CoverageTable},
@@ -57,8 +57,8 @@ impl MonkeyPatchClassDef for ClassDef<'_> {
         if class == 0 {
             // let coverage_map = coverage.unwrap().coverage_map();
             if let Some(coverage) = coverage {
-                let all_glyphs: HashSet<GlyphId16> = coverage.iter().collect();
-                let in_a_class: HashSet<GlyphId16> =
+                let all_glyphs: BTreeSet<GlyphId16> = coverage.iter().collect();
+                let in_a_class: BTreeSet<GlyphId16> =
                     self.iter().map(|(gid, _a_class)| gid).collect();
                 // Remove all the glyphs in assigned class
                 all_glyphs.difference(&in_a_class).copied().collect()

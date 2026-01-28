@@ -1,13 +1,11 @@
 use std::collections::HashMap;
 
 use crate::context::SerializationContext;
-use read_fonts::tables::gpos::DeviceOrVariationIndex::VariationIndex;
-use read_fonts::tables::variations::DeltaSetIndex;
-use read_fonts::FontData;
-use read_fonts::ReadError;
-use read_fonts::TableProvider;
-use serde_json::Map;
-use serde_json::Value;
+use read_fonts::{
+    tables::{gpos::DeviceOrVariationIndex::VariationIndex, variations::DeltaSetIndex},
+    FontData, ReadError, TableProvider,
+};
+use serde_json::{Map, Value};
 
 pub(crate) trait SerializeValueRecordLike {
     fn serialize(

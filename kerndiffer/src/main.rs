@@ -9,8 +9,7 @@ use env_logger::Env;
 use read_fonts::FontRef;
 use serde_json::{Map, Value};
 use std::path::PathBuf;
-use ttj::jsondiff::Substantial;
-use ttj::kern_diff;
+use ttj::{jsondiff::Substantial, kern_diff};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

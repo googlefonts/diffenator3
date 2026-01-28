@@ -1,14 +1,17 @@
-use std::collections::HashMap;
-use std::path::Path;
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+};
 
 /// Create before/after HTML proofs of two fonts
 // In a way this is not related to the core goal of diffenator3, but
 // at the same time, we happen to have all the moving parts required
 // to make this, and it would be a shame not to use them.
 use clap::Parser;
-use diffenator3_lib::dfont::{shared_axes, DFont};
-use diffenator3_lib::html::{gen_html, template_engine};
+use diffenator3_lib::{
+    dfont::{shared_axes, DFont},
+    html::{gen_html, template_engine},
+};
 use env_logger::Env;
 use google_fonts_languages::{SampleTextProto, LANGUAGES, SCRIPTS};
 use serde_json::json;
@@ -61,7 +64,7 @@ fn main() {
     let font_a = DFont::new(&font_binary_a);
 
     let (shared_codepoints, axes, instances) = if let Some(font2) = &cli.font2 {
-        let font_binary_b = std::fs::read(&font2).expect("Couldn't open file");
+        let font_binary_b = std::fs::read(font2).expect("Couldn't open file");
         let font_b = DFont::new(&font_binary_b);
 
         let shared_codepoints: HashSet<u32> = font_a

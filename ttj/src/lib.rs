@@ -7,16 +7,12 @@ pub mod monkeypatching;
 pub mod namemap;
 mod serializefont;
 
-use crate::jsondiff::diff;
-use crate::serializefont::ToValue;
+use crate::{jsondiff::diff, serializefont::ToValue};
 use context::SerializationContext;
 use namemap::NameMap;
-use read_fonts::traversal::SomeTable;
-use read_fonts::{FontRef, TableProvider};
+use read_fonts::{traversal::SomeTable, FontRef, TableProvider};
 use serde_json::{Map, Value};
-use skrifa::charmap::Charmap;
-use skrifa::string::StringId;
-use skrifa::MetadataProvider;
+use skrifa::{charmap::Charmap, string::StringId, MetadataProvider};
 
 pub use layout::gpos::just_kerns;
 
@@ -42,7 +38,7 @@ fn serialize_name_table<'a>(font: &(impl MetadataProvider<'a> + TableProvider<'a
     Value::Object(map)
 }
 
-fn serialize_cmap_table<'a>(font: &impl TableProvider<'a>, names: &NameMap) -> Value {
+fn serialize_cmap_table<'a>(font: &FontRef<'a>, names: &NameMap) -> Value {
     let charmap = Charmap::new(font);
     let mut map: Map<String, Value> = Map::new();
     for (codepoint, gid) in charmap.mappings() {
@@ -173,21 +169,26 @@ pub fn table_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_mat
 
     #[cfg(not(target_family = "wasm"))]
     if big_difference {
-        println!("Glyph names differ dramatically between fonts, using font names from font A");
+        log::info!("Glyph names differ dramatically between fonts, using font names from font A");
     }
 
-    diff(
-        &font_to_json(font_a, Some(&glyphmap_a)),
-        &font_to_json(
-            font_b,
-            Some(if big_difference {
-                &glyphmap_a
-            } else {
-                &glyphmap_b
-            }),
-        ),
-        max_changes,
-    )
+    let mut font_a_json = font_to_json(font_a, Some(&glyphmap_a));
+    let mut font_b_json = font_to_json(
+        font_b,
+        Some(if big_difference {
+            &glyphmap_a
+        } else {
+            &glyphmap_b
+        }),
+    );
+
+    // Remove some tables which aren't useful
+    font_a_json.as_object_mut().unwrap().remove("glyf");
+    font_b_json.as_object_mut().unwrap().remove("glyf");
+    font_a_json.as_object_mut().unwrap().remove("loca");
+    font_b_json.as_object_mut().unwrap().remove("loca");
+
+    diff(&font_a_json, &font_b_json, max_changes)
 }
 
 /// Compare two fonts and return a JSON representation of the differences in kerning
@@ -205,7 +206,7 @@ pub fn kern_diff(font_a: &FontRef, font_b: &FontRef, max_changes: usize, no_matc
 
     #[cfg(not(target_family = "wasm"))]
     if big_difference {
-        println!("Glyph names differ dramatically between fonts, using font names from font A");
+        log::info!("Glyph names differ dramatically between fonts, using font names from font A");
     }
 
     let kerns_a = just_kerns(font_to_json(font_a, None));

@@ -2,19 +2,22 @@ pub(crate) mod gpos;
 mod gsub;
 pub(crate) mod variable_scalars;
 
-use read_fonts::tables::gpos::{PositionLookup, PositionSubtables};
-use read_fonts::tables::gsub::{
-    ChainedSequenceContext, ClassDef, FeatureList, SequenceContext, SubstitutionLookup,
-    SubstitutionSubtables,
+use read_fonts::{
+    tables::{
+        gpos::{PositionLookup, PositionSubtables},
+        gsub::{
+            ChainedSequenceContext, ClassDef, FeatureList, SequenceContext, SubstitutionLookup,
+            SubstitutionSubtables,
+        },
+        layout::{self},
+        varc::CoverageTable,
+    },
+    FontRead, ReadError, TableProvider,
 };
-use read_fonts::tables::layout::{self};
-use read_fonts::tables::varc::CoverageTable;
-use read_fonts::{FontRead, ReadError, TableProvider};
 use serde_json::{Map, Value};
 use skrifa::GlyphId16;
 
-use super::context::SerializationContext;
-use super::namemap::NameMap;
+use super::{context::SerializationContext, namemap::NameMap};
 
 pub(crate) fn serialize_gpos_table(context: &SerializationContext) -> Value {
     let mut map = Map::new();
@@ -257,6 +260,8 @@ impl Slot {
         let mut result = String::new();
         if self.class_0 {
             result.push_str("@Any");
+        } else if self.glyphs.is_empty() {
+            result.push_str("[]");
         } else if self.glyphs.len() > 1 {
             result.push('[');
             result.push_str(

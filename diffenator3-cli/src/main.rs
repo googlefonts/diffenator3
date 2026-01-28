@@ -5,130 +5,42 @@
 /// and looking for differences between the renderings.
 ///
 /// Additionally, it can compare kerning table information and binary tables.
+mod args;
+mod languages;
 mod reporters;
-use crate::reporters::{LocationResult, Report};
-use clap::builder::ArgAction;
+use crate::{
+    args::Cli,
+    reporters::{LocationResult, Report},
+};
 use clap::Parser;
-use diffenator3_lib::dfont::DFont;
-use diffenator3_lib::html::template_engine;
-use diffenator3_lib::render::encodedglyphs::{modified_encoded_glyphs, CmapDiff};
-use diffenator3_lib::render::test_font_words;
-use diffenator3_lib::setting::{parse_location, Setting};
+use diffenator3_lib::{
+    dfont::DFont,
+    html::template_engine,
+    render::{
+        encodedglyphs::{modified_encoded_glyphs, CmapDiff},
+        test_font_words,
+    },
+    setting::{parse_location, Setting},
+    WordList,
+};
 use env_logger::Env;
 use indexmap::IndexSet;
 use itertools::Itertools;
 use skrifa::{MetadataProvider, Tag};
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
-use ttj::jsondiff::Substantial;
-use ttj::{kern_diff, table_diff};
-
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Cli {
-    /// Number of worker processes. Defaults to the number of logical CPUs.
-    #[clap(short = 'J', long)]
-    pub jobs: Option<usize>,
-
-    /// Don't show diffs in font tables
-    #[clap(long = "no-tables", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
-    tables: bool,
-
-    /// Show diffs in font tables [default]
-    #[clap(long = "tables", overrides_with = "tables", help_heading = Some("Tests to run"))]
-    _no_tables: bool,
-
-    /// Don't show diffs in font kerning pairs
-    #[clap(long = "no-kerns", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
-    kerns: bool,
-
-    /// Show diffs in font kerning pairs [default]
-    #[clap(long = "kerns", overrides_with = "kerns", help_heading = Some("Tests to run"))]
-    _no_kerns: bool,
-
-    /// Don't show diffs in glyph images
-    #[clap(long = "no-glyphs", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
-    glyphs: bool,
-
-    /// Show diffs in glyph images [default]
-    #[clap(long = "glyphs", overrides_with = "glyphs", help_heading = Some("Tests to run"))]
-    _no_glyphs: bool,
-
-    /// Don't show diffs in word images
-    #[clap(long = "no-words", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
-    words: bool,
-
-    /// Show diffs in word images [default]
-    #[clap(long = "words", overrides_with = "words", help_heading = Some("Tests to run"))]
-    _no_words: bool,
-
-    /// Show diffs as JSON
-    #[clap(long = "json", help_heading = Some("Report format"))]
-    json: bool,
-    /// Show diffs as HTML
-    #[clap(long = "html", help_heading = Some("Report format"))]
-    html: bool,
-    /// If an entry is absent in one font, show the data anyway
-    #[clap(long = "no-succinct", action = ArgAction::SetFalse, help_heading = Some("Report format"))]
-    succinct: bool,
-
-    /// If an entry is absent in one font, just report it as absent
-    #[clap(long = "succinct", overrides_with = "succinct", help_heading = Some("Report format"))]
-    _no_succinct: bool,
-
-    /// Maximum number of changes to report before giving up
-    #[clap(long = "max-changes", default_value = "128", help_heading = Some("Report format"))]
-    max_changes: usize,
-
-    /// Indent JSON
-    #[clap(long = "pretty", requires = "json", help_heading = Some("Report format"))]
-    pretty: bool,
-
-    /// Output directory for HTML
-    #[clap(long = "output", default_value = "out", requires = "html", help_heading = Some("Report format"))]
-    output: String,
-
-    /// Directory for custom templates
-    #[clap(long = "templates", requires = "html", help_heading = Some("Report format"))]
-    templates: Option<String>,
-
-    /// Update diffenator3's stock templates
-    #[clap(long = "update-templates", requires = "html", help_heading = Some("Report format"))]
-    update_templates: bool,
-
-    /// Location in user space, in the form axis=123,other=456 (may be repeated)
-    #[clap(long = "location", help_heading = "Locations to test")]
-    location: Vec<String>,
-    /// Instance to compare (may be repeated; use * for all instances)
-    #[clap(long = "instance", help_heading = "Locations to test")]
-    instance: Vec<String>,
-    /// Masters (as detected from the gvar table)
-    #[clap(long = "masters", help_heading = "Locations to test")]
-    masters: bool,
-    /// Cross-product (use min/default/max of all axes)
-    #[clap(long = "cross-product", help_heading = "Locations to test")]
-    cross_product: bool,
-    /// Cross-product splits
-    #[clap(
-        long = "cross-product-splits",
-        help_heading = "Locations to test",
-        default_value = "1"
-    )]
-    splits: usize,
-
-    /// Don't try to match glyph names between fonts
-    #[clap(long = "no-match", help_heading = Some("Report format"))]
-    no_match: bool,
-
-    /// The first font file to compare
-    font1: PathBuf,
-    /// The second font file to compare
-    font2: PathBuf,
-}
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
+use ttj::{jsondiff::Substantial, kern_diff, table_diff};
 
 fn main() {
     let mut cli = Cli::parse();
-    env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or(if cli.quiet {
+        "error"
+    } else {
+        "info"
+    }))
+    .init();
 
     if let Some(threads) = cli.jobs {
         rayon::ThreadPoolBuilder::new()
@@ -149,9 +61,23 @@ fn main() {
 
     let mut result = Report::default();
 
+    let custom_wordlist_inputs: Vec<WordList> = cli
+        .custom_wordlists
+        .iter()
+        .map(|path| {
+            let data = std::fs::read_to_string(path).expect("Couldn't read custom wordlist");
+            let name: String = path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("custom")
+                .to_string();
+            WordList::define(name, data.lines().map(String::from))
+        })
+        .collect();
+
     // Location-independent tests
     if cli.tables {
-        println!("Diffing binary tables");
+        log::info!("Diffing binary tables");
         let table_diff = table_diff(
             &font_a.fontref(),
             &font_b.fontref(),
@@ -163,7 +89,7 @@ fn main() {
         }
     }
     if cli.kerns {
-        println!("Diffing kerning");
+        log::info!("Diffing kerning");
         let kern_diff = kern_diff(
             &font_a.fontref(),
             &font_b.fontref(),
@@ -177,31 +103,43 @@ fn main() {
     if cli.glyphs {
         result.cmap_diff = Some(CmapDiff::new(&font_a, &font_b));
     }
-
-    // If there are no instances, location or cross-products, we set instances to "*"
-    if cli.instance.is_empty() && cli.location.is_empty() && !cli.masters && !cli.cross_product {
-        cli.instance.push("*".to_string());
-    }
-    // Location-specific tests
-    let settings: Vec<Setting> = generate_settings(&cli, &font_a, &font_b);
-
-    result.locations = settings
-        .into_iter()
-        .map(|setting| {
-            println!("Testing {}", setting.name());
-            if let Err(e) = setting.set_on_fonts(&mut font_a, &mut font_b) {
-                LocationResult::from_error(setting.name(), e)
-            } else {
-                test_at_location(&font_a, setting.name(), &cli, &font_b)
-            }
-        })
-        .collect();
-
-    // If there's more than one, filter out the boring ones
-    if result.locations.len() > 1 {
-        result.locations.retain(|l| l.is_some());
+    if cli.languages {
+        log::info!("Diffing language support");
+        result.languages = Some(languages::diff_languages(&font_a, &font_b));
     }
 
+    if cli.glyphs || cli.words {
+        // If there are no instances, location or cross-products, we set instances to "*"
+        if cli.instance.is_empty() && cli.location.is_empty() && !cli.masters && !cli.cross_product
+        {
+            cli.instance.push("*".to_string());
+        }
+        // Location-specific tests
+        let settings: Vec<Setting> = generate_settings(&cli, &font_a, &font_b);
+
+        result.locations = settings
+            .into_iter()
+            .map(|setting| {
+                log::info!("Testing {}", setting.name());
+                if let Err(e) = setting.set_on_fonts(&mut font_a, &mut font_b) {
+                    LocationResult::from_error(setting.name(), e)
+                } else {
+                    test_at_location(
+                        &font_a,
+                        setting.name(),
+                        &cli,
+                        &font_b,
+                        &custom_wordlist_inputs,
+                    )
+                }
+            })
+            .collect();
+
+        // If there's more than one, filter out the boring ones
+        if result.locations.len() > 1 {
+            result.locations.retain(|l| l.is_some());
+        }
+    }
     // Report back
     if cli.html {
         reporters::html::report(
@@ -218,7 +156,13 @@ fn main() {
     }
 }
 
-fn test_at_location(font_a: &DFont, loc_name: String, cli: &Cli, font_b: &DFont) -> LocationResult {
+fn test_at_location(
+    font_a: &DFont,
+    loc_name: String,
+    cli: &Cli,
+    font_b: &DFont,
+    wordlists: &[WordList],
+) -> LocationResult {
     let mut this_location_value = LocationResult::default();
     let loc_coords: HashMap<String, f32> = font_a
         .location
@@ -232,7 +176,7 @@ fn test_at_location(font_a: &DFont, loc_name: String, cli: &Cli, font_b: &DFont)
         this_location_value.glyphs = modified_encoded_glyphs(font_a, font_b);
     }
     if cli.words {
-        this_location_value.words = Some(test_font_words(font_a, font_b));
+        this_location_value.words = test_font_words(font_a, font_b, wordlists);
     }
     this_location_value
 }

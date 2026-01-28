@@ -1,0 +1,22 @@
+{
+  "inputs": ["./ts/*.ts"],
+  "exclude": ["*.d.ts"],
+  "compilerOptions": {
+    "outDir": "./",
+    "target": "esnext",
+    "types": ["jquery", "bootstrap"],
+    "lib": ["esnext", "dom"],
+    "module": "es2020",
+    // Other Outputs
+    "sourceMap": true,
+    "declaration": false,
+    "declarationMap": false,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "strict": true
+  }
+}

@@ -1,21 +1,14 @@
 /// Find and represent differences between encoded glyphs in the fonts.
 use std::fmt::Display;
 
-use crate::dfont::DFont;
-use crate::render::rustyruzz::Direction;
-use crate::render::{diff_many_words, GlyphDiff};
-use serde::Serialize;
-
 use super::{DEFAULT_GLYPHS_FONT_SIZE, DEFAULT_GLYPHS_THRESHOLD};
-
-#[derive(Serialize)]
-pub struct EncodedGlyph {
-    /// The character, as a string
-    pub string: String,
-    /// Name of the character from the Unicode database, if available
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-}
+pub use crate::structs::{CmapDiff, EncodedGlyph};
+use crate::{
+    dfont::DFont,
+    render::{diff_many_words, GlyphDiff},
+};
+pub use harfrust::Direction;
+use static_lang_word_lists::WordList;
 
 impl From<char> for EncodedGlyph {
     fn from(c: char) -> Self {
@@ -48,15 +41,6 @@ impl Display for EncodedGlyph {
     }
 }
 
-/// Represents changes to the cmap table - added or removed glyphs
-#[derive(Serialize)]
-pub struct CmapDiff {
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub missing: Vec<EncodedGlyph>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub new: Vec<EncodedGlyph>,
-}
-
 impl CmapDiff {
     pub fn is_some(&self) -> bool {
         !self.missing.is_empty() || !self.new.is_empty()
@@ -82,14 +66,14 @@ pub fn modified_encoded_glyphs(font_a: &DFont, font_b: &DFont) -> Vec<GlyphDiff>
         .filter_map(|i| char::from_u32(*i))
         .map(|c| c.to_string())
         .collect();
+    let wl = WordList::define("Encoded glyphs", word_list);
     let mut result: Vec<GlyphDiff> = diff_many_words(
         font_a,
         font_b,
         DEFAULT_GLYPHS_FONT_SIZE,
-        word_list,
-        DEFAULT_GLYPHS_THRESHOLD,
-        Direction::LeftToRight,
+        &wl,
         None,
+        DEFAULT_GLYPHS_THRESHOLD,
     )
     .into_iter()
     .map(|x| x.into())

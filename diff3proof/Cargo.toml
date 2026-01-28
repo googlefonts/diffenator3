@@ -1,11 +1,16 @@
 [package]
 name = "diff3proof"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
+authors = ["The Diffenator3 Authors"]
+homepage = "https://github.com/googlefonts/diffenator3"
+repository = "https://github.com/googlefonts/diffenator3"
+description = "A font proofing tool that knows about languages"
+license = "Apache-2.0"
 
 [dependencies]
-diffenator3-lib = { path = "../diffenator3-lib", features = ["html"] }
-google-fonts-languages = "0"
+diffenator3-lib = { version = "1", path = "../diffenator3-lib", features = ["html"] }
+google-fonts-languages = "0.7.0"
 tera = "1"
 clap = { version = "4.5.9", features = ["derive"] }
 env_logger = "0.11"

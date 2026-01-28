@@ -1,11 +1,13 @@
 use crate::layout::variable_scalars::{hashmap_to_value, serialize_all_deltas};
 
 use super::context::SerializationContext;
-use read_fonts::tables::gdef::{
-    AttachList, CaretValue, ClassDef, GlyphClassDef, LigCaretList, MarkGlyphSets,
+use read_fonts::{
+    tables::{
+        gdef::{AttachList, CaretValue, ClassDef, GlyphClassDef, LigCaretList, MarkGlyphSets},
+        gpos::DeviceOrVariationIndex::VariationIndex,
+    },
+    TableProvider,
 };
-use read_fonts::tables::gpos::DeviceOrVariationIndex::VariationIndex;
-use read_fonts::TableProvider;
 use serde_json::{json, Map, Value};
 use skrifa::GlyphId16;
 

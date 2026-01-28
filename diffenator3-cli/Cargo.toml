@@ -1,11 +1,12 @@
 [package]
 name = "diffenator3"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
-license = "Apache-2.0"
-description = "A utility for comparing two font files"
+authors = ["The Diffenator3 Authors"]
+homepage = "https://github.com/googlefonts/diffenator3"
 repository = "https://github.com/googlefonts/diffenator3"
-readme = "../README.md"
+description = "A font comparison tool that will not stop until your fonts are exhaustively compared"
+license = "Apache-2.0"
 
 [[bin]]
 name = "diffenator3"
@@ -14,15 +15,23 @@ path = "src/main.rs"
 [[bin]]
 name = "diff3proof"
 path = "src/bin/diff3proof.rs"
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[features]
+typescript = ["dep:typescript-type-def", "diffenator3-lib/typescript"]
 
 [dependencies]
-diffenator3-lib = { path = "../diffenator3-lib", features = ["html"] }
-ttj = { path = "../ttj" }
+diffenator3-lib = { path = "../diffenator3-lib", version = "1", features = [
+    "html",
+] }
+ttj = { version = "1", path = "../ttj" }
 indexmap = { workspace = true }
 skrifa = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
-rayon = "*"
+rayon = "1.11.0"
 colored = "2.1.0"
 
 clap = { version = "4.5.9", features = ["derive"] }
@@ -33,3 +42,11 @@ env_logger = "0.11"
 google-fonts-languages = "0"
 tera = "1"
 fancy-regex = "0.13"
+log = { workspace = true }
+shaperglot = { workspace = true }
+tabled = "0.20.0"
+
+# Code for emitting TypeScript types
+typescript-type-def = { version = "0.5.13", optional = true, features = [
+    "json_value",
+] }

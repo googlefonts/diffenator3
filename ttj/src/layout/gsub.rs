@@ -1,14 +1,16 @@
 use super::SerializeSubtable;
 use crate::context::SerializationContext;
-use read_fonts::tables::gsub::AlternateSubstFormat1;
-use read_fonts::tables::gsub::LigatureSubstFormat1;
-use read_fonts::tables::gsub::MultipleSubstFormat1;
-use read_fonts::tables::gsub::ReverseChainSingleSubstFormat1;
-use read_fonts::tables::gsub::SingleSubst;
-use read_fonts::tables::varc::CoverageTable;
-use read_fonts::ReadError;
-use serde_json::Map;
-use serde_json::Value;
+use read_fonts::{
+    tables::{
+        gsub::{
+            AlternateSubstFormat1, LigatureSubstFormat1, MultipleSubstFormat1,
+            ReverseChainSingleSubstFormat1, SingleSubst,
+        },
+        varc::CoverageTable,
+    },
+    ReadError,
+};
+use serde_json::{Map, Value};
 use skrifa::GlyphId16;
 
 impl SerializeSubtable for SingleSubst<'_> {

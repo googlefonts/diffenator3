@@ -1,9 +1,13 @@
 /// Debug rendering differences between fonts
 use clap::Parser;
-use diffenator3_lib::render::renderer::Renderer;
-use diffenator3_lib::render::utils::{count_differences, make_same_size};
-use diffenator3_lib::render::{wordlists, DEFAULT_GRAY_FUZZ};
-use diffenator3_lib::setting::{parse_location, Setting};
+use diffenator3_lib::{
+    render::{
+        renderer::Renderer,
+        utils::{count_differences, make_same_size},
+        wordlists, DEFAULT_GRAY_FUZZ,
+    },
+    setting::{parse_location, Setting},
+};
 use image::{Pixel, Rgba, RgbaImage};
 use zeno::Command;
 
@@ -24,7 +28,7 @@ struct Args {
     #[clap(short, long, default_value = "64.0")]
     size: f32,
     /// Script
-    #[clap(short, long, default_value = "Latin")]
+    #[clap(short, long, default_value = "Latn")]
     script: String,
 
     /// Verbose debugging
@@ -46,8 +50,8 @@ fn main() {
             .expect("Couldn't set location");
     }
 
+    let script_tag = harfrust::Script::from(&args.script);
     let direction = wordlists::get_script_direction(&args.script);
-    let script_tag = wordlists::get_script_tag(&args.script);
 
     let mut renderer_a = Renderer::new(&dfont_a, args.size, direction, script_tag);
     let mut renderer_b = Renderer::new(&dfont_b, args.size, direction, script_tag);

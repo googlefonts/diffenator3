@@ -29,7 +29,7 @@ impl<'a> ToValue for FieldType<'a> {
             Self::MajorMinor(arg0) => Value::String(format!("{}.{}", arg0.major, arg0.minor)),
             Self::Version16Dot16(arg0) => Value::String(format!("{}", *arg0)),
             Self::F2Dot14(arg0) => Value::Number(Number::from_f64(arg0.to_f32() as f64).unwrap()),
-            Self::Fixed(arg0) => Value::Number(Number::from(arg0.to_i32())),
+            Self::Fixed(arg0) => Value::Number(Number::from_f64(arg0.to_f32() as f64).unwrap()),
             Self::LongDateTime(arg0) => Value::Number(arg0.as_secs().into()),
             Self::GlyphId16(arg0) => Value::String(format!("g{}", arg0.to_u16())),
             Self::NameId(arg0) => Value::String(arg0.to_string()),
