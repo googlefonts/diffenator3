@@ -8,6 +8,14 @@ repository = "https://github.com/googlefonts/diffenator3"
 description = "A font proofing tool that knows about languages"
 license = "Apache-2.0"
 
+[lib]
+name = "diff3proof"
+path = "src/lib.rs"
+
+[[bin]]
+name = "diff3proof"
+path = "src/main.rs"
+
 [dependencies]
 diffenator3-lib = { version = "1", path = "../diffenator3-lib", features = ["html"] }
 google-fonts-languages = "0.7.0"

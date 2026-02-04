@@ -26,6 +26,7 @@ typescript = ["dep:typescript-type-def", "diffenator3-lib/typescript"]
 diffenator3-lib = { path = "../diffenator3-lib", version = "1", features = [
     "html",
 ] }
+diff3proof = { version = "1", path = "../diff3proof" }
 ttj = { version = "1", path = "../ttj" }
 indexmap = { workspace = true }
 skrifa = { workspace = true }
@@ -38,10 +39,6 @@ clap = { version = "4.5.9", features = ["derive"] }
 itertools = "0.13.0"
 env_logger = "0.11"
 
-# diff3proof dependencies
-google-fonts-languages = "0"
-tera = "1"
-fancy-regex = "0.13"
 log = { workspace = true }
 shaperglot = { workspace = true }
 tabled = "0.20.0"
