@@ -12,10 +12,6 @@ license = "Apache-2.0"
 name = "diff3proof"
 path = "src/lib.rs"
 
-[[bin]]
-name = "diff3proof"
-path = "src/main.rs"
-
 [dependencies]
 diffenator3-lib = { version = "1", path = "../diffenator3-lib", features = ["html"] }
 google-fonts-languages = "0.7.0"
