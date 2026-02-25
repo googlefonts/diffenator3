@@ -162,7 +162,8 @@ jobs:
               7z a "$dirname.zip" "$dirname"
               echo "ASSET=$dirname.zip" >> $GITHUB_ENV
           else
-              mv "target/${{ matrix.os.target }}/release/${{env.PROJECT_NAME}}" "$dirname"
+              mv "target/${{ matrix.os.target }}/release/diffenator3" "$dirname"
+              mv "target/${{ matrix.os.target }}/release/diff3proof" "$dirname"
               tar -czf "$dirname.tar.gz" "$dirname"
               echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
           fi
