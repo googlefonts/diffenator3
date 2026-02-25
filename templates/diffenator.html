@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" dir="auto">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -80,7 +80,7 @@
     </div>
     <script type="module">
       var report = {{ report | json_encode | safe }};
-      	{% include "script.js" %}
+      	{% include "shared.js" %}
     </script>
   </body>
 </html>

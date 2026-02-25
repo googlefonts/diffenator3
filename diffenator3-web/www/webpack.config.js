@@ -11,6 +11,14 @@ module.exports = {
   },
   entry: {
     bootstrap: "./bootstrap.js",
+    shared: {
+      import: "./ts/shared.ts",
+      filename: "../templates/shared.js",
+      library: {
+        "name": "Diffenator3Shared",
+        "type": "window",
+      }
+    },
     static: {
       import: "./ts/d3web-static.ts",
       filename: "../templates/script.js",
