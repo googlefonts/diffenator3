@@ -129,8 +129,7 @@ impl<'a> ColorRenderer<'a> {
         let (bearing_x, bearing_y, tile_w, tile_h) = self.glyph_tile_bounds(glyph_id);
 
         let outlines = self.font.outline_glyphs();
-        let mut painter =
-            SkiaPainter::new(tile_w, tile_h, &self.palette, outlines, self.location);
+        let mut painter = SkiaPainter::new(tile_w, tile_h, &self.palette, outlines, self.location);
 
         // Transform: maps font-unit origin (0,0) to pixel (-bearing_x, bearing_y)
         // within the tile, with Y-flip (font Y-up → pixel Y-down).
