@@ -39,6 +39,7 @@ unicode_names2 = "0.6.0"
 brotli = "6.0.0"
 lazy_static = "1.4.0"
 zeno = "0.3.1"
+tiny-skia = "0.12"
 log = "0.4"
 
 static-lang-word-lists = { version = "0.3.0", features = ["rayon"] }
