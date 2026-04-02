@@ -150,10 +150,12 @@ pub(crate) fn diff_many_words(
                     .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
             })
             .map(|word| {
-                let renderer_a = tl_a
-                    .get_or(|| RefCell::new(ColorRenderer::new(font_a, font_size, direction, script)));
-                let renderer_b = tl_b
-                    .get_or(|| RefCell::new(ColorRenderer::new(font_b, font_size, direction, script)));
+                let renderer_a = tl_a.get_or(|| {
+                    RefCell::new(ColorRenderer::new(font_a, font_size, direction, script))
+                });
+                let renderer_b = tl_b.get_or(|| {
+                    RefCell::new(ColorRenderer::new(font_b, font_size, direction, script))
+                });
 
                 let (buffer_a, img_a) = renderer_a.borrow_mut().render_string(word)?;
                 if buffer_a
@@ -191,10 +193,10 @@ pub(crate) fn diff_many_words(
                     .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
             })
             .map(|word| {
-                let renderer_a =
-                    tl_a.get_or(|| RefCell::new(Renderer::new(font_a, font_size, direction, script)));
-                let renderer_b =
-                    tl_b.get_or(|| RefCell::new(Renderer::new(font_b, font_size, direction, script)));
+                let renderer_a = tl_a
+                    .get_or(|| RefCell::new(Renderer::new(font_a, font_size, direction, script)));
+                let renderer_b = tl_b
+                    .get_or(|| RefCell::new(Renderer::new(font_b, font_size, direction, script)));
 
                 let (buffer_a, commands_a) =
                     renderer_a.borrow_mut().string_to_positioned_glyphs(word)?;
@@ -303,9 +305,7 @@ pub(crate) fn diff_many_words(
                     continue;
                 }
             }
-            let Some((buffer_a, commands_a)) =
-                renderer_a.string_to_positioned_glyphs(&word)
-            else {
+            let Some((buffer_a, commands_a)) = renderer_a.string_to_positioned_glyphs(&word) else {
                 continue;
             };
             if buffer_a.split('|').all(|glyph| seen_glyphs.contains(glyph)) {
@@ -314,9 +314,7 @@ pub(crate) fn diff_many_words(
             for glyph in buffer_a.split('|') {
                 seen_glyphs.insert(glyph.to_string());
             }
-            let Some((buffer_b, commands_b)) =
-                renderer_b.string_to_positioned_glyphs(&word)
-            else {
+            let Some((buffer_b, commands_b)) = renderer_b.string_to_positioned_glyphs(&word) else {
                 continue;
             };
             if commands_a == commands_b {

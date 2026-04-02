@@ -238,8 +238,10 @@ impl<'a> ColorPainter for SkiaPainter<'a> {
                     to_spread(extend),
                     self.transform,
                 ) {
-                    let mut paint = Paint::default();
-                    paint.shader = shader;
+                    let paint = Paint {
+                        shader,
+                        ..Paint::default()
+                    };
                     tmp.fill_path(
                         &path,
                         &paint,
@@ -273,8 +275,10 @@ impl<'a> ColorPainter for SkiaPainter<'a> {
                     to_spread(extend),
                     self.transform,
                 ) {
-                    let mut paint = Paint::default();
-                    paint.shader = shader;
+                    let paint = Paint {
+                        shader,
+                        ..Paint::default()
+                    };
                     tmp.fill_path(
                         &path,
                         &paint,
@@ -306,8 +310,10 @@ impl<'a> ColorPainter for SkiaPainter<'a> {
                     to_spread(extend),
                     self.transform,
                 ) {
-                    let mut paint = Paint::default();
-                    paint.shader = shader;
+                    let paint = Paint {
+                        shader,
+                        ..Paint::default()
+                    };
                     tmp.fill_path(
                         &path,
                         &paint,
@@ -393,8 +399,10 @@ impl<'a> ColorPainter for SkiaPainter<'a> {
                 CompositeMode::Plus => tiny_skia::BlendMode::Plus,
                 _ => tiny_skia::BlendMode::SourceOver,
             };
-            let mut paint = PixmapPaint::default();
-            paint.blend_mode = blend;
+            let paint = PixmapPaint {
+                blend_mode: blend,
+                ..PixmapPaint::default()
+            };
             let pm = self.current_pixmap();
             pm.draw_pixmap(0, 0, layer.as_ref(), &paint, TsTransform::identity(), None);
         }
