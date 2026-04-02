@@ -272,6 +272,85 @@ impl<'a> ColorRenderer<'a> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn load_test_font() -> Vec<u8> {
+        std::fs::read("test-data/Nabla-subset.ttf").expect("missing test font")
+    }
+
+    #[test]
+    fn colrv1_render_produces_non_empty_image() {
+        let data = load_test_font();
+        let dfont = DFont::new(&data);
+        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
+        let (buffer, img) = renderer
+            .render_string("hello")
+            .expect("render_string returned None");
+
+        assert!(!buffer.is_empty(), "serialized buffer should not be empty");
+        assert!(img.width() > 0 && img.height() > 0, "image has zero size");
+
+        let non_zero = img.pixels().filter(|p| p.0[0] > 0).count();
+        assert!(non_zero > 0, "image is completely blank");
+    }
+
+    #[test]
+    fn colrv1_glyph_cache_is_reused() {
+        let data = load_test_font();
+        let dfont = DFont::new(&data);
+        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
+
+        // "ll" shares the same glyph; after rendering, the cache should contain it
+        renderer.render_string("hello").unwrap();
+        let cache_size_after_hello = renderer.cache.len();
+
+        // "lo" reuses 'l' and 'o' which are already cached
+        renderer.render_string("lo").unwrap();
+        let cache_size_after_lo = renderer.cache.len();
+
+        assert_eq!(
+            cache_size_after_hello, cache_size_after_lo,
+            "cache grew when all glyphs should already have been cached"
+        );
+    }
+
+    #[test]
+    fn colrv1_cached_tiles_contain_color() {
+        let data = load_test_font();
+        let dfont = DFont::new(&data);
+        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
+
+        renderer.render_string("hello").unwrap();
+
+        // At least one cached tile should have pixels where the RGB channels
+        // differ from each other, proving we're rendering actual color, not
+        // just grayscale alpha.
+        let has_color = renderer.cache.values().any(|tile| {
+            tile.pixmap.pixels().iter().any(|px| {
+                let (r, g, b) = (px.red(), px.green(), px.blue());
+                px.alpha() > 0 && !(r == g && g == b)
+            })
+        });
+        assert!(has_color, "no color pixels found in cached glyph tiles");
+    }
+
+    #[test]
+    fn colrv1_same_font_has_zero_diff() {
+        let data = load_test_font();
+        let dfont = DFont::new(&data);
+        let mut renderer_a = ColorRenderer::new(&dfont, 32.0, None, None);
+        let mut renderer_b = ColorRenderer::new(&dfont, 32.0, None, None);
+
+        let (_, img_a) = renderer_a.render_string("world").unwrap();
+        let (_, img_b) = renderer_b.render_string("world").unwrap();
+
+        let diff = crate::render::utils::count_differences(img_a, img_b, 0);
+        assert_eq!(diff, 0, "same font should produce identical images");
+    }
+}
+
 /// Read the first CPAL palette from a font.
 fn read_cpal_palette(font: &skrifa::FontRef) -> Vec<PaletteColor> {
     let cpal = match font.cpal() {
