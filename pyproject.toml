@@ -8,6 +8,7 @@ bindings = "bin"
 include = [
   { path = "README.md", format = "sdist" },
   { path = "LICENSE.md", format = "sdist" },
+  { path = "templates/*", format = "sdist" },
 ]
 exclude = [
   { path = "diffenator3-cli/**/*", format = "wheel" },
