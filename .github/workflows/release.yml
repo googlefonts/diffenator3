@@ -38,7 +38,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform.target }}
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
 
       - name: Install protoc for google-fonts-languages
         uses: arduino/setup-protoc@v3
@@ -78,11 +78,24 @@ jobs:
         if: matrix.platform.target == 'x86_64-apple-darwin'
         run: pipx run twine check dist/*.tar.gz
 
-      - name: Archive binary
-        if: matrix.platform.os != 'windows-latest'
+      - name: Build native binaries (macOS)
+        if: matrix.platform.os == 'macos-latest'
         run: |
-          cd target/${{ matrix.platform.target }}/release
+          cargo build --release --target x86_64-apple-darwin
+          cargo build --release --target aarch64-apple-darwin
+
+      - name: Archive binary (macOS x86_64)
+        if: matrix.platform.target == 'x86_64-apple-darwin'
+        run: |
+          cd target/x86_64-apple-darwin/release
           tar czvf ../../../${{ matrix.platform.archive }} diffenator3 diff3proof
+          cd -
+
+      - name: Archive binary (macOS aarch64)
+        if: matrix.platform.target == 'x86_64-apple-darwin'
+        run: |
+          cd target/aarch64-apple-darwin/release
+          tar czvf ../../../diffenator3-aarch64-apple-darwin.tar.gz diffenator3 diff3proof
           cd -
 
       - name: Archive binary (windows)
@@ -90,13 +103,6 @@ jobs:
         run: |
           cd target/${{ matrix.platform.target }}/release
           7z a ../../../${{ matrix.platform.archive }} diffenator3.exe diff3proof.exe
-          cd -
-
-      - name: Archive binary (macOS aarch64)
-        if: matrix.platform.os == 'macos-latest'
-        run: |
-          cd target/aarch64-apple-darwin/release
-          tar czvf ../../../diffenator3-aarch64-apple-darwin.tar.gz diffenator3 diff3proof
           cd -
 
       - name: Upload wheel artifacts
