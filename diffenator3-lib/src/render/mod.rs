@@ -28,6 +28,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     ops::ControlFlow,
     str::FromStr,
+    time::Duration,
 };
 
 cfg_if! {
@@ -230,6 +231,11 @@ pub(crate) fn diff_many_words(
     let mut renderer_b = make_renderer(font_b, font_size, direction, script, use_color);
 
     let time_before = std::time::Instant::now();
+    let mut first_shape_time = Duration::ZERO;
+    let mut var_shape_time = Duration::ZERO;
+    let mut first_other_time = Duration::ZERO;
+    let mut var_other_time = Duration::ZERO;
+    let mut variations_processed = 0;
 
     for word in wordlist.iter() {
         if let Some(scp) = shared_codepoints {
@@ -238,10 +244,14 @@ pub(crate) fn diff_many_words(
             }
         }
         // Shape it at the default location and render to a buffer
+        let shaping = std::time::Instant::now();
         let buffer_a = renderer_a.shape(word, None);
         let mut variation_positions = font_a.variations_for_buffer(&buffer_a);
         let buffer_b = renderer_b.shape(word, None);
         variation_positions.extend(font_b.variations_for_buffer(&buffer_b));
+        first_shape_time += shaping.elapsed();
+
+        let other = std::time::Instant::now();
 
         if let Some(diff) = process_word(
             threshold,
@@ -256,10 +266,16 @@ pub(crate) fn diff_many_words(
             differences.push(diff);
         }
 
+        first_other_time += other.elapsed();
+
         // // Now let's look at the variations!
         // for variation in variation_positions {
+        //     let shaping = std::time::Instant::now();
+
         //     let buffer_a = renderer_a.shape(word, Some(font_a.location_to_coords(&variation)));
         //     let buffer_b = renderer_b.shape(word, Some(font_b.location_to_coords(&variation)));
+        //     var_shape_time += shaping.elapsed();
+        //     let other = std::time::Instant::now();
         //     let user_space = font_a.location_to_user(&variation);
         //     // println!("also checking {} at {}", word, user_space);
         //     if let Some(diff) = process_word(
@@ -274,13 +290,26 @@ pub(crate) fn diff_many_words(
         //     ) {
         //         differences.push(diff);
         //     }
+        //     var_other_time += other.elapsed();
+        //     variations_processed += 1;
         // }
     }
 
     log::info!(
-        "Processed {} words in {:?}",
+        "Processed {} words in {:?} with {} variations",
         wordlist.len(),
-        time_before.elapsed()
+        time_before.elapsed(),
+        variations_processed
+    );
+    log::info!(
+        "First shape time: {:?}, first other time: {:?}",
+        first_shape_time,
+        first_other_time
+    );
+    log::info!(
+        "Variation shape time: {:?}, variation other time: {:?}",
+        var_shape_time,
+        var_other_time
     );
 
     differences.sort_by_key(|x| -(x.differing_pixels as i32));
