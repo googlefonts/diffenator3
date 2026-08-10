@@ -189,7 +189,7 @@ fn generate_settings(args: &Cli, font_a: &DFont, font_b: &DFont) -> Vec<Setting>
         if instance == "*" {
             // Add the union of instances from both fonts
             let mut instances: IndexSet<String> = font_a.instances().into_iter().collect();
-            instances.extend(font_b.instances().into_iter());
+            instances.extend(font_b.instances());
             settings.extend(instances.into_iter().map(Setting::from_instance));
         } else {
             settings.push(Setting::from_instance(instance.clone()));
