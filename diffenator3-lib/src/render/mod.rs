@@ -13,16 +13,20 @@ pub mod wordlists;
 pub use crate::structs::{Difference, GlyphDiff};
 use crate::{
     dfont::DFont,
-    render::{utils::count_differences, wordlists::direction_from_script},
+    render::{shaper::PositionedGlyph, utils::count_differences, wordlists::direction_from_script},
 };
 use cfg_if::cfg_if;
 use colorrenderer::ColorRenderer;
+use fontdrasil::coords::NormalizedLocation;
 use harfrust::{Direction, Script};
+use indicatif::ProgressIterator as _;
+use read_fonts::ReadError;
 use renderer::{AnyRenderer, Renderer};
 use skrifa::raw::TableProvider;
 use static_lang_word_lists::WordList;
 use std::{
     collections::{BTreeMap, HashSet},
+    ops::ControlFlow,
     str::FromStr,
 };
 
@@ -91,7 +95,8 @@ pub fn test_font_words(
             job,
             Some(&shared_codepoints),
             DEFAULT_WORDS_THRESHOLD,
-        );
+        )
+        .unwrap_or_default();
         if !results.is_empty() {
             map.insert(job.name().to_string(), results);
         }
@@ -180,26 +185,9 @@ fn make_renderer<'a>(
 //                 ))
 //             });
 
-//             let (buffer_a, data_a) = renderer_a.borrow_mut().string_to_stage1_rendering(word)?;
 //             if buffer_a
-//                 .split('|')
-//                 .all(|glyph| seen_glyphs.read().unwrap().contains(glyph))
-//             {
-//                 return None;
-//             }
-//             for glyph in buffer_a.split('|') {
-//                 seen_glyphs.write().unwrap().insert(glyph.to_string());
-//             }
 //             let (buffer_b, data_b) = renderer_b.borrow_mut().string_to_stage1_rendering(word)?;
-//             if renderer_a
 //                 .borrow()
-//                 .fast_equivalence_check(&*data_a, &*data_b)
-//             {
-//                 return None;
-//             }
-//             let img_a = renderer_a.borrow_mut().final_rendering(&*data_a);
-//             let img_b = renderer_b.borrow_mut().final_rendering(&*data_b);
-//             let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
 //             let buffers_same = buffer_a == buffer_b;
 
 //             Some(Difference {
@@ -231,11 +219,11 @@ pub(crate) fn diff_many_words(
     wordlist: &WordList,
     shared_codepoints: Option<&HashSet<u32>>,
     threshold: usize,
-) -> Vec<Difference> {
+) -> Result<Vec<Difference>, ReadError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
-    let direction = script.and_then(|s| direction_from_script(s));
+    let direction = script.and_then(direction_from_script);
     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
-    let mut seen_glyphs: HashSet<String> = HashSet::new();
+    let mut seen_glyphs: HashSet<PositionedGlyph> = HashSet::new();
     let mut differences: Vec<Difference> = vec![];
 
     let mut renderer_a = make_renderer(font_a, font_size, direction, script, use_color);
@@ -249,35 +237,44 @@ pub(crate) fn diff_many_words(
                 continue;
             }
         }
-        let Some((buffer_a, data_a)) = renderer_a.string_to_stage1_rendering(&word) else {
-            continue;
-        };
-        if buffer_a.split('|').all(|glyph| seen_glyphs.contains(glyph)) {
-            continue;
+        // Shape it at the default location and render to a buffer
+        let buffer_a = renderer_a.shape(word, None);
+        let mut variation_positions = font_a.variations_for_buffer(&buffer_a);
+        let buffer_b = renderer_b.shape(word, None);
+        variation_positions.extend(font_b.variations_for_buffer(&buffer_b));
+
+        if let Some(diff) = process_word(
+            threshold,
+            &mut seen_glyphs,
+            &mut renderer_a,
+            &mut renderer_b,
+            word,
+            buffer_a,
+            buffer_b,
+            "".to_string(),
+        ) {
+            differences.push(diff);
         }
-        for glyph in buffer_a.split('|') {
-            seen_glyphs.insert(glyph.to_string());
-        }
-        let Some((buffer_b, data_b)) = renderer_b.string_to_stage1_rendering(&word) else {
-            continue;
-        };
-        if renderer_a.fast_equivalence_check(&*data_a, &*data_b) {
-            continue;
-        }
-        let buffers_same = buffer_a == buffer_b;
-        let img_a = renderer_a.final_rendering(&*data_a);
-        let img_b = renderer_b.final_rendering(&*data_b);
-        let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
-        if differing_pixels > threshold {
-            differences.push(Difference {
-                word: word.to_string(),
-                buffer_a,
-                buffer_b: if buffers_same { None } else { Some(buffer_b) },
-                ot_features: "".to_string(),
-                lang: "".to_string(),
-                differing_pixels,
-            });
-        }
+
+        // // Now let's look at the variations!
+        // for variation in variation_positions {
+        //     let buffer_a = renderer_a.shape(word, Some(font_a.location_to_coords(&variation)));
+        //     let buffer_b = renderer_b.shape(word, Some(font_b.location_to_coords(&variation)));
+        //     let user_space = font_a.location_to_user(&variation);
+        //     // println!("also checking {} at {}", word, user_space);
+        //     if let Some(diff) = process_word(
+        //         threshold,
+        //         &mut seen_glyphs,
+        //         &mut renderer_a,
+        //         &mut renderer_b,
+        //         word,
+        //         buffer_a,
+        //         buffer_b,
+        //         user_space,
+        //     ) {
+        //         differences.push(diff);
+        //     }
+        // }
     }
 
     log::info!(
@@ -287,5 +284,49 @@ pub(crate) fn diff_many_words(
     );
 
     differences.sort_by_key(|x| -(x.differing_pixels as i32));
-    differences
+    Ok(differences)
+}
+
+fn process_word<'a>(
+    threshold: usize,
+    seen_glyphs: &mut HashSet<PositionedGlyph>,
+    renderer_a: &mut Box<dyn AnyRenderer + Send + 'a>,
+    renderer_b: &mut Box<dyn AnyRenderer + Send + 'a>,
+    word: &str,
+    buffer_a: shaper::DrawBuffer,
+    buffer_b: shaper::DrawBuffer,
+    location: String,
+) -> Option<Difference> {
+    let data_a = renderer_a.buffer_to_stage1_rendering(&buffer_a)?;
+    if buffer_a.iter().all(|glyph| seen_glyphs.contains(glyph)) {
+        return None;
+    }
+    for glyph in buffer_a.iter() {
+        seen_glyphs.insert(*glyph);
+    }
+    let data_b = renderer_b.buffer_to_stage1_rendering(&buffer_b)?;
+    if renderer_a.fast_equivalence_check(&*data_a, &*data_b) {
+        return None;
+    }
+    let buffers_same = buffer_a == buffer_b;
+    let img_a = renderer_a.final_rendering(&*data_a);
+    let img_b = renderer_b.final_rendering(&*data_b);
+    let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
+
+    if differing_pixels > threshold {
+        return Some(Difference {
+            word: word.to_string(),
+            buffer_a: buffer_a.serialize(),
+            buffer_b: if buffers_same {
+                None
+            } else {
+                Some(buffer_b.serialize())
+            },
+            ot_features: "".to_string(),
+            lang: "".to_string(),
+            differing_pixels,
+            location,
+        });
+    }
+    None
 }

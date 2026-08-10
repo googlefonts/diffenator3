@@ -8,10 +8,7 @@
 mod args;
 mod languages;
 mod reporters;
-use crate::{
-    args::Cli,
-    reporters::{LocationResult, Report},
-};
+use crate::{args::Cli, reporters::Report};
 use clap::Parser;
 use diffenator3_lib::{
     dfont::DFont,
@@ -20,11 +17,10 @@ use diffenator3_lib::{
         encodedglyphs::{modified_encoded_glyphs, CmapDiff},
         test_font_words,
     },
-    setting::Setting,
     WordList,
 };
 use env_logger::Env;
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 use ttj::{jsondiff::Substantial, kern_diff, table_diff};
 
 fn main() {
@@ -103,10 +99,10 @@ fn main() {
     }
 
     if cli.glyphs {
-        result.glyphs = modified_encoded_glyphs(&font_a, &font_b);
+        result.glyphs = modified_encoded_glyphs(&font_a, &font_b).expect("Error diffing glyphs");
     }
     if cli.words {
-        result.words = test_font_words(&font_a, &font_b, wordlists);
+        result.words = test_font_words(&font_a, &font_b, &custom_wordlist_inputs);
     }
     // Report back
     if cli.html {

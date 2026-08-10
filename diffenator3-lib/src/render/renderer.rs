@@ -1,25 +1,33 @@
 /// Turn some words into images
 use std::any::Any;
 
-use harfrust::{Direction, Script, ShapePlan, ShaperData, ShaperInstance, Variation};
+use fontdrasil::coords::NormalizedCoord;
+use harfrust::{Direction, Script};
 use image::{DynamicImage, GrayImage, Luma};
-use skrifa::{instance::Size, MetadataProvider};
+use skrifa::{
+    instance::{LocationRef, Size},
+    MetadataProvider,
+};
 use zeno::Command;
 
 use super::{
     cachedoutlines::CachedOutlineGlyphCollection,
     utils::{terrible_bounding_box, RecordingPen},
 };
-use crate::{dfont::DFont, render::shaper::DrawBuffer};
+use crate::{
+    dfont::DFont,
+    render::shaper::{CachedShaper, DrawBuffer},
+};
 
 pub trait AnyRenderer {
-    /// Shape `string` and return a serialized glyph buffer plus an opaque handle
+    fn shape(&mut self, string: &str, location: Option<Vec<NormalizedCoord>>) -> DrawBuffer;
+
+    /// Given a shaped string, return a an opaque handle
     /// to the renderer's intermediate data.
     ///
-    /// The serialized buffer is used for de-duplication and for reporting; the
-    /// opaque handle is passed back to [`Self::fast_equivalence_check`] and
+    /// The handle is passed back to [`Self::fast_equivalence_check`] and
     /// [`Self::final_rendering`] for this renderer to downcast.
-    fn string_to_stage1_rendering(&mut self, string: &str) -> Option<(String, Box<dyn Any>)>;
+    fn buffer_to_stage1_rendering(&mut self, draw_buffer: &DrawBuffer) -> Option<Box<dyn Any>>;
 
     /// Cheap check for whether two intermediate renderings are equivalent, so that
     /// rasterization can be skipped when both fonts produce identical output.
@@ -30,16 +38,13 @@ pub trait AnyRenderer {
     fn fast_equivalence_check(&self, data1: &dyn Any, data2: &dyn Any) -> bool;
 
     /// Rasterize intermediate data into a grayscale image.
-    fn final_rendering(&mut self, data: &dyn Any) -> GrayImage;
+    fn final_rendering(&self, data: &dyn Any) -> GrayImage;
 }
 
 pub struct Renderer<'a> {
-    shaper_data: ShaperData,
-    scale: f32,
-    font: skrifa::FontRef<'a>,
-    plan: Option<ShapePlan>,
-    instance: ShaperInstance,
+    // instance: ShaperInstance,
     outlines: CachedOutlineGlyphCollection<'a>,
+    cached_shaper: CachedShaper<'a>,
 }
 
 impl<'a> Renderer<'a> {
@@ -58,72 +63,41 @@ impl<'a> Renderer<'a> {
                 dfont.family_name()
             );
         });
-        let shaper_data = ShaperData::new(&font);
 
-        // Convert our location into a structure that rustybuzz/harfruzz can use
-        let instance = ShaperInstance::from_variations(
-            &font,
-            dfont.location.iter().map(|setting| {
-                let tag = setting.selector;
-                let value = setting.value;
-                Variation { tag, value }
-            }),
-        );
-        let shaper = shaper_data.shaper(&font).instance(Some(&instance)).build();
-
-        let plan = if let Some(direction) = direction {
-            if script.is_some() {
-                Some(ShapePlan::new(&shaper, direction, script, None, &[]))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        let location = (&dfont.normalized_location).into();
         let outlines = CachedOutlineGlyphCollection::new(
             font.outline_glyphs(),
             Size::new(font_size),
-            location,
+            LocationRef::default(),
         );
+        let cached_shaper = CachedShaper::new(font, font_size, direction, script);
 
         Self {
-            shaper_data,
-            font,
-            plan,
-            instance,
-            scale: font_size,
+            cached_shaper,
+            // instance,
             outlines,
         }
     }
 }
 
 impl AnyRenderer for Renderer<'_> {
+    fn shape(&mut self, string: &str, location: Option<Vec<NormalizedCoord>>) -> DrawBuffer {
+        self.cached_shaper.shape(string, location)
+    }
+
     /// Render a string to a series of commands
     ///
-    /// The commands can be used to render the string to an image. This routine also returns a
-    /// serialized buffer that can be used both for debugging purposes and also to detect
-    /// glyph sequences which have been rendered already (which helps to speed up the comparison).
-    fn string_to_stage1_rendering(&mut self, string: &str) -> Option<(String, Box<dyn Any>)> {
-        let draw_buffer = DrawBuffer::new_from_font(
-            &self.shaper_data,
-            &self.font,
-            string,
-            Some(&self.instance),
-            self.scale,
-            self.plan.as_ref(),
-        );
+    /// The commands can be used to render the string to an image.
+    fn buffer_to_stage1_rendering(&mut self, draw_buffer: &DrawBuffer) -> Option<Box<dyn Any>> {
+        if draw_buffer.is_empty() {
+            return None;
+        }
         let mut pen = RecordingPen::default();
         for glyph in draw_buffer.iter() {
             pen.offset_x = glyph.x_pos;
             pen.offset_y = glyph.y_pos;
             self.outlines.draw(glyph.glyph_id, &mut pen);
         }
-        let serialized_buffer = draw_buffer.serialize();
-        if serialized_buffer.is_empty() {
-            return None;
-        }
-        Some((serialized_buffer, Box::new(pen.buffer)))
+        Some(Box::new(pen.buffer))
     }
 
     fn fast_equivalence_check(&self, data1: &dyn Any, data2: &dyn Any) -> bool {
@@ -142,7 +116,7 @@ impl AnyRenderer for Renderer<'_> {
     ///
     /// This routine takes a series of commands returned from [string_to_stage1_rendering]
     /// and renders them to an image.
-    fn final_rendering(&mut self, data: &dyn Any) -> GrayImage {
+    fn final_rendering(&self, data: &dyn Any) -> GrayImage {
         let pen_buffer = data
             .downcast_ref::<Vec<Command>>()
             .expect("final_rendering: expected Vec<Command> from string_to_stage1_rendering");
@@ -216,8 +190,8 @@ mod tests {
             Some(Direction::RightToLeft),
             Some(script::ARABIC),
         );
-        let (_serialized_buffer, commands) =
-            renderer.string_to_stage1_rendering("السلام عليكم").unwrap();
+        let draw_buffer = renderer.shape("السلام عليكم", None);
+        let commands = renderer.buffer_to_stage1_rendering(&draw_buffer).unwrap();
         let image = renderer.final_rendering(&*commands);
         image.save("test.png").unwrap();
     }

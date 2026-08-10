@@ -19,6 +19,9 @@ pub struct Difference {
     /// The OpenType language tag applied to the text
     #[serde(skip_serializing_if = "String::is_empty")]
     pub lang: String,
+    /// The font variation location applied to the text, if any
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub location: String,
 }
 
 #[derive(Serialize)]
