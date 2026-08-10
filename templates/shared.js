@@ -240,7 +240,7 @@ function diffLanguages(report) {
         $("#difflanguages").append(`<p>No changes to languages</p>`);
         return;
     }
-    $("#difflanguages").append(`<table class="table table-striped" id="difflanguages"><tr><th>Language</th><th>Old</th><th>New</th></tr></table>`);
+    $("#difflanguages").append(`<table class="table table-striped" id="difflanguages"><tr><th>Language</th><th>Before</th><th>After</th></tr></table>`);
     for (let [name, diff] of notSame) {
         let row = $("<tr>");
         row.append(`<td>${name}</td>`);
@@ -390,7 +390,7 @@ function diffKerns(report) {
         return;
     }
     $("#diffkerns").append(`<h3 class="border-top pt-2 border-dark-subtle">Modified Kerns</h3>`);
-    $("#diffkerns").append(`<table class="table table-striped" id="diffkerns"><tr><th>Pair</th><th>Old</th><th>New</th></tr></table>`);
+    $("#diffkerns").append(`<table class="table table-striped" id="diffkerns"><tr><th>Pair</th><th>Before</th><th>After</th></tr></table>`);
     for (let [pair, value] of Object.entries(report["kerns"])) {
         if (pair == "error") {
             $("#diffkerns").append(`<p class="text-danger">Error: ${value}</p>`);
@@ -470,7 +470,7 @@ function cmapDiff(cmap_diff) {
     $("#cmapdiff").append(`<h3 class="border-top pt-2 border-dark-subtle">Added and Removed Encoded Glyphs</h3>`);
     if (cmap_diff && (cmap_diff.new || cmap_diff.missing)) {
         if (cmap_diff.new) {
-            $("#cmapdiff").append(`<h4>Added Glyphs</h4>`);
+            $("#cmapdiff").append(`<h4>Added Glyphs</h4><p>Be sure to look at the 'after' because the 'before' will likely show tofu</p>`);
             let added = $("<div>");
             for (let glyph of cmap_diff.new) {
                 addAGlyph(glyph, added);
@@ -492,12 +492,12 @@ function cmapDiff(cmap_diff) {
 }
 function setupAnimation() {
     $("#fonttoggle").click(function () {
-        if ($(this).text() == "Old") {
-            $(this).text("New");
+        if ($(this).text() == "Before") {
+            $(this).text("After");
             $(".font-before").removeClass("font-before").addClass("font-after");
         }
         else {
-            $(this).text("Old");
+            $(this).text("Before");
             $(".font-after").removeClass("font-after").addClass("font-before");
         }
     });
