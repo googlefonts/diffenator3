@@ -241,6 +241,8 @@ pub(crate) fn diff_many_words(
     let mut renderer_a = make_renderer(font_a, font_size, direction, script, use_color);
     let mut renderer_b = make_renderer(font_b, font_size, direction, script, use_color);
 
+    let time_before = std::time::Instant::now();
+
     for word in wordlist.iter() {
         if let Some(scp) = shared_codepoints {
             if !word.chars().all(|c| scp.contains(&(c as u32))) {
@@ -277,6 +279,12 @@ pub(crate) fn diff_many_words(
             });
         }
     }
+
+    log::info!(
+        "Processed {} words in {:?}",
+        wordlist.len(),
+        time_before.elapsed()
+    );
 
     differences.sort_by_key(|x| -(x.differing_pixels as i32));
     differences
