@@ -137,91 +137,93 @@ fn make_renderer<'a>(
     }
 }
 
-// A fast but complicated version
-#[cfg(not(target_family = "wasm"))]
-/// Compare two fonts by rendering a list of words and comparing the images
-///
-/// This function is parallelized and uses rayon to speed up the process.
-pub(crate) fn diff_many_words(
-    font_a: &DFont,
-    font_b: &DFont,
-    font_size: f32,
-    wordlist: &WordList,
-    shared_codepoints: Option<&HashSet<u32>>,
-    threshold: usize,
-) -> Vec<Difference> {
-    let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
-    let direction = script.and_then(direction_from_script);
-    let seen_glyphs = RwLock::new(HashSet::new());
-    let use_color = font_has_colr(font_a) || font_has_colr(font_b);
+// Disable fast complicated version while we're refactoring. Get simple one working first.
 
-    let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
-    let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+// // A fast but complicated version
+// #[cfg(not(target_family = "wasm"))]
+// /// Compare two fonts by rendering a list of words and comparing the images
+// ///
+// /// This function is parallelized and uses rayon to speed up the process.
+// pub(crate) fn diff_many_words(
+//     font_a: &DFont,
+//     font_b: &DFont,
+//     font_size: f32,
+//     wordlist: &WordList,
+//     shared_codepoints: Option<&HashSet<u32>>,
+//     threshold: usize,
+// ) -> Vec<Difference> {
+//     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
+//     let direction = script.and_then(direction_from_script);
+//     let seen_glyphs = RwLock::new(HashSet::new());
+//     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
 
-    let differences: Vec<Option<Difference>> = wordlist
-        .par_iter()
-        .progress()
-        .filter(|word| {
-            shared_codepoints
-                .as_ref()
-                .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
-        })
-        .map(|word| {
-            let renderer_a = tl_a.get_or(|| {
-                RefCell::new(make_renderer(
-                    font_a, font_size, direction, script, use_color,
-                ))
-            });
-            let renderer_b = tl_b.get_or(|| {
-                RefCell::new(make_renderer(
-                    font_b, font_size, direction, script, use_color,
-                ))
-            });
+//     let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+//     let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
 
-            let (buffer_a, data_a) = renderer_a.borrow_mut().string_to_stage1_rendering(word)?;
-            if buffer_a
-                .split('|')
-                .all(|glyph| seen_glyphs.read().unwrap().contains(glyph))
-            {
-                return None;
-            }
-            for glyph in buffer_a.split('|') {
-                seen_glyphs.write().unwrap().insert(glyph.to_string());
-            }
-            let (buffer_b, data_b) = renderer_b.borrow_mut().string_to_stage1_rendering(word)?;
-            if renderer_a
-                .borrow()
-                .fast_equivalence_check(&*data_a, &*data_b)
-            {
-                return None;
-            }
-            let img_a = renderer_a.borrow_mut().final_rendering(&*data_a);
-            let img_b = renderer_b.borrow_mut().final_rendering(&*data_b);
-            let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
-            let buffers_same = buffer_a == buffer_b;
+//     let differences: Vec<Option<Difference>> = wordlist
+//         .par_iter()
+//         .progress()
+//         .filter(|word| {
+//             shared_codepoints
+//                 .as_ref()
+//                 .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
+//         })
+//         .map(|word| {
+//             let renderer_a = tl_a.get_or(|| {
+//                 RefCell::new(make_renderer(
+//                     font_a, font_size, direction, script, use_color,
+//                 ))
+//             });
+//             let renderer_b = tl_b.get_or(|| {
+//                 RefCell::new(make_renderer(
+//                     font_b, font_size, direction, script, use_color,
+//                 ))
+//             });
 
-            Some(Difference {
-                word: word.to_string(),
-                buffer_a,
-                buffer_b: if buffers_same { None } else { Some(buffer_b) },
-                differing_pixels,
-                ot_features: "".to_string(),
-                lang: "".to_string(),
-            })
-        })
-        .collect();
+//             let (buffer_a, data_a) = renderer_a.borrow_mut().string_to_stage1_rendering(word)?;
+//             if buffer_a
+//                 .split('|')
+//                 .all(|glyph| seen_glyphs.read().unwrap().contains(glyph))
+//             {
+//                 return None;
+//             }
+//             for glyph in buffer_a.split('|') {
+//                 seen_glyphs.write().unwrap().insert(glyph.to_string());
+//             }
+//             let (buffer_b, data_b) = renderer_b.borrow_mut().string_to_stage1_rendering(word)?;
+//             if renderer_a
+//                 .borrow()
+//                 .fast_equivalence_check(&*data_a, &*data_b)
+//             {
+//                 return None;
+//             }
+//             let img_a = renderer_a.borrow_mut().final_rendering(&*data_a);
+//             let img_b = renderer_b.borrow_mut().final_rendering(&*data_b);
+//             let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
+//             let buffers_same = buffer_a == buffer_b;
 
-    let mut diffs: Vec<Difference> = differences
-        .into_iter()
-        .flatten()
-        .filter(|diff| diff.differing_pixels > threshold)
-        .collect();
-    diffs.sort_by_key(|x| -(x.differing_pixels as i32));
-    diffs
-}
+//             Some(Difference {
+//                 word: word.to_string(),
+//                 buffer_a,
+//                 buffer_b: if buffers_same { None } else { Some(buffer_b) },
+//                 differing_pixels,
+//                 ot_features: "".to_string(),
+//                 lang: "".to_string(),
+//             })
+//         })
+//         .collect();
 
-// A slow and simple version
-#[cfg(target_family = "wasm")]
+//     let mut diffs: Vec<Difference> = differences
+//         .into_iter()
+//         .flatten()
+//         .filter(|diff| diff.differing_pixels > threshold)
+//         .collect();
+//     diffs.sort_by_key(|x| -(x.differing_pixels as i32));
+//     diffs
+// }
+
+// // A slow and simple version
+// #[cfg(target_family = "wasm")]
 pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
