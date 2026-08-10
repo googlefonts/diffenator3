@@ -5,11 +5,9 @@
 /// [`SkiaPainter`] and caches the resulting RGBA tile. Subsequent occurrences
 /// of the same glyph are composited from the cache, avoiding repeated paint
 /// graph traversals.
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
-use harfrust::{
-    Direction, Script, ShapePlan, ShaperData, ShaperInstance, UnicodeBuffer, Variation,
-};
+use harfrust::{Direction, Script, ShapePlan, ShaperData, ShaperInstance, Variation};
 use image::{GrayImage, Luma};
 use skrifa::{
     color::{ColorPainter, Transform},
@@ -21,7 +19,10 @@ use skrifa::{
 use tiny_skia::{Pixmap, PixmapPaint, Transform as TsTransform};
 
 use super::colorpainter::{PaletteColor, SkiaPainter};
-use crate::dfont::DFont;
+use crate::{
+    dfont::DFont,
+    render::{renderer::AnyRenderer, shaper::DrawBuffer},
+};
 
 /// A pre-rendered glyph tile cached for reuse across words.
 struct CachedColorGlyph {
@@ -167,65 +168,36 @@ impl<'a> ColorRenderer<'a> {
             self.cache.insert(glyph_id, tile);
         }
     }
+}
+
+impl AnyRenderer for ColorRenderer<'_> {
+    fn fast_equivalence_check(&self, _data1: &dyn Any, _data2: &dyn Any) -> bool {
+        false // We can't do one cheaply
+    }
+
+    fn string_to_stage1_rendering(&mut self, string: &str) -> Option<(String, Box<dyn Any>)> {
+        let buffer = DrawBuffer::new_from_font(
+            &self.shaper_data,
+            &self.font,
+            string,
+            Some(&self.instance),
+            self.scale,
+            self.plan.as_ref(),
+        );
+        // Ensure all glyphs for this word are cached
+        for glyph in buffer.iter() {
+            self.ensure_cached(glyph.glyph_id.into());
+        }
+        Some((buffer.serialize(), Box::new(buffer)))
+    }
 
     /// Render a string to a GrayImage using cached glyph tiles.
     ///
     /// Returns the serialized glyph buffer (for dedup) and the rendered image.
-    pub fn render_string(&mut self, string: &str) -> Option<(String, GrayImage)> {
-        let mut buffer = UnicodeBuffer::new();
-        buffer.push_str(string);
-        let shaper = self
-            .shaper_data
-            .shaper(&self.font)
-            .instance(Some(&self.instance))
-            .build();
-
-        let output = if let Some(plan) = &self.plan {
-            if let Some(script) = plan.script() {
-                buffer.set_script(script);
-            }
-            buffer.set_direction(plan.direction());
-            if let Some(lang) = plan.language() {
-                buffer.set_language(lang.clone());
-            }
-            shaper.shape_with_plan(plan, buffer, &[])
-        } else {
-            buffer.guess_segment_properties();
-            shaper.shape(buffer, &[])
-        };
-
-        let upem = self.font.head().unwrap().units_per_em() as f32;
-        let factor = self.scale / upem;
-
-        let positions = output.glyph_positions();
-        let infos = output.glyph_infos();
-
-        let mut serialized_buffer = String::new();
-        let mut glyphs: Vec<(u32, f32, f32)> = Vec::with_capacity(positions.len());
-        let mut cursor = 0.0_f32;
-
-        for (position, info) in positions.iter().zip(infos) {
-            let px_x = cursor + (position.x_offset as f32 * factor);
-            let px_y = position.y_offset as f32 * factor;
-            glyphs.push((info.glyph_id, px_x, px_y));
-
-            serialized_buffer.push_str(&format!("{}", info.glyph_id));
-            if position.x_offset != 0 || position.y_offset != 0 {
-                serialized_buffer
-                    .push_str(&format!("@{},{}", position.x_offset, position.y_offset));
-            }
-            serialized_buffer.push('|');
-            cursor += position.x_advance as f32 * factor;
-        }
-
-        if serialized_buffer.is_empty() {
-            return None;
-        }
-
-        // Ensure all glyphs for this word are cached
-        for &(glyph_id, _, _) in &glyphs {
-            self.ensure_cached(glyph_id);
-        }
+    fn final_rendering(&mut self, data: &dyn Any) -> GrayImage {
+        let buffer = data
+            .downcast_ref::<DrawBuffer>()
+            .expect("final_rendering: expected DrawBuffer from string_to_stage1_rendering");
 
         // Image dimensions from font metrics
         let size = Size::new(self.scale);
@@ -233,18 +205,18 @@ impl<'a> ColorRenderer<'a> {
         let ascent = metrics.ascent;
         let descent = metrics.descent;
         let height = ((ascent - descent).ceil() as u32).max(1);
-        let width = (cursor.ceil() as u32).max(1);
+        let width = (buffer.cursor_xmax.ceil() as u32).max(1);
 
         let mut word_pixmap = Pixmap::new(width, height).unwrap();
 
         // Composite cached tiles onto the word pixmap
-        for &(glyph_id, px_x, px_y) in &glyphs {
-            if let Some(tile) = self.cache.get(&glyph_id) {
+        for glyph in buffer.iter() {
+            if let Some(tile) = self.cache.get(&glyph.glyph_id.into()) {
                 // The tile was rendered with its origin at (-bearing_x, bearing_y).
                 // In the word pixmap, the glyph origin is at (px_x, ascent - px_y).
                 // So the tile's top-left corner goes at:
-                let dest_x = (px_x + tile.bearing_x).round() as i32;
-                let dest_y = ((ascent - px_y) - tile.bearing_y).round() as i32;
+                let dest_x = (glyph.x_pos + tile.bearing_x).round() as i32;
+                let dest_y = ((ascent - glyph.y_pos) - tile.bearing_y).round() as i32;
 
                 word_pixmap.draw_pixmap(
                     dest_x,
@@ -267,86 +239,7 @@ impl<'a> ColorRenderer<'a> {
             img.put_pixel(x, y, Luma([gray.round().min(255.0) as u8]));
         }
 
-        Some((serialized_buffer, img))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn load_test_font() -> Vec<u8> {
-        std::fs::read("test-data/Nabla-subset.ttf").expect("missing test font")
-    }
-
-    #[test]
-    fn colrv1_render_produces_non_empty_image() {
-        let data = load_test_font();
-        let dfont = DFont::new(&data);
-        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
-        let (buffer, img) = renderer
-            .render_string("hello")
-            .expect("render_string returned None");
-
-        assert!(!buffer.is_empty(), "serialized buffer should not be empty");
-        assert!(img.width() > 0 && img.height() > 0, "image has zero size");
-
-        let non_zero = img.pixels().filter(|p| p.0[0] > 0).count();
-        assert!(non_zero > 0, "image is completely blank");
-    }
-
-    #[test]
-    fn colrv1_glyph_cache_is_reused() {
-        let data = load_test_font();
-        let dfont = DFont::new(&data);
-        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
-
-        // "ll" shares the same glyph; after rendering, the cache should contain it
-        renderer.render_string("hello").unwrap();
-        let cache_size_after_hello = renderer.cache.len();
-
-        // "lo" reuses 'l' and 'o' which are already cached
-        renderer.render_string("lo").unwrap();
-        let cache_size_after_lo = renderer.cache.len();
-
-        assert_eq!(
-            cache_size_after_hello, cache_size_after_lo,
-            "cache grew when all glyphs should already have been cached"
-        );
-    }
-
-    #[test]
-    fn colrv1_cached_tiles_contain_color() {
-        let data = load_test_font();
-        let dfont = DFont::new(&data);
-        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
-
-        renderer.render_string("hello").unwrap();
-
-        // At least one cached tile should have pixels where the RGB channels
-        // differ from each other, proving we're rendering actual color, not
-        // just grayscale alpha.
-        let has_color = renderer.cache.values().any(|tile| {
-            tile.pixmap.pixels().iter().any(|px| {
-                let (r, g, b) = (px.red(), px.green(), px.blue());
-                px.alpha() > 0 && !(r == g && g == b)
-            })
-        });
-        assert!(has_color, "no color pixels found in cached glyph tiles");
-    }
-
-    #[test]
-    fn colrv1_same_font_has_zero_diff() {
-        let data = load_test_font();
-        let dfont = DFont::new(&data);
-        let mut renderer_a = ColorRenderer::new(&dfont, 32.0, None, None);
-        let mut renderer_b = ColorRenderer::new(&dfont, 32.0, None, None);
-
-        let (_, img_a) = renderer_a.render_string("world").unwrap();
-        let (_, img_b) = renderer_b.render_string("world").unwrap();
-
-        let diff = crate::render::utils::count_differences(img_a, img_b, 0);
-        assert_eq!(diff, 0, "same font should produce identical images");
+        img
     }
 }
 
@@ -372,4 +265,116 @@ fn read_cpal_palette(font: &skrifa::FontRef) -> Vec<PaletteColor> {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn load_test_font() -> Vec<u8> {
+        std::fs::read("test-data/Nabla-subset.ttf").expect("missing test font")
+    }
+
+    #[test]
+    fn colrv1_render_produces_non_empty_image() {
+        let data = load_test_font();
+        let dfont = DFont::new(&data);
+        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
+        let (buffer, data) = renderer
+            .string_to_stage1_rendering("hello")
+            .expect("string_to_stage1_rendering returned None");
+        let img = renderer.final_rendering(&*data);
+
+        assert!(!buffer.is_empty(), "serialized buffer should not be empty");
+        assert!(img.width() > 0 && img.height() > 0, "image has zero size");
+
+        let non_zero = img.pixels().filter(|p| p.0[0] > 0).count();
+        assert!(non_zero > 0, "image is completely blank");
+    }
+
+    #[test]
+    fn colrv1_glyph_cache_is_reused() {
+        let data = load_test_font();
+        let dfont = DFont::new(&data);
+        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
+
+        // "ll" shares the same glyph; after rendering, the cache should contain it
+        renderer.string_to_stage1_rendering("hello").unwrap();
+        let cache_size_after_hello = renderer.cache.len();
+
+        // "lo" reuses 'l' and 'o' which are already cached
+        renderer.string_to_stage1_rendering("lo").unwrap();
+        let cache_size_after_lo = renderer.cache.len();
+
+        assert_eq!(
+            cache_size_after_hello, cache_size_after_lo,
+            "cache grew when all glyphs should already have been cached"
+        );
+    }
+
+    #[test]
+    fn colrv1_cached_tiles_contain_color() {
+        let data = load_test_font();
+        let dfont = DFont::new(&data);
+        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
+
+        renderer.string_to_stage1_rendering("hello").unwrap();
+
+        // At least one cached tile should have pixels where the RGB channels
+        // differ from each other, proving we're rendering actual color, not
+        // just grayscale alpha.
+        let has_color = renderer.cache.values().any(|tile| {
+            tile.pixmap.pixels().iter().any(|px| {
+                let (r, g, b) = (px.red(), px.green(), px.blue());
+                px.alpha() > 0 && !(r == g && g == b)
+            })
+        });
+        assert!(has_color, "no color pixels found in cached glyph tiles");
+    }
+
+    #[test]
+    fn colrv1_same_font_has_zero_diff() {
+        let data = load_test_font();
+        let dfont = DFont::new(&data);
+        let mut renderer_a = ColorRenderer::new(&dfont, 32.0, None, None);
+        let mut renderer_b = ColorRenderer::new(&dfont, 32.0, None, None);
+
+        let (_, data_a) = renderer_a.string_to_stage1_rendering("world").unwrap();
+        let img_a = renderer_a.final_rendering(&*data_a);
+        let (_, data_b) = renderer_b.string_to_stage1_rendering("world").unwrap();
+        let img_b = renderer_b.final_rendering(&*data_b);
+
+        let diff = crate::render::utils::count_differences(img_a, img_b, 0);
+        assert_eq!(diff, 0, "same font should produce identical images");
+    }
+
+    #[test]
+    fn scratch_old_render_string_path() {
+        use crate::render::shaper::DrawBuffer;
+        let data = load_test_font();
+        let dfont = DFont::new(&data);
+        let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
+
+        // Exactly what the removed `render_string` used to do:
+        let buffer = DrawBuffer::new_from_font(
+            &renderer.shaper_data,
+            &renderer.font,
+            "hello",
+            Some(&renderer.instance),
+            renderer.scale,
+            renderer.plan.as_ref(),
+        );
+        for glyph in buffer.iter() {
+            renderer.ensure_cached(glyph.glyph_id.into());
+        }
+        let img = renderer.final_rendering(&buffer as &dyn Any);
+        let non_zero = img.pixels().filter(|p| p.0[0] > 0).count();
+        panic!(
+            "old-path: serialized='{}' dims={}x{} non_zero={}",
+            buffer.serialize(),
+            img.width(),
+            img.height(),
+            non_zero
+        );
+    }
 }

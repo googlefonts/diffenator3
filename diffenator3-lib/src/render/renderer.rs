@@ -1,16 +1,37 @@
 /// Turn some words into images
-use harfrust::{
-    Direction, Script, ShapePlan, ShaperData, ShaperInstance, UnicodeBuffer, Variation,
-};
+use std::any::Any;
+
+use harfrust::{Direction, Script, ShapePlan, ShaperData, ShaperInstance, Variation};
 use image::{DynamicImage, GrayImage, Luma};
-use skrifa::{instance::Size, raw::TableProvider, GlyphId, MetadataProvider};
+use skrifa::{instance::Size, MetadataProvider};
 use zeno::Command;
 
 use super::{
     cachedoutlines::CachedOutlineGlyphCollection,
     utils::{terrible_bounding_box, RecordingPen},
 };
-use crate::dfont::DFont;
+use crate::{dfont::DFont, render::shaper::DrawBuffer};
+
+pub trait AnyRenderer {
+    /// Shape `string` and return a serialized glyph buffer plus an opaque handle
+    /// to the renderer's intermediate data.
+    ///
+    /// The serialized buffer is used for de-duplication and for reporting; the
+    /// opaque handle is passed back to [`Self::fast_equivalence_check`] and
+    /// [`Self::final_rendering`] for this renderer to downcast.
+    fn string_to_stage1_rendering(&mut self, string: &str) -> Option<(String, Box<dyn Any>)>;
+
+    /// Cheap check for whether two intermediate renderings are equivalent, so that
+    /// rasterization can be skipped when both fonts produce identical output.
+    ///
+    /// The arguments always originate from this same renderer's
+    /// [`Self::string_to_stage1_rendering`], so implementations can safely
+    /// downcast them to their concrete intermediate type.
+    fn fast_equivalence_check(&self, data1: &dyn Any, data2: &dyn Any) -> bool;
+
+    /// Rasterize intermediate data into a grayscale image.
+    fn final_rendering(&mut self, data: &dyn Any) -> GrayImage;
+}
 
 pub struct Renderer<'a> {
     shaper_data: ShaperData,
@@ -75,72 +96,56 @@ impl<'a> Renderer<'a> {
             outlines,
         }
     }
+}
 
+impl AnyRenderer for Renderer<'_> {
     /// Render a string to a series of commands
     ///
     /// The commands can be used to render the string to an image. This routine also returns a
     /// serialized buffer that can be used both for debugging purposes and also to detect
     /// glyph sequences which have been rendered already (which helps to speed up the comparison).
-    pub fn string_to_positioned_glyphs(&mut self, string: &str) -> Option<(String, Vec<Command>)> {
+    fn string_to_stage1_rendering(&mut self, string: &str) -> Option<(String, Box<dyn Any>)> {
+        let draw_buffer = DrawBuffer::new_from_font(
+            &self.shaper_data,
+            &self.font,
+            string,
+            Some(&self.instance),
+            self.scale,
+            self.plan.as_ref(),
+        );
         let mut pen = RecordingPen::default();
-
-        let mut buffer = UnicodeBuffer::new();
-        buffer.push_str(string);
-        let shaper = self
-            .shaper_data
-            .shaper(&self.font)
-            .instance(Some(&self.instance))
-            .build();
-
-        let output = if let Some(plan) = &self.plan {
-            // If we have a shaping plan, we can use it to shape the string
-            if let Some(script) = plan.script() {
-                buffer.set_script(script);
-            }
-            buffer.set_direction(plan.direction());
-            if let Some(lang) = plan.language() {
-                buffer.set_language(lang.clone());
-            }
-            shaper.shape_with_plan(plan, buffer, &[])
-        } else {
-            // Otherwise, we guess segment properties
-            buffer.guess_segment_properties();
-            shaper.shape(buffer, &[])
-        };
-        let upem = self.font.head().unwrap().units_per_em();
-        let factor = self.scale / upem as f32;
-
-        let mut cursor = 0.0;
-
-        // The results of the shaping operation are stored in the `output` buffer.
-        let positions = output.glyph_positions();
-        let infos = output.glyph_infos();
-
-        let mut serialized_buffer = String::new();
-
-        for (position, info) in positions.iter().zip(infos) {
-            pen.offset_x = cursor + (position.x_offset as f32 * factor);
-            pen.offset_y = position.y_offset as f32 * factor;
-            self.outlines.draw(GlyphId::new(info.glyph_id), &mut pen);
-            serialized_buffer.push_str(&format!("{}", info.glyph_id,));
-            if position.x_offset != 0 || position.y_offset != 0 {
-                serialized_buffer
-                    .push_str(&format!("@{},{}", position.x_offset, position.y_offset));
-            }
-            serialized_buffer.push('|');
-            cursor += position.x_advance as f32 * factor;
+        for glyph in draw_buffer.iter() {
+            pen.offset_x = glyph.x_pos;
+            pen.offset_y = glyph.y_pos;
+            self.outlines.draw(glyph.glyph_id, &mut pen);
         }
+        let serialized_buffer = draw_buffer.serialize();
         if serialized_buffer.is_empty() {
             return None;
         }
-        Some((serialized_buffer, pen.buffer))
+        Some((serialized_buffer, Box::new(pen.buffer)))
+    }
+
+    fn fast_equivalence_check(&self, data1: &dyn Any, data2: &dyn Any) -> bool {
+        // The data always comes from this renderer, so the downcast should succeed; if it
+        // somehow doesn't, conservatively fall back to rasterizing.
+        match (
+            data1.downcast_ref::<Vec<Command>>(),
+            data2.downcast_ref::<Vec<Command>>(),
+        ) {
+            (Some(a), Some(b)) => a == b,
+            _ => false,
+        }
     }
 
     /// Render a series of commands to an image
     ///
-    /// This routine takes a series of commands returned from [string_to_positioned_glyphs]
+    /// This routine takes a series of commands returned from [string_to_stage1_rendering]
     /// and renders them to an image.
-    pub fn render_positioned_glyphs(&mut self, pen_buffer: &[Command]) -> GrayImage {
+    fn final_rendering(&mut self, data: &dyn Any) -> GrayImage {
+        let pen_buffer = data
+            .downcast_ref::<Vec<Command>>()
+            .expect("final_rendering: expected Vec<Command> from string_to_stage1_rendering");
         let (min_x, min_y, max_x, max_y) = terrible_bounding_box(pen_buffer);
         let x_origin = min_x.min(0.0);
         let y_origin = min_y.min(0.0);
@@ -212,8 +217,8 @@ mod tests {
             Some(script::ARABIC),
         );
         let (_serialized_buffer, commands) =
-            renderer.string_to_positioned_glyphs("السلام عليكم").unwrap();
-        let image = renderer.render_positioned_glyphs(&commands);
+            renderer.string_to_stage1_rendering("السلام عليكم").unwrap();
+        let image = renderer.final_rendering(&*commands);
         image.save("test.png").unwrap();
     }
 }

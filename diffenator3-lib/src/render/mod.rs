@@ -7,6 +7,7 @@ pub(crate) mod colorpainter;
 pub(crate) mod colorrenderer;
 pub mod encodedglyphs;
 pub mod renderer;
+pub mod shaper;
 pub mod utils;
 pub mod wordlists;
 pub use crate::structs::{Difference, GlyphDiff};
@@ -16,8 +17,8 @@ use crate::{
 };
 use cfg_if::cfg_if;
 use colorrenderer::ColorRenderer;
-use harfrust::Script;
-use renderer::Renderer;
+use harfrust::{Direction, Script};
+use renderer::{AnyRenderer, Renderer};
 use skrifa::raw::TableProvider;
 use static_lang_word_lists::WordList;
 use std::{
@@ -120,6 +121,22 @@ impl From<Difference> for GlyphDiff {
     }
 }
 
+/// Build a renderer appropriate for the fonts being compared, boxed as a trait
+/// object so that the color and outline rendering paths share a single loop.
+fn make_renderer<'a>(
+    dfont: &'a DFont,
+    font_size: f32,
+    direction: Option<Direction>,
+    script: Option<Script>,
+    use_color: bool,
+) -> Box<dyn AnyRenderer + Send + 'a> {
+    if use_color {
+        Box::new(ColorRenderer::new(dfont, font_size, direction, script))
+    } else {
+        Box::new(Renderer::new(dfont, font_size, direction, script))
+    }
+}
+
 // A fast but complicated version
 #[cfg(not(target_family = "wasm"))]
 /// Compare two fonts by rendering a list of words and comparing the images
@@ -138,102 +155,61 @@ pub(crate) fn diff_many_words(
     let seen_glyphs = RwLock::new(HashSet::new());
     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
 
-    let differences: Vec<Option<Difference>> = if use_color {
-        let tl_a: ThreadLocal<RefCell<ColorRenderer>> = ThreadLocal::new();
-        let tl_b: ThreadLocal<RefCell<ColorRenderer>> = ThreadLocal::new();
-        wordlist
-            .par_iter()
-            .progress()
-            .filter(|word| {
-                shared_codepoints
-                    .as_ref()
-                    .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
-            })
-            .map(|word| {
-                let renderer_a = tl_a.get_or(|| {
-                    RefCell::new(ColorRenderer::new(font_a, font_size, direction, script))
-                });
-                let renderer_b = tl_b.get_or(|| {
-                    RefCell::new(ColorRenderer::new(font_b, font_size, direction, script))
-                });
+    let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+    let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
 
-                let (buffer_a, img_a) = renderer_a.borrow_mut().render_string(word)?;
-                if buffer_a
-                    .split('|')
-                    .all(|glyph| seen_glyphs.read().unwrap().contains(glyph))
-                {
-                    return None;
-                }
-                for glyph in buffer_a.split('|') {
-                    seen_glyphs.write().unwrap().insert(glyph.to_string());
-                }
-                let (buffer_b, img_b) = renderer_b.borrow_mut().render_string(word)?;
-                let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
-                let buffers_same = buffer_a == buffer_b;
+    let differences: Vec<Option<Difference>> = wordlist
+        .par_iter()
+        .progress()
+        .filter(|word| {
+            shared_codepoints
+                .as_ref()
+                .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
+        })
+        .map(|word| {
+            let renderer_a = tl_a.get_or(|| {
+                RefCell::new(make_renderer(
+                    font_a, font_size, direction, script, use_color,
+                ))
+            });
+            let renderer_b = tl_b.get_or(|| {
+                RefCell::new(make_renderer(
+                    font_b, font_size, direction, script, use_color,
+                ))
+            });
 
-                Some(Difference {
-                    word: word.to_string(),
-                    buffer_a,
-                    buffer_b: if buffers_same { None } else { Some(buffer_b) },
-                    differing_pixels,
-                    ot_features: "".to_string(),
-                    lang: "".to_string(),
-                })
-            })
-            .collect()
-    } else {
-        let tl_a: ThreadLocal<RefCell<Renderer>> = ThreadLocal::new();
-        let tl_b: ThreadLocal<RefCell<Renderer>> = ThreadLocal::new();
-        wordlist
-            .par_iter()
-            .progress()
-            .filter(|word| {
-                shared_codepoints
-                    .as_ref()
-                    .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
-            })
-            .map(|word| {
-                let renderer_a = tl_a
-                    .get_or(|| RefCell::new(Renderer::new(font_a, font_size, direction, script)));
-                let renderer_b = tl_b
-                    .get_or(|| RefCell::new(Renderer::new(font_b, font_size, direction, script)));
+            let (buffer_a, data_a) = renderer_a.borrow_mut().string_to_stage1_rendering(word)?;
+            if buffer_a
+                .split('|')
+                .all(|glyph| seen_glyphs.read().unwrap().contains(glyph))
+            {
+                return None;
+            }
+            for glyph in buffer_a.split('|') {
+                seen_glyphs.write().unwrap().insert(glyph.to_string());
+            }
+            let (buffer_b, data_b) = renderer_b.borrow_mut().string_to_stage1_rendering(word)?;
+            if renderer_a
+                .borrow()
+                .fast_equivalence_check(&*data_a, &*data_b)
+            {
+                return None;
+            }
+            let img_a = renderer_a.borrow_mut().final_rendering(&*data_a);
+            let img_b = renderer_b.borrow_mut().final_rendering(&*data_b);
+            let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
+            let buffers_same = buffer_a == buffer_b;
 
-                let (buffer_a, commands_a) =
-                    renderer_a.borrow_mut().string_to_positioned_glyphs(word)?;
-                if buffer_a
-                    .split('|')
-                    .all(|glyph| seen_glyphs.read().unwrap().contains(glyph))
-                {
-                    return None;
-                }
-                for glyph in buffer_a.split('|') {
-                    seen_glyphs.write().unwrap().insert(glyph.to_string());
-                }
-                let (buffer_b, commands_b) =
-                    renderer_b.borrow_mut().string_to_positioned_glyphs(word)?;
-                if commands_a == commands_b {
-                    return None;
-                }
-                let img_a = renderer_a
-                    .borrow_mut()
-                    .render_positioned_glyphs(&commands_a);
-                let img_b = renderer_b
-                    .borrow_mut()
-                    .render_positioned_glyphs(&commands_b);
-                let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
-                let buffers_same = buffer_a == buffer_b;
-
-                Some(Difference {
-                    word: word.to_string(),
-                    buffer_a,
-                    buffer_b: if buffers_same { None } else { Some(buffer_b) },
-                    differing_pixels,
-                    ot_features: "".to_string(),
-                    lang: "".to_string(),
-                })
+            Some(Difference {
+                word: word.to_string(),
+                buffer_a,
+                buffer_b: if buffers_same { None } else { Some(buffer_b) },
+                differing_pixels,
+                ot_features: "".to_string(),
+                lang: "".to_string(),
             })
-            .collect()
-    };
+        })
+        .collect();
 
     let mut diffs: Vec<Difference> = differences
         .into_iter()
@@ -260,80 +236,43 @@ pub(crate) fn diff_many_words(
     let mut seen_glyphs: HashSet<String> = HashSet::new();
     let mut differences: Vec<Difference> = vec![];
 
-    if use_color {
-        let mut renderer_a = ColorRenderer::new(font_a, font_size, direction, script);
-        let mut renderer_b = ColorRenderer::new(font_b, font_size, direction, script);
+    let mut renderer_a = make_renderer(font_a, font_size, direction, script, use_color);
+    let mut renderer_b = make_renderer(font_b, font_size, direction, script, use_color);
 
-        for word in wordlist.iter() {
-            if let Some(scp) = shared_codepoints {
-                if !word.chars().all(|c| scp.contains(&(c as u32))) {
-                    continue;
-                }
-            }
-            let Some((buffer_a, img_a)) = renderer_a.render_string(&word) else {
+    for word in wordlist.iter() {
+        if let Some(scp) = shared_codepoints {
+            if !word.chars().all(|c| scp.contains(&(c as u32))) {
                 continue;
-            };
-            if buffer_a.split('|').all(|glyph| seen_glyphs.contains(glyph)) {
-                continue;
-            }
-            for glyph in buffer_a.split('|') {
-                seen_glyphs.insert(glyph.to_string());
-            }
-            let Some((buffer_b, img_b)) = renderer_b.render_string(&word) else {
-                continue;
-            };
-            let buffers_same = buffer_a == buffer_b;
-            let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
-            if differing_pixels > threshold {
-                differences.push(Difference {
-                    word: word.to_string(),
-                    buffer_a,
-                    buffer_b: if buffers_same { None } else { Some(buffer_b) },
-                    ot_features: "".to_string(),
-                    lang: "".to_string(),
-                    differing_pixels,
-                });
             }
         }
-    } else {
-        let mut renderer_a = Renderer::new(font_a, font_size, direction, script);
-        let mut renderer_b = Renderer::new(font_b, font_size, direction, script);
-
-        for word in wordlist.iter() {
-            if let Some(scp) = shared_codepoints {
-                if !word.chars().all(|c| scp.contains(&(c as u32))) {
-                    continue;
-                }
-            }
-            let Some((buffer_a, commands_a)) = renderer_a.string_to_positioned_glyphs(&word) else {
-                continue;
-            };
-            if buffer_a.split('|').all(|glyph| seen_glyphs.contains(glyph)) {
-                continue;
-            }
-            for glyph in buffer_a.split('|') {
-                seen_glyphs.insert(glyph.to_string());
-            }
-            let Some((buffer_b, commands_b)) = renderer_b.string_to_positioned_glyphs(&word) else {
-                continue;
-            };
-            if commands_a == commands_b {
-                continue;
-            }
-            let buffers_same = buffer_a == buffer_b;
-            let img_a = renderer_a.render_positioned_glyphs(&commands_a);
-            let img_b = renderer_b.render_positioned_glyphs(&commands_b);
-            let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
-            if differing_pixels > threshold {
-                differences.push(Difference {
-                    word: word.to_string(),
-                    buffer_a,
-                    buffer_b: if buffers_same { None } else { Some(buffer_b) },
-                    ot_features: "".to_string(),
-                    lang: "".to_string(),
-                    differing_pixels,
-                });
-            }
+        let Some((buffer_a, data_a)) = renderer_a.string_to_stage1_rendering(&word) else {
+            continue;
+        };
+        if buffer_a.split('|').all(|glyph| seen_glyphs.contains(glyph)) {
+            continue;
+        }
+        for glyph in buffer_a.split('|') {
+            seen_glyphs.insert(glyph.to_string());
+        }
+        let Some((buffer_b, data_b)) = renderer_b.string_to_stage1_rendering(&word) else {
+            continue;
+        };
+        if renderer_a.fast_equivalence_check(&*data_a, &*data_b) {
+            continue;
+        }
+        let buffers_same = buffer_a == buffer_b;
+        let img_a = renderer_a.final_rendering(&*data_a);
+        let img_b = renderer_b.final_rendering(&*data_b);
+        let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
+        if differing_pixels > threshold {
+            differences.push(Difference {
+                word: word.to_string(),
+                buffer_a,
+                buffer_b: if buffers_same { None } else { Some(buffer_b) },
+                ot_features: "".to_string(),
+                lang: "".to_string(),
+                differing_pixels,
+            });
         }
     }
 
