@@ -86,26 +86,6 @@ pub struct Cli {
     #[clap(long = "update-templates", requires = "html", help_heading = Some("Report format"))]
     pub update_templates: bool,
 
-    /// Location in user space, in the form axis=123,other=456 (may be repeated)
-    #[clap(long = "location", help_heading = "Locations to test")]
-    pub location: Vec<String>,
-    /// Instance to compare (may be repeated; use * for all instances)
-    #[clap(long = "instance", help_heading = "Locations to test")]
-    pub instance: Vec<String>,
-    /// Masters (as detected from the gvar table)
-    #[clap(long = "masters", help_heading = "Locations to test")]
-    pub masters: bool,
-    /// Cross-product (use min/default/max of all axes)
-    #[clap(long = "cross-product", help_heading = "Locations to test")]
-    pub cross_product: bool,
-    /// Cross-product splits
-    #[clap(
-        long = "cross-product-splits",
-        help_heading = "Locations to test",
-        default_value = "1"
-    )]
-    pub splits: usize,
-
     /// Don't try to match glyph names between fonts
     #[clap(long = "no-match", help_heading = Some("Report format"))]
     pub no_match: bool,
