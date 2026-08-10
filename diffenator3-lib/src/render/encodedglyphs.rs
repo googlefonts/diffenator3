@@ -8,6 +8,7 @@ use crate::{
     render::{diff_many_words, GlyphDiff},
 };
 pub use harfrust::Direction;
+use read_fonts::ReadError;
 use static_lang_word_lists::WordList;
 
 impl From<char> for EncodedGlyph {
@@ -58,7 +59,10 @@ impl CmapDiff {
 }
 
 /// Render the encoded glyphs common to both fonts, and return any differences
-pub fn modified_encoded_glyphs(font_a: &DFont, font_b: &DFont) -> Vec<GlyphDiff> {
+pub fn modified_encoded_glyphs(
+    font_a: &DFont,
+    font_b: &DFont,
+) -> Result<Vec<GlyphDiff>, ReadError> {
     let cmap_a = &font_a.codepoints;
     let cmap_b = &font_b.codepoints;
     let same_glyphs = cmap_a.intersection(cmap_b);
@@ -74,10 +78,10 @@ pub fn modified_encoded_glyphs(font_a: &DFont, font_b: &DFont) -> Vec<GlyphDiff>
         &wl,
         None,
         DEFAULT_GLYPHS_THRESHOLD,
-    )
+    )?
     .into_iter()
     .map(|x| x.into())
     .collect();
     result.sort_by_key(|x| -(x.differing_pixels as i32));
-    result
+    Ok(result)
 }
