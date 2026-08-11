@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use fontdrasil::coords::NormalizedCoord;
 use harfrust::{ShapePlan, ShaperData, ShaperInstance, UnicodeBuffer};
-use read_fonts::{types::F2Dot14, TableProvider};
+use read_fonts::TableProvider;
 use skrifa::GlyphId;
 
 #[derive(Default, Clone, PartialEq, Debug)]

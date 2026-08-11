@@ -25,7 +25,7 @@ use renderer::{AnyRenderer, Renderer};
 use rustc_hash::FxHashSet;
 use skrifa::raw::TableProvider;
 use static_lang_word_lists::WordList;
-use std::{collections::BTreeMap, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr, time::Duration};
 
 use cfg_if::cfg_if;
 cfg_if! {
@@ -137,148 +137,148 @@ fn make_renderer<'a>(
     }
 }
 
-// A fast but complicated version
-#[cfg(not(target_family = "wasm"))]
-/// Compare two fonts by rendering a list of words and comparing the images
-///
-/// This function is parallelized and uses rayon to speed up the process.
-pub(crate) fn diff_many_words(
-    font_a: &DFont,
-    font_b: &DFont,
-    font_size: f32,
-    wordlist: &WordList,
-    signature: &DifferenceSignature,
-    threshold: usize,
-) -> Result<Vec<Difference>, ReadError> {
-    let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
-    let direction = script.and_then(direction_from_script);
-    let use_color = font_has_colr(font_a) || font_has_colr(font_b);
+// // A fast but complicated version
+// #[cfg(not(target_family = "wasm"))]
+// /// Compare two fonts by rendering a list of words and comparing the images
+// ///
+// /// This function is parallelized and uses rayon to speed up the process.
+// pub(crate) fn diff_many_words(
+//     font_a: &DFont,
+//     font_b: &DFont,
+//     font_size: f32,
+//     wordlist: &WordList,
+//     signature: &DifferenceSignature,
+//     threshold: usize,
+// ) -> Result<Vec<Difference>, ReadError> {
+//     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
+//     let direction = script.and_then(direction_from_script);
+//     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
 
-    // The static difference signature (outlines, advances, GPOS positioning)
-    // is computed by the caller and passed in; it drives word selection
-    // below. `uncertain` and `marks` are derived indexes, shared read-only
-    // across the worker threads.
-    let uncertain = signature.uncertain_glyphs();
-    let marks = font_a.mark_glyphs();
+//     // The static difference signature (outlines, advances, GPOS positioning)
+//     // is computed by the caller and passed in; it drives word selection
+//     // below. `uncertain` and `marks` are derived indexes, shared read-only
+//     // across the worker threads.
+//     let uncertain = signature.uncertain_glyphs();
+//     let marks = font_a.mark_glyphs();
 
-    let seen_glyphs = RwLock::new(FxHashSet::default());
+//     let seen_glyphs = RwLock::new(FxHashSet::default());
 
-    let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
-    let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+//     let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+//     let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
 
-    let differences: Vec<Difference> = wordlist
-        .par_iter()
-        .progress()
-        .filter(|word| word_is_encoded(font_a, font_b, word))
-        .flat_map(|word| {
-            let renderer_a = tl_a.get_or(|| {
-                RefCell::new(make_renderer(
-                    font_a, font_size, direction, script, use_color,
-                ))
-            });
-            let renderer_b = tl_b.get_or(|| {
-                RefCell::new(make_renderer(
-                    font_b, font_size, direction, script, use_color,
-                ))
-            });
+//     let differences: Vec<Difference> = wordlist
+//         .par_iter()
+//         .progress()
+//         .filter(|word| word_is_encoded(font_a, font_b, word))
+//         .flat_map(|word| {
+//             let renderer_a = tl_a.get_or(|| {
+//                 RefCell::new(make_renderer(
+//                     font_a, font_size, direction, script, use_color,
+//                 ))
+//             });
+//             let renderer_b = tl_b.get_or(|| {
+//                 RefCell::new(make_renderer(
+//                     font_b, font_size, direction, script, use_color,
+//                 ))
+//             });
 
-            // Shape at the default location, then ask the static analysis
-            // whether this word needs behavioural testing at all.
-            let buffer_a = renderer_a.borrow_mut().shape(word, None);
-            let selection = select_buffer(
-                signature, &uncertain, &marks, font_a, font_b, word, &buffer_a,
-            );
-            if !selection.selected {
-                // Nothing in this word's buffer intersects the difference
-                // signature, so skip it entirely (no second shape, no render).
-                return vec![];
-            }
+//             // Shape at the default location, then ask the static analysis
+//             // whether this word needs behavioural testing at all.
+//             let buffer_a = renderer_a.borrow_mut().shape(word, None);
+//             let selection = select_buffer(
+//                 signature, &uncertain, &marks, font_a, font_b, word, &buffer_a,
+//             );
+//             if !selection.selected {
+//                 // Nothing in this word's buffer intersects the difference
+//                 // signature, so skip it entirely (no second shape, no render).
+//                 return vec![];
+//             }
 
-            // Deduplication under an RwLock: read-check then write-insert. If
-            // every glyph in A's buffer was already rendered, skip this word.
-            let is_dup = {
-                let seen = seen_glyphs.read().unwrap();
-                buffer_a.iter().all(|g| seen.contains(g))
-            };
-            if is_dup {
-                return vec![];
-            }
-            {
-                let mut seen = seen_glyphs.write().unwrap();
-                for g in buffer_a.iter() {
-                    seen.insert(*g);
-                }
-            }
+//             // Deduplication under an RwLock: read-check then write-insert. If
+//             // every glyph in A's buffer was already rendered, skip this word.
+//             let is_dup = {
+//                 let seen = seen_glyphs.read().unwrap();
+//                 buffer_a.iter().all(|g| seen.contains(g))
+//             };
+//             if is_dup {
+//                 return vec![];
+//             }
+//             {
+//                 let mut seen = seen_glyphs.write().unwrap();
+//                 for g in buffer_a.iter() {
+//                     seen.insert(*g);
+//                 }
+//             }
 
-            let buffer_b = renderer_b.borrow_mut().shape(word, None);
+//             let buffer_b = renderer_b.borrow_mut().shape(word, None);
 
-            // Locations to test: the selected locations (default + the
-            // designspace points where something changed), or -- when the
-            // fallback is exhaustive -- every variation peak of either font.
-            let locations: Vec<NormalizedLocation> = if selection.exhaustive {
-                let mut locs = font_a.variations_for_buffer(&buffer_a);
-                locs.extend(font_b.variations_for_buffer(&buffer_b));
-                locs.into_iter().collect()
-            } else {
-                selection.locations.iter().cloned().collect()
-            };
+//             // Locations to test: the selected locations (default + the
+//             // designspace points where something changed), or -- when the
+//             // fallback is exhaustive -- every variation peak of either font.
+//             let locations: Vec<NormalizedLocation> = if selection.exhaustive {
+//                 let mut locs = font_a.variations_for_buffer(&buffer_a);
+//                 locs.extend(font_b.variations_for_buffer(&buffer_b));
+//                 locs.into_iter().collect()
+//             } else {
+//                 selection.locations.iter().cloned().collect()
+//             };
 
-            let mut results = Vec::with_capacity(locations.len() + 1);
+//             let mut results = Vec::with_capacity(locations.len() + 1);
 
-            // Render at the default location
-            if let Some(diff) = render_word(
-                threshold,
-                &mut renderer_a.borrow_mut(),
-                &mut renderer_b.borrow_mut(),
-                word,
-                buffer_a,
-                buffer_b,
-                "default location",
-                &[],
-                &[],
-            ) {
-                results.push(diff);
-            }
+//             // Render at the default location
+//             if let Some(diff) = render_word(
+//                 threshold,
+//                 &mut renderer_a.borrow_mut(),
+//                 &mut renderer_b.borrow_mut(),
+//                 word,
+//                 buffer_a,
+//                 buffer_b,
+//                 "default location",
+//                 &[],
+//                 &[],
+//             ) {
+//                 results.push(diff);
+//             }
 
-            // Render at each selected/variation location (default is already
-            // rendered above, so skip it here).
-            for variation in locations {
-                if variation == NormalizedLocation::default() {
-                    continue;
-                }
-                let coords_a = font_a.location_to_coords(&variation);
-                let coords_b = font_b.location_to_coords(&variation);
-                let buffer_a = renderer_a.borrow_mut().shape(word, Some(coords_a.clone()));
-                let buffer_b = renderer_b.borrow_mut().shape(word, Some(coords_b.clone()));
-                let user_space = font_a.location_to_user(&variation);
-                if let Some(diff) = render_word(
-                    threshold,
-                    &mut renderer_a.borrow_mut(),
-                    &mut renderer_b.borrow_mut(),
-                    word,
-                    buffer_a,
-                    buffer_b,
-                    &user_space,
-                    &coords_a,
-                    &coords_b,
-                ) {
-                    results.push(diff);
-                }
-            }
+//             // Render at each selected/variation location (default is already
+//             // rendered above, so skip it here).
+//             for variation in locations {
+//                 if variation == NormalizedLocation::default() {
+//                     continue;
+//                 }
+//                 let coords_a = font_a.location_to_coords(&variation);
+//                 let coords_b = font_b.location_to_coords(&variation);
+//                 let buffer_a = renderer_a.borrow_mut().shape(word, Some(coords_a.clone()));
+//                 let buffer_b = renderer_b.borrow_mut().shape(word, Some(coords_b.clone()));
+//                 let user_space = font_a.location_to_user(&variation);
+//                 if let Some(diff) = render_word(
+//                     threshold,
+//                     &mut renderer_a.borrow_mut(),
+//                     &mut renderer_b.borrow_mut(),
+//                     word,
+//                     buffer_a,
+//                     buffer_b,
+//                     &user_space,
+//                     &coords_a,
+//                     &coords_b,
+//                 ) {
+//                     results.push(diff);
+//                 }
+//             }
 
-            results
-        })
-        .collect();
+//             results
+//         })
+//         .collect();
 
-    let mut diffs = differences;
-    diffs.retain(|diff| diff.differing_pixels > threshold);
-    diffs.sort_by_key(|x| -(x.differing_pixels as i32));
-    Ok(diffs)
-}
+//     let mut diffs = differences;
+//     diffs.retain(|diff| diff.differing_pixels > threshold);
+//     diffs.sort_by_key(|x| -(x.differing_pixels as i32));
+//     Ok(diffs)
+// }
 
-// A slow and simple version (wasm; the parallel version above is used on
-// native targets)
-#[cfg(target_family = "wasm")]
+// // A slow and simple version (wasm; the parallel version above is used on
+// // native targets)
+// #[cfg(target_family = "wasm")]
 pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,

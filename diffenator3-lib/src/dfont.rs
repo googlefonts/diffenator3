@@ -73,6 +73,8 @@ pub struct DFont {
     pub codepoints: HashSet<u32>,
     /// Cached variation positions
     variation_positions: HashMap<GlyphId, Vec<NormalizedLocation>>,
+    /// Fontdrasil axes, if the font has any. This is cached because building it is expensive.
+    pub fontdrasil_axes: Option<fontdrasil::types::Axes>,
 }
 
 impl DFont {
@@ -84,7 +86,9 @@ impl DFont {
             backing,
             codepoints: HashSet::new(),
             variation_positions: HashMap::new(),
+            fontdrasil_axes: None,
         };
+        fnt.fontdrasil_axes = fontdrasil_axes(&fnt.fontref()).unwrap_or_default();
         let cmap = fnt.fontref().charmap();
         fnt.codepoints = cmap.mappings().map(|(cp, _)| cp).collect();
         let max_glyphid = fnt.fontref().maxp().map(|x| x.num_glyphs()).unwrap_or(0);
@@ -238,7 +242,7 @@ impl DFont {
     }
 
     pub fn location_to_user(&self, location: &NormalizedLocation) -> String {
-        if let Some(fontdrasil_axes) = fontdrasil_axes(&self.fontref()).unwrap_or_default() {
+        if let Some(fontdrasil_axes) = &self.fontdrasil_axes {
             // A location may contain axes which this font doesn't have (e.g. a
             // location built from the union of both fonts' variation peaks).
             // Convert only the axes this font knows about, otherwise fontdrasil
@@ -251,7 +255,7 @@ impl DFont {
                 .map(|axis| axis.tag())
                 .collect();
             location.fit_to_axes(&tags);
-            let user_location = location.to_user(&fontdrasil_axes);
+            let user_location = location.to_user(fontdrasil_axes);
             let mut loc_str: Vec<String> = user_location
                 .iter()
                 .map(|(tag, coord)| format!("{}={}", tag, coord.to_f64()))
