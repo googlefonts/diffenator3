@@ -44,8 +44,8 @@ impl Eq for PositionedGlyph {}
 impl Hash for PositionedGlyph {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.glyph_id.hash(state);
-        F2Dot14::from_f32(self.x_pos).to_bits().hash(state);
-        F2Dot14::from_f32(self.y_pos).to_bits().hash(state);
+        self.x_pos.to_bits().hash(state);
+        self.y_pos.to_bits().hash(state);
     }
 }
 

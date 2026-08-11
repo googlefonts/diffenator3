@@ -43,7 +43,6 @@ pub struct ColorRenderer<'a> {
     scale: f32,
     font: skrifa::FontRef<'a>,
     palette: Vec<PaletteColor>,
-    location: LocationRef<'a>,
     cache: HashMap<u32, CachedColorGlyph>, // XXX needs to be per-location
 }
 
@@ -71,7 +70,6 @@ impl<'a> ColorRenderer<'a> {
             // instance,
             scale: font_size,
             palette,
-            location: LocationRef::default(),
             cache: HashMap::new(),
         }
     }
@@ -81,13 +79,23 @@ impl<'a> ColorRenderer<'a> {
     /// Returns `(bearing_x, bearing_y, width, height)` in pixels.
     /// `bearing_x` is the horizontal offset from the glyph origin to the tile's left edge.
     /// `bearing_y` is the vertical offset from the baseline to the tile's top edge (Y-up).
-    fn glyph_tile_bounds(&self, glyph_id: GlyphId) -> (f32, f32, u32, u32) {
+    fn glyph_tile_bounds(
+        &self,
+        glyph_id: GlyphId,
+        coords: Option<&[NormalizedCoord]>,
+    ) -> (f32, f32, u32, u32) {
+        let skrifa_norm_coords = coords
+            .unwrap_or(&[])
+            .iter()
+            .map(|x| x.to_f2dot14())
+            .collect::<Vec<_>>();
+        let location = LocationRef::from(skrifa_norm_coords.as_slice());
         let size = Size::new(self.scale);
         let color_glyphs = self.font.color_glyphs();
 
         // COLRv1 glyphs may have a clip box that gives tight pixel bounds
         if let Some(color_glyph) = color_glyphs.get(glyph_id) {
-            if let Some(bbox) = color_glyph.bounding_box(self.location, size) {
+            if let Some(bbox) = color_glyph.bounding_box(location, size) {
                 let w = (bbox.x_max - bbox.x_min).ceil().max(1.0) as u32;
                 let h = (bbox.y_max - bbox.y_min).ceil().max(1.0) as u32;
                 return (bbox.x_min, bbox.y_max, w, h);
@@ -95,23 +103,35 @@ impl<'a> ColorRenderer<'a> {
         }
 
         // Fallback for COLRv0 or outline glyphs: use font-level metrics
-        let glyph_metrics = self.font.glyph_metrics(size, self.location);
+        let glyph_metrics = self.font.glyph_metrics(size, location);
         let advance = glyph_metrics.advance_width(glyph_id).unwrap_or(self.scale);
-        let metrics = self.font.metrics(size, self.location);
+        let metrics = self.font.metrics(size, location);
         let w = advance.ceil().max(1.0) as u32;
         let h = (metrics.ascent - metrics.descent).ceil().max(1.0) as u32;
         (0.0, metrics.ascent, w, h)
     }
 
     /// Render a single glyph into a tile for caching.
-    fn render_glyph(&self, glyph_id: GlyphId) -> CachedColorGlyph {
+    fn render_glyph(
+        &self,
+        glyph_id: GlyphId,
+        location: Option<&[NormalizedCoord]>,
+    ) -> CachedColorGlyph {
         let upem = self.font.head().unwrap().units_per_em() as f32;
         let factor = self.scale / upem;
 
-        let (bearing_x, bearing_y, tile_w, tile_h) = self.glyph_tile_bounds(glyph_id);
+        let (bearing_x, bearing_y, tile_w, tile_h) = self.glyph_tile_bounds(glyph_id, location);
 
         let outlines = self.font.outline_glyphs();
-        let mut painter = SkiaPainter::new(tile_w, tile_h, &self.palette, outlines, self.location);
+
+        let skrifa_norm_coords = location
+            .unwrap_or(&[])
+            .iter()
+            .map(|x| x.to_f2dot14())
+            .collect::<Vec<_>>();
+        let locationref = LocationRef::from(skrifa_norm_coords.as_slice());
+
+        let mut painter = SkiaPainter::new(tile_w, tile_h, &self.palette, outlines, locationref);
 
         // Transform: maps font-unit origin (0,0) to pixel (-bearing_x, bearing_y)
         // within the tile, with Y-flip (font Y-up → pixel Y-down).
@@ -127,7 +147,7 @@ impl<'a> ColorRenderer<'a> {
         let color_glyphs = self.font.color_glyphs();
         if let Some(color_glyph) = color_glyphs.get(glyph_id) {
             painter.push_transform(transform);
-            let _ = color_glyph.paint(self.location, &mut painter);
+            let _ = color_glyph.paint(locationref, &mut painter);
             painter.pop_transform();
         } else {
             painter.push_transform(transform);
@@ -143,9 +163,9 @@ impl<'a> ColorRenderer<'a> {
     }
 
     /// Ensure a glyph is in the cache, rendering it if needed.
-    fn ensure_cached(&mut self, glyph_id: u32) {
+    fn ensure_cached(&mut self, glyph_id: u32, location: Option<&[NormalizedCoord]>) {
         if !self.cache.contains_key(&glyph_id) {
-            let tile = self.render_glyph(GlyphId::new(glyph_id));
+            let tile = self.render_glyph(GlyphId::new(glyph_id), location);
             self.cache.insert(glyph_id, tile);
         }
     }
@@ -159,10 +179,14 @@ impl AnyRenderer for ColorRenderer<'_> {
         false // We can't do one cheaply
     }
 
-    fn buffer_to_stage1_rendering(&mut self, buffer: &DrawBuffer) -> Option<Box<dyn Any>> {
+    fn buffer_to_stage1_rendering(
+        &mut self,
+        buffer: &DrawBuffer,
+        location: Option<&[NormalizedCoord]>,
+    ) -> Option<Box<dyn Any>> {
         // Ensure all glyphs for this word are cached
         for glyph in buffer.iter() {
-            self.ensure_cached(glyph.glyph_id.into());
+            self.ensure_cached(glyph.glyph_id.into(), location);
         }
         Some(Box::new(buffer.clone()))
     }
@@ -170,14 +194,25 @@ impl AnyRenderer for ColorRenderer<'_> {
     /// Render a string to a GrayImage using cached glyph tiles.
     ///
     /// Returns the serialized glyph buffer (for dedup) and the rendered image.
-    fn final_rendering(&self, data: &dyn Any) -> GrayImage {
+    fn final_rendering(
+        &mut self,
+        data: &dyn Any,
+        location: Option<&[NormalizedCoord]>,
+    ) -> GrayImage {
         let buffer = data
             .downcast_ref::<DrawBuffer>()
             .expect("final_rendering: expected DrawBuffer from string_to_stage1_rendering");
 
         // Image dimensions from font metrics
         let size = Size::new(self.scale);
-        let metrics = self.font.metrics(size, self.location);
+        let skrifa_norm_coords = location
+            .unwrap_or(&[])
+            .iter()
+            .map(|x| x.to_f2dot14())
+            .collect::<Vec<_>>();
+        let locationref = LocationRef::from(skrifa_norm_coords.as_slice());
+
+        let metrics = self.font.metrics(size, locationref);
         let ascent = metrics.ascent;
         let descent = metrics.descent;
         let height = ((ascent - descent).ceil() as u32).max(1);
@@ -216,6 +251,8 @@ impl AnyRenderer for ColorRenderer<'_> {
 
         img
     }
+
+    fn log_stats(&self) {}
 }
 
 /// Read the first CPAL palette from a font.
@@ -257,9 +294,9 @@ mod tests {
         let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
         let buffer = renderer.shape("hello", None);
         let data = renderer
-            .buffer_to_stage1_rendering(&buffer)
+            .buffer_to_stage1_rendering(&buffer, None)
             .expect("buffer_to_stage1_rendering returned None");
-        let img = renderer.final_rendering(&*data);
+        let img = renderer.final_rendering(&*data, None);
 
         assert!(
             !buffer.serialize().is_empty(),
@@ -279,12 +316,12 @@ mod tests {
 
         // "ll" shares the same glyph; after rendering, the cache should contain it
         let buffer = renderer.shape("hello", None);
-        renderer.buffer_to_stage1_rendering(&buffer).unwrap();
+        renderer.buffer_to_stage1_rendering(&buffer, None).unwrap();
         let cache_size_after_hello = renderer.cache.len();
 
         // "lo" reuses 'l' and 'o' which are already cached
         let buffer = renderer.shape("lo", None);
-        renderer.buffer_to_stage1_rendering(&buffer).unwrap();
+        renderer.buffer_to_stage1_rendering(&buffer, None).unwrap();
         let cache_size_after_lo = renderer.cache.len();
 
         assert_eq!(
@@ -300,7 +337,7 @@ mod tests {
         let mut renderer = ColorRenderer::new(&dfont, 32.0, None, None);
 
         let buffer = renderer.shape("hello", None);
-        renderer.buffer_to_stage1_rendering(&buffer).unwrap();
+        renderer.buffer_to_stage1_rendering(&buffer, None).unwrap();
 
         // At least one cached tile should have pixels where the RGB channels
         // differ from each other, proving we're rendering actual color, not
@@ -322,11 +359,15 @@ mod tests {
         let mut renderer_b = ColorRenderer::new(&dfont, 32.0, None, None);
 
         let buffer_a = renderer_a.shape("world", None);
-        let data_a = renderer_a.buffer_to_stage1_rendering(&buffer_a).unwrap();
-        let img_a = renderer_a.final_rendering(&*data_a);
+        let data_a = renderer_a
+            .buffer_to_stage1_rendering(&buffer_a, None)
+            .unwrap();
+        let img_a = renderer_a.final_rendering(&*data_a, None);
         let buffer_b = renderer_b.shape("world", None);
-        let data_b = renderer_b.buffer_to_stage1_rendering(&buffer_b).unwrap();
-        let img_b = renderer_b.final_rendering(&*data_b);
+        let data_b = renderer_b
+            .buffer_to_stage1_rendering(&buffer_b, None)
+            .unwrap();
+        let img_b = renderer_b.final_rendering(&*data_b, None);
 
         let diff = crate::render::utils::count_differences(img_a, img_b, 0);
         assert_eq!(diff, 0, "same font should produce identical images");

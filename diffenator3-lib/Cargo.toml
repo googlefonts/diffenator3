@@ -54,3 +54,4 @@ typescript-type-def = { version = "0.5.13", optional = true, features = [
     "json_value",
 ] }
 fontdrasil = "0.4.0"
+rustc-hash = "2.1.3"
