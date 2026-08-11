@@ -172,7 +172,7 @@ impl<'a> ColorRenderer<'a> {
 }
 
 impl AnyRenderer for ColorRenderer<'_> {
-    fn shape(&mut self, string: &str, location: Option<Vec<NormalizedCoord>>) -> DrawBuffer {
+    fn shape(&mut self, string: &str, location: Option<&[NormalizedCoord]>) -> DrawBuffer {
         self.cached_shaper.shape(string, location)
     }
     fn fast_equivalence_check(&self, _data1: &dyn Any, _data2: &dyn Any) -> bool {
