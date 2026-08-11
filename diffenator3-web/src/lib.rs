@@ -96,8 +96,6 @@ pub fn diff_kerns(font_a: &[u8], font_b: &[u8], f: &js_sys::Function) {
 pub fn modified_glyphs(font_a: &[u8], font_b: &[u8], location: &str, f: &js_sys::Function) {
     let mut f_a = DFont::new(font_a);
     let mut f_b = DFont::new(font_b);
-    let _hack = f_a.set_location(location);
-    let _hack = f_b.set_location(location);
 
     let val = json!({
         "modified_glyphs": encodedglyphs::modified_encoded_glyphs(&f_a, &f_b)

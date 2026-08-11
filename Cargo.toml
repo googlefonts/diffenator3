@@ -7,7 +7,9 @@ members = [
     "diff3proof",
     "kerndiffer",
     "rendertest",
+    "staticdifftest",
     "ttj",
+    "wordselecttest",
 ]
 default-members = ["diffenator3-cli", "diff3proof"]
 

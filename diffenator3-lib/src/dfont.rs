@@ -216,9 +216,12 @@ impl DFont {
         buffer
             .iter()
             .fold(HashSet::new(), |mut acc, positioned_glyph| {
-                let glyphid = positioned_glyph.glyph_id;
-                let variations = self.variations_for_glyph(&glyphid);
-                acc.extend(variations);
+                // Borrow the cached per-glyph list directly instead of going
+                // through variations_for_glyph (which clones a Vec per glyph);
+                // this runs per (word, buffer) in the hot loops.
+                if let Some(variations) = self.variation_positions.get(&positioned_glyph.glyph_id) {
+                    acc.extend(variations.iter().cloned());
+                }
                 acc
             })
     }
@@ -236,6 +239,18 @@ impl DFont {
 
     pub fn location_to_user(&self, location: &NormalizedLocation) -> String {
         if let Some(fontdrasil_axes) = fontdrasil_axes(&self.fontref()).unwrap_or_default() {
+            // A location may contain axes which this font doesn't have (e.g. a
+            // location built from the union of both fonts' variation peaks).
+            // Convert only the axes this font knows about, otherwise fontdrasil
+            // panics on the unknown axes.
+            let mut location = location.clone();
+            let tags: Vec<_> = self
+                .fontref()
+                .axes()
+                .iter()
+                .map(|axis| axis.tag())
+                .collect();
+            location.fit_to_axes(&tags);
             let user_location = location.to_user(&fontdrasil_axes);
             let mut loc_str: Vec<String> = user_location
                 .iter()
@@ -246,6 +261,35 @@ impl DFont {
         } else {
             "".to_string()
         }
+    }
+
+    /// The GDEF glyph class of a glyph: 0=unassigned, 1=base, 2=ligature,
+    /// 3=mark, 4=component. Returns 0 if the font has no GDEF glyph class
+    /// definition.
+    pub fn glyph_class(&self, gid: GlyphId) -> u16 {
+        self.fontref()
+            .gdef()
+            .ok()
+            .and_then(|gdef| gdef.glyph_class_def())
+            .and_then(|res| res.ok())
+            .map(|class_def| class_def.get(gid))
+            .unwrap_or(0)
+    }
+
+    /// Whether the glyph is a mark glyph (GDEF glyph class 3).
+    pub fn glyph_is_mark(&self, gid: GlyphId) -> bool {
+        self.glyph_class(gid) == 3
+    }
+
+    /// The set of glyph ids whose GDEF glyph class is 3 (mark). Build once
+    /// and reuse: per-glyph [`Self::glyph_class`] lookups re-parse GDEF and
+    /// are too slow to call inside a per-word hot loop.
+    pub fn mark_glyphs(&self) -> HashSet<GlyphId> {
+        let num = self.fontref().maxp().map(|x| x.num_glyphs()).unwrap_or(0);
+        (0..num)
+            .map(|gid| GlyphId::new(gid as u32))
+            .filter(|gid| self.glyph_class(*gid) == 3)
+            .collect()
     }
 }
 

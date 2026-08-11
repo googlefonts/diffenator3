@@ -14,10 +14,11 @@ pub use crate::structs::{Difference, GlyphDiff};
 use crate::{
     dfont::DFont,
     render::{shaper::PositionedGlyph, utils::count_differences, wordlists::direction_from_script},
+    staticdiff::DifferenceSignature,
+    wordselect::{select_buffer, word_is_encoded},
 };
-use cfg_if::cfg_if;
 use colorrenderer::ColorRenderer;
-use fontdrasil::coords::NormalizedCoord;
+use fontdrasil::coords::{NormalizedCoord, NormalizedLocation};
 use harfrust::{Direction, Script};
 use read_fonts::ReadError;
 use renderer::{AnyRenderer, Renderer};
@@ -26,6 +27,7 @@ use skrifa::raw::TableProvider;
 use static_lang_word_lists::WordList;
 use std::{collections::BTreeMap, str::FromStr};
 
+use cfg_if::cfg_if;
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
         use indicatif::ParallelProgressIterator;
@@ -33,6 +35,8 @@ cfg_if! {
         use thread_local::ThreadLocal;
         use std::cell::RefCell;
         use std::sync::RwLock;
+    } else {
+        use std::time::Duration;
     }
 }
 
@@ -61,16 +65,11 @@ fn font_has_colr(dfont: &DFont) -> bool {
 pub fn test_font_words(
     font_a: &DFont,
     font_b: &DFont,
+    signature: &DifferenceSignature,
     custom_inputs: &[WordList],
 ) -> BTreeMap<String, Vec<Difference>> {
     let mut map: BTreeMap<String, Vec<Difference>> = BTreeMap::new();
     let mut jobs: Vec<&WordList> = vec![];
-
-    let shared_codepoints = font_a
-        .codepoints
-        .intersection(&font_b.codepoints)
-        .copied()
-        .collect();
 
     let supported_a = font_a.supported_scripts();
     let supported_b = font_b.supported_scripts();
@@ -89,7 +88,7 @@ pub fn test_font_words(
             font_b,
             DEFAULT_WORDS_FONT_SIZE,
             job,
-            Some(&shared_codepoints),
+            signature,
             DEFAULT_WORDS_THRESHOLD,
         )
         .unwrap_or_default();
@@ -148,12 +147,20 @@ pub(crate) fn diff_many_words(
     font_b: &DFont,
     font_size: f32,
     wordlist: &WordList,
-    shared_codepoints: Option<&FxHashSet<u32>>,
+    signature: &DifferenceSignature,
     threshold: usize,
 ) -> Result<Vec<Difference>, ReadError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
+
+    // The static difference signature (outlines, advances, GPOS positioning)
+    // is computed by the caller and passed in; it drives word selection
+    // below. `uncertain` and `marks` are derived indexes, shared read-only
+    // across the worker threads.
+    let uncertain = signature.uncertain_glyphs();
+    let marks = font_a.mark_glyphs();
+
     let seen_glyphs = RwLock::new(FxHashSet::default());
 
     let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
@@ -162,11 +169,7 @@ pub(crate) fn diff_many_words(
     let differences: Vec<Difference> = wordlist
         .par_iter()
         .progress()
-        .filter(|word| {
-            shared_codepoints
-                .as_ref()
-                .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
-        })
+        .filter(|word| word_is_encoded(font_a, font_b, word))
         .flat_map(|word| {
             let renderer_a = tl_a.get_or(|| {
                 RefCell::new(make_renderer(
@@ -179,13 +182,20 @@ pub(crate) fn diff_many_words(
                 ))
             });
 
-            // Shape at the default location
+            // Shape at the default location, then ask the static analysis
+            // whether this word needs behavioural testing at all.
             let buffer_a = renderer_a.borrow_mut().shape(word, None);
-            let mut variation_positions = font_a.variations_for_buffer(&buffer_a);
-            let buffer_b = renderer_b.borrow_mut().shape(word, None);
-            variation_positions.extend(font_b.variations_for_buffer(&buffer_b));
+            let selection = select_buffer(
+                signature, &uncertain, &marks, font_a, font_b, word, &buffer_a,
+            );
+            if !selection.selected {
+                // Nothing in this word's buffer intersects the difference
+                // signature, so skip it entirely (no second shape, no render).
+                return vec![];
+            }
 
-            // Deduplication under an RwLock: read-check then write-insert
+            // Deduplication under an RwLock: read-check then write-insert. If
+            // every glyph in A's buffer was already rendered, skip this word.
             let is_dup = {
                 let seen = seen_glyphs.read().unwrap();
                 buffer_a.iter().all(|g| seen.contains(g))
@@ -200,9 +210,22 @@ pub(crate) fn diff_many_words(
                 }
             }
 
-            let mut results = Vec::with_capacity(variation_positions.len() + 1);
+            let buffer_b = renderer_b.borrow_mut().shape(word, None);
 
-            // Render at default location
+            // Locations to test: the selected locations (default + the
+            // designspace points where something changed), or -- when the
+            // fallback is exhaustive -- every variation peak of either font.
+            let locations: Vec<NormalizedLocation> = if selection.exhaustive {
+                let mut locs = font_a.variations_for_buffer(&buffer_a);
+                locs.extend(font_b.variations_for_buffer(&buffer_b));
+                locs.into_iter().collect()
+            } else {
+                selection.locations.iter().cloned().collect()
+            };
+
+            let mut results = Vec::with_capacity(locations.len() + 1);
+
+            // Render at the default location
             if let Some(diff) = render_word(
                 threshold,
                 &mut renderer_a.borrow_mut(),
@@ -217,8 +240,12 @@ pub(crate) fn diff_many_words(
                 results.push(diff);
             }
 
-            // Render at each variation position
-            for variation in variation_positions {
+            // Render at each selected/variation location (default is already
+            // rendered above, so skip it here).
+            for variation in locations {
+                if variation == NormalizedLocation::default() {
+                    continue;
+                }
                 let coords_a = font_a.location_to_coords(&variation);
                 let coords_b = font_b.location_to_coords(&variation);
                 let buffer_a = renderer_a.borrow_mut().shape(word, Some(coords_a.clone()));
@@ -249,20 +276,31 @@ pub(crate) fn diff_many_words(
     Ok(diffs)
 }
 
-// A slow and simple version
+// A slow and simple version (wasm; the parallel version above is used on
+// native targets)
 #[cfg(target_family = "wasm")]
 pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
     font_size: f32,
     wordlist: &WordList,
-    shared_codepoints: Option<&FxHashSet<u32>>,
+    signature: &DifferenceSignature,
     threshold: usize,
 ) -> Result<Vec<Difference>, ReadError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
-    let mut seen_glyphs: FxHashSet<PositionedGlyph> = FxHashSet::new();
+
+    // The static difference signature (outlines, advances, GPOS positioning)
+    // is computed by the caller and passed in; it drives word selection
+    // below: a word is shaped once at the default location, then only
+    // rendered at the designspace points where its glyphs/pairs actually
+    // changed. `uncertain` and `marks` are derived indexes, built once and
+    // reused for every word.
+    let uncertain = signature.uncertain_glyphs();
+    let marks = font_a.mark_glyphs();
+
+    let mut seen_glyphs: FxHashSet<PositionedGlyph> = FxHashSet::default();
     let mut differences: Vec<Difference> = vec![];
 
     let mut renderer_a = make_renderer(font_a, font_size, direction, script, use_color);
@@ -276,18 +314,35 @@ pub(crate) fn diff_many_words(
     let mut variations_processed = 0;
 
     for word in wordlist.iter() {
-        if let Some(scp) = shared_codepoints {
-            if !word.chars().all(|c| scp.contains(&(c as u32))) {
-                continue;
-            }
+        if !word_is_encoded(font_a, font_b, word) {
+            continue;
         }
-        // Shape it at the default location and render to a buffer
+        // Shape at the default location to discover the buffer, then ask the
+        // static analysis whether this word needs behavioural testing at all.
         let shaping = std::time::Instant::now();
         let buffer_a = renderer_a.shape(word, None);
-        let mut variation_positions = font_a.variations_for_buffer(&buffer_a);
+        let selection = select_buffer(
+            signature, &uncertain, &marks, font_a, font_b, word, &buffer_a,
+        );
+        if !selection.selected {
+            // Nothing in this word's buffer intersects the difference
+            // signature, so skip it entirely (no second shape, no render).
+            continue;
+        }
         let buffer_b = renderer_b.shape(word, None);
-        variation_positions.extend(font_b.variations_for_buffer(&buffer_b));
         first_shape_time += shaping.elapsed();
+
+        // Locations to test: the selected locations (default + the designspace
+        // points where something changed), or -- when the fallback is
+        // exhaustive -- every variation peak of either font. Computed before
+        // the default render below moves the buffers.
+        let locations: Vec<NormalizedLocation> = if selection.exhaustive {
+            let mut locs = font_a.variations_for_buffer(&buffer_a);
+            locs.extend(font_b.variations_for_buffer(&buffer_b));
+            locs.into_iter().collect()
+        } else {
+            selection.locations.iter().cloned().collect()
+        };
 
         let other = std::time::Instant::now();
 
@@ -308,17 +363,19 @@ pub(crate) fn diff_many_words(
 
         first_other_time += other.elapsed();
 
-        // Now let's look at the variations!
-        for variation in variation_positions {
+        for variation in locations {
+            if variation == NormalizedLocation::default() {
+                // The default location was already rendered above.
+                continue;
+            }
             let shaping = std::time::Instant::now();
-
-            let buffer_a = renderer_a.shape(word, Some(font_a.location_to_coords(&variation)));
-            let buffer_b = renderer_b.shape(word, Some(font_b.location_to_coords(&variation)));
+            let coords_a = font_a.location_to_coords(&variation);
+            let coords_b = font_b.location_to_coords(&variation);
+            let buffer_a = renderer_a.shape(word, Some(coords_a.clone()));
+            let buffer_b = renderer_b.shape(word, Some(coords_b.clone()));
             var_shape_time += shaping.elapsed();
             let other = std::time::Instant::now();
             let user_space = font_a.location_to_user(&variation);
-            let coords_a = font_a.location_to_coords(&variation);
-            let coords_b = font_b.location_to_coords(&variation);
             if let Some(diff) = process_word(
                 threshold,
                 &mut seen_glyphs,
@@ -428,4 +485,73 @@ fn render_word<'a>(
         });
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{dfont::DFont, staticdiff::compute_signature};
+
+    /// Helper: build a DFont if the test font exists, else None.
+    fn dfont(path: &str) -> Option<DFont> {
+        let data = std::fs::read(path).ok()?;
+        Some(DFont::new(&data))
+    }
+
+    /// `diff_many_words` now drives its rendering from the static difference
+    /// signature: changed words must still be reported (at the locations
+    /// where they change) and unchanged words must be skipped entirely.
+    #[test]
+    fn diff_many_words_reports_kern_changes_with_selection() {
+        let Some(font_a) = dfont("test-data/Martel-Original.ttf") else {
+            eprintln!("skipping: test font not present");
+            return;
+        };
+        let Some(font_b) = dfont("test-data/Martel-KernChange.ttf") else {
+            eprintln!("skipping: test font not present");
+            return;
+        };
+        let words = ["To", "Tory", "AV", "Tg", "hello", "world", "zip"];
+        let wl = WordList::define("kern", words.iter().cloned());
+        // Threshold 0: any differing pixel counts, so the assertions are
+        // purely about which words are reported (and where).
+        let signature = compute_signature(&font_a, &font_b);
+        let diffs = diff_many_words(&font_a, &font_b, 16.0, &wl, &signature, 0)
+            .expect("diff_many_words failed");
+
+        let reported: Vec<&str> = diffs.iter().map(|d| d.word.as_str()).collect();
+
+        // "AV" has a *real* added kern (-30 at regular, -70 at bold): the
+        // selection must catch it, and it must be reported at the bold
+        // (wght=900) variation location where the pixels differ.
+        assert!(
+            reported.contains(&"AV"),
+            "expected AV to be reported, got {reported:?}"
+        );
+        let av_locations: Vec<&str> = diffs
+            .iter()
+            .filter(|d| d.word == "AV")
+            .map(|d| d.location.as_str())
+            .collect();
+        assert!(
+            av_locations.iter().any(|l| l.contains("wght=900")),
+            "expected a wght=900 location for AV, got {av_locations:?}"
+        );
+
+        // Words whose buffers don't intersect the difference signature must be
+        // skipped entirely by the static-analysis selection.
+        for skipped in ["hello", "world", "zip"] {
+            assert!(
+                !reported.contains(&skipped),
+                "expected {skipped} to be skipped, got {reported:?}"
+            );
+        }
+
+        // Note: the static analysis also flags the T/o and T/g pairs, so "To",
+        // "Tory" and "Tg" ARE selected and rendered -- but the flagged change
+        // does not manifest in the rendered output (the lookup isn't active in
+        // default shaping), so they are correctly *not* reported as pixel
+        // diffs. The selection is conservative (renders them) and sound (no
+        // false positives).
+    }
 }

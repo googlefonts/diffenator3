@@ -1,0 +1,17 @@
+[package]
+name = "wordselecttest"
+version = "0.1.0"
+edition = "2021"
+description = "Temporary test harness for difference-signature-driven word selection (diffenator3)"
+publish = false
+
+[dependencies]
+diffenator3-lib = { path = "../diffenator3-lib" }
+fontdrasil = "0.4.0"
+skrifa = { workspace = true }
+static-lang-word-lists = { version = "0.3.0", features = ["rayon"] }
+harfrust = { workspace = true }
+clap = { version = "4.5.9", features = ["derive"] }
+serde_json = "1"
+env_logger = "0.11"
+log = "0.4"
