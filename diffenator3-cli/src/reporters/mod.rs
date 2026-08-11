@@ -4,7 +4,7 @@ pub mod text;
 
 use diffenator3_lib::structs::{CmapDiff, Difference, GlyphDiff};
 use serde::Serialize;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 #[derive(Serialize, Default)]
 #[cfg_attr(feature = "typescript", derive(typescript_type_def::TypeDef))]
@@ -27,4 +27,4 @@ pub struct Report {
 
 #[cfg(feature = "typescript")]
 #[allow(dead_code)]
-pub type Api = (Report);
+pub type Api = Report;

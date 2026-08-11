@@ -2175,6 +2175,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "staticdifftest"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "diffenator3-lib",
+ "env_logger",
+ "fontdrasil 0.4.0",
+ "log",
+ "serde_json",
+ "skrifa",
+]
+
+[[package]]
 name = "strict-num"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2989,6 +3002,21 @@ name = "wit-bindgen"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
+
+[[package]]
+name = "wordselecttest"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "diffenator3-lib",
+ "env_logger",
+ "fontdrasil 0.4.0",
+ "harfrust",
+ "log",
+ "serde_json",
+ "skrifa",
+ "static-lang-word-lists",
+]
 
 [[package]]
 name = "write-fonts"

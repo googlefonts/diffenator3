@@ -6,6 +6,7 @@ pub use crate::structs::{CmapDiff, EncodedGlyph};
 use crate::{
     dfont::DFont,
     render::{diff_many_words, GlyphDiff},
+    staticdiff::DifferenceSignature,
 };
 pub use harfrust::Direction;
 use read_fonts::ReadError;
@@ -62,6 +63,7 @@ impl CmapDiff {
 pub fn modified_encoded_glyphs(
     font_a: &DFont,
     font_b: &DFont,
+    signature: &DifferenceSignature,
 ) -> Result<Vec<GlyphDiff>, ReadError> {
     let cmap_a = &font_a.codepoints;
     let cmap_b = &font_b.codepoints;
@@ -76,7 +78,7 @@ pub fn modified_encoded_glyphs(
         font_b,
         DEFAULT_GLYPHS_FONT_SIZE,
         &wl,
-        None,
+        signature,
         DEFAULT_GLYPHS_THRESHOLD,
     )?
     .into_iter()

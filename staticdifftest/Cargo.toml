@@ -1,0 +1,15 @@
+[package]
+name = "staticdifftest"
+version = "0.1.0"
+edition = "2021"
+description = "Temporary test harness for the static difference analysis (diffenator3 staticdiff)"
+publish = false
+
+[dependencies]
+diffenator3-lib = { path = "../diffenator3-lib" }
+fontdrasil = "0.4.0"
+skrifa = { workspace = true }
+clap = { version = "4.5.9", features = ["derive"] }
+serde_json = "1"
+env_logger = "0.11"
+log = "0.4"

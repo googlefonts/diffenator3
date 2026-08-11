@@ -17,6 +17,7 @@ use diffenator3_lib::{
         encodedglyphs::{modified_encoded_glyphs, CmapDiff},
         test_font_words,
     },
+    staticdiff::compute_signature,
     WordList,
 };
 use env_logger::Env;
@@ -24,7 +25,7 @@ use std::path::Path;
 use ttj::{jsondiff::Substantial, kern_diff, table_diff};
 
 fn main() {
-    let mut cli = Cli::parse();
+    let cli = Cli::parse();
     env_logger::Builder::from_env(Env::default().default_filter_or(if cli.quiet {
         "error"
     } else {
@@ -46,10 +47,15 @@ fn main() {
         .html
         .then(|| template_engine(cli.templates.as_ref(), cli.update_templates));
 
-    let mut font_a = DFont::new(&font_binary_a);
-    let mut font_b = DFont::new(&font_binary_b);
+    let font_a = DFont::new(&font_binary_a);
+    let font_b = DFont::new(&font_binary_b);
 
     let mut result = Report::default();
+
+    // Static analysis of the two fonts, computed once up here. It drives word
+    // selection during the behavioural tests, and will later feed the
+    // human-readable summary of changes in the report.
+    let signature = compute_signature(&font_a, &font_b);
 
     let custom_wordlist_inputs: Vec<WordList> = cli
         .custom_wordlists
@@ -99,10 +105,11 @@ fn main() {
     }
 
     if cli.glyphs {
-        result.glyphs = modified_encoded_glyphs(&font_a, &font_b).expect("Error diffing glyphs");
+        result.glyphs =
+            modified_encoded_glyphs(&font_a, &font_b, &signature).expect("Error diffing glyphs");
     }
     if cli.words {
-        result.words = test_font_words(&font_a, &font_b, &custom_wordlist_inputs);
+        result.words = test_font_words(&font_a, &font_b, &signature, &custom_wordlist_inputs);
     }
     // Report back
     if cli.html {
