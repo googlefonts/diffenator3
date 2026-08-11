@@ -17,19 +17,14 @@ use crate::{
 };
 use cfg_if::cfg_if;
 use colorrenderer::ColorRenderer;
-use fontdrasil::coords::NormalizedLocation;
+use fontdrasil::coords::NormalizedCoord;
 use harfrust::{Direction, Script};
-use indicatif::ProgressIterator as _;
 use read_fonts::ReadError;
 use renderer::{AnyRenderer, Renderer};
+use rustc_hash::FxHashSet;
 use skrifa::raw::TableProvider;
 use static_lang_word_lists::WordList;
-use std::{
-    collections::{BTreeMap, HashSet},
-    ops::ControlFlow,
-    str::FromStr,
-    time::Duration,
-};
+use std::{collections::BTreeMap, str::FromStr};
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
@@ -143,88 +138,131 @@ fn make_renderer<'a>(
     }
 }
 
-// Disable fast complicated version while we're refactoring. Get simple one working first.
-
-// // A fast but complicated version
-// #[cfg(not(target_family = "wasm"))]
-// /// Compare two fonts by rendering a list of words and comparing the images
-// ///
-// /// This function is parallelized and uses rayon to speed up the process.
-// pub(crate) fn diff_many_words(
-//     font_a: &DFont,
-//     font_b: &DFont,
-//     font_size: f32,
-//     wordlist: &WordList,
-//     shared_codepoints: Option<&HashSet<u32>>,
-//     threshold: usize,
-// ) -> Vec<Difference> {
-//     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
-//     let direction = script.and_then(direction_from_script);
-//     let seen_glyphs = RwLock::new(HashSet::new());
-//     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
-
-//     let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
-//     let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
-
-//     let differences: Vec<Option<Difference>> = wordlist
-//         .par_iter()
-//         .progress()
-//         .filter(|word| {
-//             shared_codepoints
-//                 .as_ref()
-//                 .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
-//         })
-//         .map(|word| {
-//             let renderer_a = tl_a.get_or(|| {
-//                 RefCell::new(make_renderer(
-//                     font_a, font_size, direction, script, use_color,
-//                 ))
-//             });
-//             let renderer_b = tl_b.get_or(|| {
-//                 RefCell::new(make_renderer(
-//                     font_b, font_size, direction, script, use_color,
-//                 ))
-//             });
-
-//             if buffer_a
-//             let (buffer_b, data_b) = renderer_b.borrow_mut().string_to_stage1_rendering(word)?;
-//                 .borrow()
-//             let buffers_same = buffer_a == buffer_b;
-
-//             Some(Difference {
-//                 word: word.to_string(),
-//                 buffer_a,
-//                 buffer_b: if buffers_same { None } else { Some(buffer_b) },
-//                 differing_pixels,
-//                 ot_features: "".to_string(),
-//                 lang: "".to_string(),
-//             })
-//         })
-//         .collect();
-
-//     let mut diffs: Vec<Difference> = differences
-//         .into_iter()
-//         .flatten()
-//         .filter(|diff| diff.differing_pixels > threshold)
-//         .collect();
-//     diffs.sort_by_key(|x| -(x.differing_pixels as i32));
-//     diffs
-// }
-
-// // A slow and simple version
-// #[cfg(target_family = "wasm")]
+// A fast but complicated version
+#[cfg(not(target_family = "wasm"))]
+/// Compare two fonts by rendering a list of words and comparing the images
+///
+/// This function is parallelized and uses rayon to speed up the process.
 pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
     font_size: f32,
     wordlist: &WordList,
-    shared_codepoints: Option<&HashSet<u32>>,
+    shared_codepoints: Option<&FxHashSet<u32>>,
     threshold: usize,
 ) -> Result<Vec<Difference>, ReadError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
-    let mut seen_glyphs: HashSet<PositionedGlyph> = HashSet::new();
+    let seen_glyphs = RwLock::new(FxHashSet::default());
+
+    let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+    let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+
+    let differences: Vec<Difference> = wordlist
+        .par_iter()
+        .progress()
+        .filter(|word| {
+            shared_codepoints
+                .as_ref()
+                .is_none_or(|scp| word.chars().all(|c| scp.contains(&(c as u32))))
+        })
+        .flat_map(|word| {
+            let renderer_a = tl_a.get_or(|| {
+                RefCell::new(make_renderer(
+                    font_a, font_size, direction, script, use_color,
+                ))
+            });
+            let renderer_b = tl_b.get_or(|| {
+                RefCell::new(make_renderer(
+                    font_b, font_size, direction, script, use_color,
+                ))
+            });
+
+            // Shape at the default location
+            let buffer_a = renderer_a.borrow_mut().shape(word, None);
+            let mut variation_positions = font_a.variations_for_buffer(&buffer_a);
+            let buffer_b = renderer_b.borrow_mut().shape(word, None);
+            variation_positions.extend(font_b.variations_for_buffer(&buffer_b));
+
+            // Deduplication under an RwLock: read-check then write-insert
+            let is_dup = {
+                let seen = seen_glyphs.read().unwrap();
+                buffer_a.iter().all(|g| seen.contains(g))
+            };
+            if is_dup {
+                return vec![];
+            }
+            {
+                let mut seen = seen_glyphs.write().unwrap();
+                for g in buffer_a.iter() {
+                    seen.insert(*g);
+                }
+            }
+
+            let mut results = Vec::with_capacity(variation_positions.len() + 1);
+
+            // Render at default location
+            if let Some(diff) = render_word(
+                threshold,
+                &mut renderer_a.borrow_mut(),
+                &mut renderer_b.borrow_mut(),
+                word,
+                buffer_a,
+                buffer_b,
+                "default location",
+                &[],
+                &[],
+            ) {
+                results.push(diff);
+            }
+
+            // Render at each variation position
+            for variation in variation_positions {
+                let coords_a = font_a.location_to_coords(&variation);
+                let coords_b = font_b.location_to_coords(&variation);
+                let buffer_a = renderer_a.borrow_mut().shape(word, Some(coords_a.clone()));
+                let buffer_b = renderer_b.borrow_mut().shape(word, Some(coords_b.clone()));
+                let user_space = font_a.location_to_user(&variation);
+                if let Some(diff) = render_word(
+                    threshold,
+                    &mut renderer_a.borrow_mut(),
+                    &mut renderer_b.borrow_mut(),
+                    word,
+                    buffer_a,
+                    buffer_b,
+                    &user_space,
+                    &coords_a,
+                    &coords_b,
+                ) {
+                    results.push(diff);
+                }
+            }
+
+            results
+        })
+        .collect();
+
+    let mut diffs = differences;
+    diffs.retain(|diff| diff.differing_pixels > threshold);
+    diffs.sort_by_key(|x| -(x.differing_pixels as i32));
+    Ok(diffs)
+}
+
+// A slow and simple version
+#[cfg(target_family = "wasm")]
+pub(crate) fn diff_many_words(
+    font_a: &DFont,
+    font_b: &DFont,
+    font_size: f32,
+    wordlist: &WordList,
+    shared_codepoints: Option<&FxHashSet<u32>>,
+    threshold: usize,
+) -> Result<Vec<Difference>, ReadError> {
+    let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
+    let direction = script.and_then(direction_from_script);
+    let use_color = font_has_colr(font_a) || font_has_colr(font_b);
+    let mut seen_glyphs: FxHashSet<PositionedGlyph> = FxHashSet::new();
     let mut differences: Vec<Difference> = vec![];
 
     let mut renderer_a = make_renderer(font_a, font_size, direction, script, use_color);
@@ -261,38 +299,43 @@ pub(crate) fn diff_many_words(
             word,
             buffer_a,
             buffer_b,
-            "".to_string(),
+            "default location",
+            &[],
+            &[],
         ) {
             differences.push(diff);
         }
 
         first_other_time += other.elapsed();
 
-        // // Now let's look at the variations!
-        // for variation in variation_positions {
-        //     let shaping = std::time::Instant::now();
+        // Now let's look at the variations!
+        for variation in variation_positions {
+            let shaping = std::time::Instant::now();
 
-        //     let buffer_a = renderer_a.shape(word, Some(font_a.location_to_coords(&variation)));
-        //     let buffer_b = renderer_b.shape(word, Some(font_b.location_to_coords(&variation)));
-        //     var_shape_time += shaping.elapsed();
-        //     let other = std::time::Instant::now();
-        //     let user_space = font_a.location_to_user(&variation);
-        //     // println!("also checking {} at {}", word, user_space);
-        //     if let Some(diff) = process_word(
-        //         threshold,
-        //         &mut seen_glyphs,
-        //         &mut renderer_a,
-        //         &mut renderer_b,
-        //         word,
-        //         buffer_a,
-        //         buffer_b,
-        //         user_space,
-        //     ) {
-        //         differences.push(diff);
-        //     }
-        //     var_other_time += other.elapsed();
-        //     variations_processed += 1;
-        // }
+            let buffer_a = renderer_a.shape(word, Some(font_a.location_to_coords(&variation)));
+            let buffer_b = renderer_b.shape(word, Some(font_b.location_to_coords(&variation)));
+            var_shape_time += shaping.elapsed();
+            let other = std::time::Instant::now();
+            let user_space = font_a.location_to_user(&variation);
+            let coords_a = font_a.location_to_coords(&variation);
+            let coords_b = font_b.location_to_coords(&variation);
+            if let Some(diff) = process_word(
+                threshold,
+                &mut seen_glyphs,
+                &mut renderer_a,
+                &mut renderer_b,
+                word,
+                buffer_a,
+                buffer_b,
+                &user_space,
+                &coords_a,
+                &coords_b,
+            ) {
+                differences.push(diff);
+            }
+            var_other_time += other.elapsed();
+            variations_processed += 1;
+        }
     }
 
     log::info!(
@@ -312,34 +355,61 @@ pub(crate) fn diff_many_words(
         var_other_time
     );
 
+    renderer_a.log_stats();
+    renderer_b.log_stats();
+
     differences.sort_by_key(|x| -(x.differing_pixels as i32));
     Ok(differences)
 }
 
+/// Per-word deduplication: checks whether all glyphs in `buffer_a` have already
+/// been seen, and if not, inserts them.  Then delegates to [`render_word`].
+#[allow(clippy::too_many_arguments, dead_code)]
 fn process_word<'a>(
     threshold: usize,
-    seen_glyphs: &mut HashSet<PositionedGlyph>,
+    seen_glyphs: &mut FxHashSet<PositionedGlyph>,
     renderer_a: &mut Box<dyn AnyRenderer + Send + 'a>,
     renderer_b: &mut Box<dyn AnyRenderer + Send + 'a>,
     word: &str,
     buffer_a: shaper::DrawBuffer,
     buffer_b: shaper::DrawBuffer,
-    location: String,
+    location: &str,
+    coords_a: &[NormalizedCoord],
+    coords_b: &[NormalizedCoord],
 ) -> Option<Difference> {
-    let data_a = renderer_a.buffer_to_stage1_rendering(&buffer_a)?;
     if buffer_a.iter().all(|glyph| seen_glyphs.contains(glyph)) {
         return None;
     }
     for glyph in buffer_a.iter() {
         seen_glyphs.insert(*glyph);
     }
-    let data_b = renderer_b.buffer_to_stage1_rendering(&buffer_b)?;
+    render_word(
+        threshold, renderer_a, renderer_b, word, buffer_a, buffer_b, location, coords_a, coords_b,
+    )
+}
+
+/// Stage-1 render, fast-equivalence check, rasterize, and pixel-compare a word
+/// pair.  Deduplication (the [`HashSet`] guard) is the caller's responsibility.
+#[allow(clippy::too_many_arguments)]
+fn render_word<'a>(
+    threshold: usize,
+    renderer_a: &mut Box<dyn AnyRenderer + Send + 'a>,
+    renderer_b: &mut Box<dyn AnyRenderer + Send + 'a>,
+    word: &str,
+    buffer_a: shaper::DrawBuffer,
+    buffer_b: shaper::DrawBuffer,
+    location: &str,
+    coords_a: &[NormalizedCoord],
+    coords_b: &[NormalizedCoord],
+) -> Option<Difference> {
+    let data_a = renderer_a.buffer_to_stage1_rendering(&buffer_a, Some(coords_a))?;
+    let data_b = renderer_b.buffer_to_stage1_rendering(&buffer_b, Some(coords_b))?;
     if renderer_a.fast_equivalence_check(&*data_a, &*data_b) {
         return None;
     }
     let buffers_same = buffer_a == buffer_b;
-    let img_a = renderer_a.final_rendering(&*data_a);
-    let img_b = renderer_b.final_rendering(&*data_b);
+    let img_a = renderer_a.final_rendering(&*data_a, Some(coords_a));
+    let img_b = renderer_b.final_rendering(&*data_b, Some(coords_b));
     let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
 
     if differing_pixels > threshold {
@@ -354,7 +424,7 @@ fn process_word<'a>(
             ot_features: "".to_string(),
             lang: "".to_string(),
             differing_pixels,
-            location,
+            location: location.to_string(),
         });
     }
     None

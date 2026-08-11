@@ -1,13 +1,10 @@
 /// Turn some words into images
-use std::any::Any;
+use std::{any::Any, time::Duration};
 
 use fontdrasil::coords::NormalizedCoord;
 use harfrust::{Direction, Script};
 use image::{DynamicImage, GrayImage, Luma};
-use skrifa::{
-    instance::{LocationRef, Size},
-    MetadataProvider,
-};
+use skrifa::{instance::Size, MetadataProvider};
 use zeno::Command;
 
 use super::{
@@ -27,24 +24,37 @@ pub trait AnyRenderer {
     ///
     /// The handle is passed back to [`Self::fast_equivalence_check`] and
     /// [`Self::final_rendering`] for this renderer to downcast.
-    fn buffer_to_stage1_rendering(&mut self, draw_buffer: &DrawBuffer) -> Option<Box<dyn Any>>;
+    fn buffer_to_stage1_rendering(
+        &mut self,
+        draw_buffer: &DrawBuffer,
+        location: Option<&[NormalizedCoord]>,
+    ) -> Option<Box<dyn Any>>;
 
     /// Cheap check for whether two intermediate renderings are equivalent, so that
     /// rasterization can be skipped when both fonts produce identical output.
     ///
     /// The arguments always originate from this same renderer's
-    /// [`Self::string_to_stage1_rendering`], so implementations can safely
+    /// [`Self::buffer_to_stage1_rendering`], so implementations can safely
     /// downcast them to their concrete intermediate type.
     fn fast_equivalence_check(&self, data1: &dyn Any, data2: &dyn Any) -> bool;
 
     /// Rasterize intermediate data into a grayscale image.
-    fn final_rendering(&self, data: &dyn Any) -> GrayImage;
+    fn final_rendering(
+        &mut self,
+        data: &dyn Any,
+        location: Option<&[NormalizedCoord]>,
+    ) -> GrayImage;
+
+    /// Log statistics
+    fn log_stats(&self) {}
 }
 
 pub struct Renderer<'a> {
     // instance: ShaperInstance,
-    outlines: CachedOutlineGlyphCollection<'a>,
+    pub(crate) outlines: CachedOutlineGlyphCollection<'a>,
     cached_shaper: CachedShaper<'a>,
+    pub stage1_time: Duration,
+    pub render_time: Duration,
 }
 
 impl<'a> Renderer<'a> {
@@ -64,17 +74,16 @@ impl<'a> Renderer<'a> {
             );
         });
 
-        let outlines = CachedOutlineGlyphCollection::new(
-            font.outline_glyphs(),
-            Size::new(font_size),
-            LocationRef::default(),
-        );
+        let outlines =
+            CachedOutlineGlyphCollection::new(font.outline_glyphs(), Size::new(font_size));
         let cached_shaper = CachedShaper::new(font, font_size, direction, script);
 
         Self {
             cached_shaper,
             // instance,
             outlines,
+            stage1_time: Duration::ZERO,
+            render_time: Duration::ZERO,
         }
     }
 }
@@ -87,7 +96,12 @@ impl AnyRenderer for Renderer<'_> {
     /// Render a string to a series of commands
     ///
     /// The commands can be used to render the string to an image.
-    fn buffer_to_stage1_rendering(&mut self, draw_buffer: &DrawBuffer) -> Option<Box<dyn Any>> {
+    fn buffer_to_stage1_rendering(
+        &mut self,
+        draw_buffer: &DrawBuffer,
+        location: Option<&[NormalizedCoord]>,
+    ) -> Option<Box<dyn Any>> {
+        let time = std::time::Instant::now();
         if draw_buffer.is_empty() {
             return None;
         }
@@ -95,8 +109,10 @@ impl AnyRenderer for Renderer<'_> {
         for glyph in draw_buffer.iter() {
             pen.offset_x = glyph.x_pos;
             pen.offset_y = glyph.y_pos;
-            self.outlines.draw(glyph.glyph_id, &mut pen);
+            self.outlines
+                .draw(glyph.glyph_id, location.unwrap_or(&[]), &mut pen);
         }
+        self.stage1_time += time.elapsed();
         Some(Box::new(pen.buffer))
     }
 
@@ -116,7 +132,12 @@ impl AnyRenderer for Renderer<'_> {
     ///
     /// This routine takes a series of commands returned from [string_to_stage1_rendering]
     /// and renders them to an image.
-    fn final_rendering(&self, data: &dyn Any) -> GrayImage {
+    fn final_rendering(
+        &mut self,
+        data: &dyn Any,
+        _location: Option<&[NormalizedCoord]>,
+    ) -> GrayImage {
+        let time = std::time::Instant::now();
         let pen_buffer = data
             .downcast_ref::<Vec<Command>>()
             .expect("final_rendering: expected Vec<Command> from string_to_stage1_rendering");
@@ -169,7 +190,17 @@ impl AnyRenderer for Renderer<'_> {
         rasterizer.for_each_pixel_2d(|x, y, alpha| {
             image.put_pixel(x, y, Luma([(alpha * 255.0) as u8]));
         });
+        self.render_time += time.elapsed();
         image
+    }
+
+    fn log_stats(&self) {
+        self.outlines.log_stats();
+        log::debug!(
+            "Renderer: stage1_time: {:?}, render_time: {:?}",
+            self.stage1_time,
+            self.render_time
+        );
     }
 }
 
@@ -191,8 +222,10 @@ mod tests {
             Some(script::ARABIC),
         );
         let draw_buffer = renderer.shape("السلام عليكم", None);
-        let commands = renderer.buffer_to_stage1_rendering(&draw_buffer).unwrap();
-        let image = renderer.final_rendering(&*commands);
+        let commands = renderer
+            .buffer_to_stage1_rendering(&draw_buffer, None)
+            .unwrap();
+        let image = renderer.final_rendering(&*commands, None);
         image.save("test.png").unwrap();
     }
 }
