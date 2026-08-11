@@ -17,7 +17,7 @@ use crate::{
 };
 
 pub trait AnyRenderer {
-    fn shape(&mut self, string: &str, location: Option<Vec<NormalizedCoord>>) -> DrawBuffer;
+    fn shape(&mut self, string: &str, location: Option<&[NormalizedCoord]>) -> DrawBuffer;
 
     /// Given a shaped string, return a an opaque handle
     /// to the renderer's intermediate data.
@@ -89,7 +89,7 @@ impl<'a> Renderer<'a> {
 }
 
 impl AnyRenderer for Renderer<'_> {
-    fn shape(&mut self, string: &str, location: Option<Vec<NormalizedCoord>>) -> DrawBuffer {
+    fn shape(&mut self, string: &str, location: Option<&[NormalizedCoord]>) -> DrawBuffer {
         self.cached_shaper.shape(string, location)
     }
 

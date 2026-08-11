@@ -82,6 +82,11 @@ export type GlyphDiff = {
      * The number of differing pixels
      */
     "differing_pixels": Usize;
+
+    /**
+     * The font variation location applied to the glyph, if any
+     */
+    "location"?: string;
 };
 
 /**

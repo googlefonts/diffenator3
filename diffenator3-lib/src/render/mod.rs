@@ -25,7 +25,7 @@ use renderer::{AnyRenderer, Renderer};
 use rustc_hash::FxHashSet;
 use skrifa::raw::TableProvider;
 use static_lang_word_lists::WordList;
-use std::{collections::BTreeMap, str::FromStr, time::Duration};
+use std::{collections::BTreeMap, str::FromStr};
 
 use cfg_if::cfg_if;
 cfg_if! {
@@ -35,8 +35,6 @@ cfg_if! {
         use thread_local::ThreadLocal;
         use std::cell::RefCell;
         use std::sync::RwLock;
-    } else {
-        use std::time::Duration;
     }
 }
 
@@ -90,6 +88,7 @@ pub fn test_font_words(
             job,
             signature,
             DEFAULT_WORDS_THRESHOLD,
+            None,
         )
         .unwrap_or_default();
         if !results.is_empty() {
@@ -109,6 +108,7 @@ impl From<Difference> for GlyphDiff {
                     .unwrap_or_default(),
                 unicode: format!("U+{:04X}", c as i32),
                 differing_pixels: diff.differing_pixels,
+                location: diff.location,
             }
         } else {
             GlyphDiff {
@@ -116,6 +116,7 @@ impl From<Difference> for GlyphDiff {
                 name: "".to_string(),
                 unicode: "".to_string(),
                 differing_pixels: 0,
+                location: "".to_string(),
             }
         }
     }
@@ -137,148 +138,11 @@ fn make_renderer<'a>(
     }
 }
 
-// // A fast but complicated version
-// #[cfg(not(target_family = "wasm"))]
-// /// Compare two fonts by rendering a list of words and comparing the images
-// ///
-// /// This function is parallelized and uses rayon to speed up the process.
-// pub(crate) fn diff_many_words(
-//     font_a: &DFont,
-//     font_b: &DFont,
-//     font_size: f32,
-//     wordlist: &WordList,
-//     signature: &DifferenceSignature,
-//     threshold: usize,
-// ) -> Result<Vec<Difference>, ReadError> {
-//     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
-//     let direction = script.and_then(direction_from_script);
-//     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
-
-//     // The static difference signature (outlines, advances, GPOS positioning)
-//     // is computed by the caller and passed in; it drives word selection
-//     // below. `uncertain` and `marks` are derived indexes, shared read-only
-//     // across the worker threads.
-//     let uncertain = signature.uncertain_glyphs();
-//     let marks = font_a.mark_glyphs();
-
-//     let seen_glyphs = RwLock::new(FxHashSet::default());
-
-//     let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
-//     let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
-
-//     let differences: Vec<Difference> = wordlist
-//         .par_iter()
-//         .progress()
-//         .filter(|word| word_is_encoded(font_a, font_b, word))
-//         .flat_map(|word| {
-//             let renderer_a = tl_a.get_or(|| {
-//                 RefCell::new(make_renderer(
-//                     font_a, font_size, direction, script, use_color,
-//                 ))
-//             });
-//             let renderer_b = tl_b.get_or(|| {
-//                 RefCell::new(make_renderer(
-//                     font_b, font_size, direction, script, use_color,
-//                 ))
-//             });
-
-//             // Shape at the default location, then ask the static analysis
-//             // whether this word needs behavioural testing at all.
-//             let buffer_a = renderer_a.borrow_mut().shape(word, None);
-//             let selection = select_buffer(
-//                 signature, &uncertain, &marks, font_a, font_b, word, &buffer_a,
-//             );
-//             if !selection.selected {
-//                 // Nothing in this word's buffer intersects the difference
-//                 // signature, so skip it entirely (no second shape, no render).
-//                 return vec![];
-//             }
-
-//             // Deduplication under an RwLock: read-check then write-insert. If
-//             // every glyph in A's buffer was already rendered, skip this word.
-//             let is_dup = {
-//                 let seen = seen_glyphs.read().unwrap();
-//                 buffer_a.iter().all(|g| seen.contains(g))
-//             };
-//             if is_dup {
-//                 return vec![];
-//             }
-//             {
-//                 let mut seen = seen_glyphs.write().unwrap();
-//                 for g in buffer_a.iter() {
-//                     seen.insert(*g);
-//                 }
-//             }
-
-//             let buffer_b = renderer_b.borrow_mut().shape(word, None);
-
-//             // Locations to test: the selected locations (default + the
-//             // designspace points where something changed), or -- when the
-//             // fallback is exhaustive -- every variation peak of either font.
-//             let locations: Vec<NormalizedLocation> = if selection.exhaustive {
-//                 let mut locs = font_a.variations_for_buffer(&buffer_a);
-//                 locs.extend(font_b.variations_for_buffer(&buffer_b));
-//                 locs.into_iter().collect()
-//             } else {
-//                 selection.locations.iter().cloned().collect()
-//             };
-
-//             let mut results = Vec::with_capacity(locations.len() + 1);
-
-//             // Render at the default location
-//             if let Some(diff) = render_word(
-//                 threshold,
-//                 &mut renderer_a.borrow_mut(),
-//                 &mut renderer_b.borrow_mut(),
-//                 word,
-//                 buffer_a,
-//                 buffer_b,
-//                 "default location",
-//                 &[],
-//                 &[],
-//             ) {
-//                 results.push(diff);
-//             }
-
-//             // Render at each selected/variation location (default is already
-//             // rendered above, so skip it here).
-//             for variation in locations {
-//                 if variation == NormalizedLocation::default() {
-//                     continue;
-//                 }
-//                 let coords_a = font_a.location_to_coords(&variation);
-//                 let coords_b = font_b.location_to_coords(&variation);
-//                 let buffer_a = renderer_a.borrow_mut().shape(word, Some(coords_a.clone()));
-//                 let buffer_b = renderer_b.borrow_mut().shape(word, Some(coords_b.clone()));
-//                 let user_space = font_a.location_to_user(&variation);
-//                 if let Some(diff) = render_word(
-//                     threshold,
-//                     &mut renderer_a.borrow_mut(),
-//                     &mut renderer_b.borrow_mut(),
-//                     word,
-//                     buffer_a,
-//                     buffer_b,
-//                     &user_space,
-//                     &coords_a,
-//                     &coords_b,
-//                 ) {
-//                     results.push(diff);
-//                 }
-//             }
-
-//             results
-//         })
-//         .collect();
-
-//     let mut diffs = differences;
-//     diffs.retain(|diff| diff.differing_pixels > threshold);
-//     diffs.sort_by_key(|x| -(x.differing_pixels as i32));
-//     Ok(diffs)
-// }
-
-// // A slow and simple version (wasm; the parallel version above is used on
-// // native targets)
-// #[cfg(target_family = "wasm")]
+// A fast but complicated version
+#[cfg(not(target_family = "wasm"))]
+/// Compare two fonts by rendering a list of words and comparing the images
+///
+/// This function is parallelized and uses rayon to speed up the process.
 pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
@@ -286,6 +150,152 @@ pub(crate) fn diff_many_words(
     wordlist: &WordList,
     signature: &DifferenceSignature,
     threshold: usize,
+    base_location: Option<&[NormalizedCoord]>,
+) -> Result<Vec<Difference>, ReadError> {
+    let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
+    let direction = script.and_then(direction_from_script);
+    let use_color = font_has_colr(font_a) || font_has_colr(font_b);
+
+    // The static difference signature (outlines, advances, GPOS positioning)
+    // is computed by the caller and passed in; it drives word selection
+    // below. `uncertain` and `marks` are derived indexes, shared read-only
+    // across the worker threads.
+    let uncertain = signature.uncertain_glyphs();
+    let marks = font_a.mark_glyphs();
+
+    let seen_glyphs = RwLock::new(FxHashSet::default());
+
+    let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+    let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+
+    let differences: Vec<Difference> = wordlist
+        .par_iter()
+        .progress()
+        .filter(|word| word_is_encoded(font_a, font_b, word))
+        .flat_map(|word| {
+            let renderer_a = tl_a.get_or(|| {
+                RefCell::new(make_renderer(
+                    font_a, font_size, direction, script, use_color,
+                ))
+            });
+            let renderer_b = tl_b.get_or(|| {
+                RefCell::new(make_renderer(
+                    font_b, font_size, direction, script, use_color,
+                ))
+            });
+
+            // Shape at the default location, then ask the static analysis
+            // whether this word needs behavioural testing at all.
+            let buffer_a = renderer_a.borrow_mut().shape(word, base_location);
+            let selection = select_buffer(
+                signature, &uncertain, &marks, font_a, font_b, word, &buffer_a,
+            );
+            if !selection.selected {
+                // Nothing in this word's buffer intersects the difference
+                // signature, so skip it entirely (no second shape, no render).
+                return vec![];
+            }
+
+            // Deduplication under an RwLock: read-check then write-insert. If
+            // every glyph in A's buffer was already rendered, skip this word.
+            let is_dup = {
+                let seen = seen_glyphs.read().unwrap();
+                buffer_a.iter().all(|g| seen.contains(g))
+            };
+            if is_dup {
+                return vec![];
+            }
+            {
+                let mut seen = seen_glyphs.write().unwrap();
+                for g in buffer_a.iter() {
+                    seen.insert(*g);
+                }
+            }
+
+            let buffer_b = renderer_b.borrow_mut().shape(word, base_location);
+
+            // Locations to test: the selected locations (default + the
+            // designspace points where something changed), or -- when the
+            // fallback is exhaustive -- every variation peak of either font.
+            let locations: Vec<NormalizedLocation> = if selection.exhaustive {
+                let mut locs = font_a.variations_for_buffer(&buffer_a);
+                locs.extend(font_b.variations_for_buffer(&buffer_b));
+                locs.into_iter().collect()
+            } else {
+                selection.locations.iter().cloned().collect()
+            };
+
+            let mut results = Vec::with_capacity(locations.len() + 1);
+
+            // Render at the default location
+            if let Some(diff) = render_word(
+                threshold,
+                &mut renderer_a.borrow_mut(),
+                &mut renderer_b.borrow_mut(),
+                word,
+                buffer_a,
+                buffer_b,
+                "default location",
+                &[],
+                &[],
+            ) {
+                results.push(diff);
+            }
+
+            if base_location.is_some() {
+                // If the caller asked for an explicit location, don't render any
+                // variations: the caller is responsible for rendering at the
+                // other locations.
+                return results;
+            }
+
+            // Render at each selected/variation location (default is already
+            // rendered above, so skip it here).
+            for variation in locations {
+                if variation == NormalizedLocation::default() {
+                    continue;
+                }
+                let coords_a = font_a.location_to_coords(&variation);
+                let coords_b = font_b.location_to_coords(&variation);
+                let buffer_a = renderer_a.borrow_mut().shape(word, Some(&coords_a));
+                let buffer_b = renderer_b.borrow_mut().shape(word, Some(&coords_b));
+                let user_space = font_a.location_to_user(&variation);
+                if let Some(diff) = render_word(
+                    threshold,
+                    &mut renderer_a.borrow_mut(),
+                    &mut renderer_b.borrow_mut(),
+                    word,
+                    buffer_a,
+                    buffer_b,
+                    &user_space,
+                    &coords_a,
+                    &coords_b,
+                ) {
+                    results.push(diff);
+                }
+            }
+
+            results
+        })
+        .collect();
+
+    let mut diffs = differences;
+    diffs.retain(|diff| diff.differing_pixels > threshold);
+    diffs.sort_by_key(|x| -(x.differing_pixels as i32));
+    Ok(diffs)
+}
+
+// A slow and simple version (wasm; the parallel version above is used on
+// native targets)
+#[cfg(target_family = "wasm")]
+pub(crate) fn diff_many_words(
+    font_a: &DFont,
+    font_b: &DFont,
+    font_size: f32,
+    wordlist: &WordList,
+    signature: &DifferenceSignature,
+    threshold: usize,
+    base_location: Option<NormalizedLocation>,
 ) -> Result<Vec<Difference>, ReadError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
@@ -306,11 +316,13 @@ pub(crate) fn diff_many_words(
     let mut renderer_a = make_renderer(font_a, font_size, direction, script, use_color);
     let mut renderer_b = make_renderer(font_b, font_size, direction, script, use_color);
 
-    let time_before = std::time::Instant::now();
-    let mut first_shape_time = Duration::ZERO;
-    let mut var_shape_time = Duration::ZERO;
-    let mut first_other_time = Duration::ZERO;
-    let mut var_other_time = Duration::ZERO;
+    // No timings in wasm!
+
+    // let time_before = std::time::Instant::now();
+    // let mut first_shape_time = Duration::ZERO;
+    // let mut var_shape_time = Duration::ZERO;
+    // let mut first_other_time = Duration::ZERO;
+    // let mut var_other_time = Duration::ZERO;
     let mut variations_processed = 0;
 
     for word in wordlist.iter() {
@@ -319,8 +331,8 @@ pub(crate) fn diff_many_words(
         }
         // Shape at the default location to discover the buffer, then ask the
         // static analysis whether this word needs behavioural testing at all.
-        let shaping = std::time::Instant::now();
-        let buffer_a = renderer_a.shape(word, None);
+        // let shaping = std::time::Instant::now();
+        let buffer_a = renderer_a.shape(word, base_location);
         let selection = select_buffer(
             signature, &uncertain, &marks, font_a, font_b, word, &buffer_a,
         );
@@ -329,8 +341,8 @@ pub(crate) fn diff_many_words(
             // signature, so skip it entirely (no second shape, no render).
             continue;
         }
-        let buffer_b = renderer_b.shape(word, None);
-        first_shape_time += shaping.elapsed();
+        let buffer_b = renderer_b.shape(word, base_location);
+        // first_shape_time += shaping.elapsed();
 
         // Locations to test: the selected locations (default + the designspace
         // points where something changed), or -- when the fallback is
@@ -344,7 +356,7 @@ pub(crate) fn diff_many_words(
             selection.locations.iter().cloned().collect()
         };
 
-        let other = std::time::Instant::now();
+        // let other = std::time::Instant::now();
 
         if let Some(diff) = process_word(
             threshold,
@@ -361,14 +373,21 @@ pub(crate) fn diff_many_words(
             differences.push(diff);
         }
 
-        first_other_time += other.elapsed();
+        if base_location.is_some() {
+            // If the caller asked for an explicit location, don't render any
+            // variations: the caller is responsible for rendering at the
+            // other locations.
+            continue;
+        }
+
+        // first_other_time += other.elapsed();
 
         for variation in locations {
             if variation == NormalizedLocation::default() {
                 // The default location was already rendered above.
                 continue;
             }
-            let shaping = std::time::Instant::now();
+            // let shaping = std::time::Instant::now();
             let coords_a = font_a.location_to_coords(&variation);
             let coords_b = font_b.location_to_coords(&variation);
             let buffer_a = renderer_a.shape(word, Some(coords_a.clone()));
@@ -390,30 +409,30 @@ pub(crate) fn diff_many_words(
             ) {
                 differences.push(diff);
             }
-            var_other_time += other.elapsed();
+            // var_other_time += other.elapsed();
             variations_processed += 1;
         }
     }
 
-    log::info!(
-        "Processed {} words in {:?} with {} variations",
-        wordlist.len(),
-        time_before.elapsed(),
-        variations_processed
-    );
-    log::info!(
-        "First shape time: {:?}, first other time: {:?}",
-        first_shape_time,
-        first_other_time
-    );
-    log::info!(
-        "Variation shape time: {:?}, variation other time: {:?}",
-        var_shape_time,
-        var_other_time
-    );
+    // log::info!(
+    //     "Processed {} words in {:?} with {} variations",
+    //     wordlist.len(),
+    //     time_before.elapsed(),
+    //     variations_processed
+    // );
+    // log::info!(
+    //     "First shape time: {:?}, first other time: {:?}",
+    //     first_shape_time,
+    //     first_other_time
+    // );
+    // log::info!(
+    //     "Variation shape time: {:?}, variation other time: {:?}",
+    //     var_shape_time,
+    //     var_other_time
+    // );
 
-    renderer_a.log_stats();
-    renderer_b.log_stats();
+    // renderer_a.log_stats();
+    // renderer_b.log_stats();
 
     differences.sort_by_key(|x| -(x.differing_pixels as i32));
     Ok(differences)
@@ -516,7 +535,7 @@ mod tests {
         // Threshold 0: any differing pixel counts, so the assertions are
         // purely about which words are reported (and where).
         let signature = compute_signature(&font_a, &font_b);
-        let diffs = diff_many_words(&font_a, &font_b, 16.0, &wl, &signature, 0)
+        let diffs = diff_many_words(&font_a, &font_b, 16.0, &wl, &signature, 0, None)
             .expect("diff_many_words failed");
 
         let reported: Vec<&str> = diffs.iter().map(|d| d.word.as_str()).collect();

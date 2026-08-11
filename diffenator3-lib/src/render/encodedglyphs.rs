@@ -80,6 +80,7 @@ pub fn modified_encoded_glyphs(
         &wl,
         signature,
         DEFAULT_GLYPHS_THRESHOLD,
+        None,
     )?
     .into_iter()
     .map(|x| x.into())

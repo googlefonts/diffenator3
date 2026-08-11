@@ -55,6 +55,9 @@ pub struct GlyphDiff {
     pub unicode: String,
     /// The number of differing pixels
     pub differing_pixels: usize,
+    /// The font variation location applied to the glyph, if any
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub location: String,
 }
 
 #[cfg(feature = "typescript")]
