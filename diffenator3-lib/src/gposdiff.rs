@@ -932,12 +932,7 @@ mod tests {
             signature.mark_position_changes
         );
 
-        let cmap: HashMap<u32, GlyphId> = font_a
-            .fontref()
-            .charmap()
-            .mappings()
-            .map(|(cp, gid)| (cp, gid))
-            .collect();
+        let cmap: HashMap<u32, GlyphId> = font_a.fontref().charmap().mappings().collect();
         let gid = |c: char| cmap[&(c as u32)];
         let expected = [
             (gid('A'), gid('V')),
