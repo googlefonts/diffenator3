@@ -282,7 +282,7 @@ fn build_font_effects(font: &DFont) -> FontEffects {
     let coords: Vec<Vec<F2Dot14>> = locations
         .iter()
         .map(|loc| {
-            font.location_to_coords(loc)
+            font.normalized_location_to_coords(loc)
                 .iter()
                 .map(|coord| coord.to_f2dot14())
                 .collect()

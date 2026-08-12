@@ -84,7 +84,7 @@ impl<'a> CachedShaper<'a> {
         }
     }
 
-    pub fn shape(&self, string: &str, location: Option<&[NormalizedCoord]>) -> DrawBuffer {
+    pub fn shape(&self, string: &str, location: Option<&Vec<NormalizedCoord>>) -> DrawBuffer {
         let mut buffer = UnicodeBuffer::new();
         let instance = location.map(|location| {
             ShaperInstance::from_coords(&self.font, location.iter().map(|x| x.to_f2dot14()))

@@ -8,6 +8,7 @@ use crate::{
     render::{diff_many_words, GlyphDiff},
     staticdiff::DifferenceSignature,
 };
+use fontdrasil::coords::UserLocation;
 pub use harfrust::Direction;
 use read_fonts::ReadError;
 use static_lang_word_lists::WordList;
@@ -63,6 +64,7 @@ impl CmapDiff {
 pub fn modified_encoded_glyphs(
     font_a: &DFont,
     font_b: &DFont,
+    location: Option<&UserLocation>,
     signature: &DifferenceSignature,
 ) -> Result<Vec<GlyphDiff>, ReadError> {
     let cmap_a = &font_a.codepoints;
@@ -80,7 +82,7 @@ pub fn modified_encoded_glyphs(
         &wl,
         signature,
         DEFAULT_GLYPHS_THRESHOLD,
-        None,
+        location,
     )?
     .into_iter()
     .map(|x| x.into())

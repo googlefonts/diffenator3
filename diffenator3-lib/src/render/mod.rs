@@ -18,6 +18,8 @@ use crate::{
     wordselect::{select_buffer, word_is_encoded},
 };
 use colorrenderer::ColorRenderer;
+#[cfg(not(target_family = "wasm"))]
+use fontdrasil::coords::UserLocation;
 use fontdrasil::coords::{NormalizedCoord, NormalizedLocation};
 use harfrust::{Direction, Script};
 use read_fonts::ReadError;
@@ -29,7 +31,7 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use cfg_if::cfg_if;
 cfg_if! {
-    if #[cfg(not(target_family = "wasm"))] {
+    if #[cfg(feature = "rayon")] {
         use indicatif::ParallelProgressIterator;
         use rayon::iter::ParallelIterator;
         use thread_local::ThreadLocal;
@@ -65,6 +67,7 @@ pub fn test_font_words(
     font_b: &DFont,
     signature: &DifferenceSignature,
     custom_inputs: &[WordList],
+    location: Option<&UserLocation>,
 ) -> BTreeMap<String, Vec<Difference>> {
     let mut map: BTreeMap<String, Vec<Difference>> = BTreeMap::new();
     let mut jobs: Vec<&WordList> = vec![];
@@ -88,7 +91,7 @@ pub fn test_font_words(
             job,
             signature,
             DEFAULT_WORDS_THRESHOLD,
-            None,
+            location,
         )
         .unwrap_or_default();
         if !results.is_empty() {
@@ -139,7 +142,7 @@ fn make_renderer<'a>(
 }
 
 // A fast but complicated version
-#[cfg(not(target_family = "wasm"))]
+#[cfg(feature = "rayon")]
 /// Compare two fonts by rendering a list of words and comparing the images
 ///
 /// This function is parallelized and uses rayon to speed up the process.
@@ -150,7 +153,7 @@ pub(crate) fn diff_many_words(
     wordlist: &WordList,
     signature: &DifferenceSignature,
     threshold: usize,
-    base_location: Option<&[NormalizedCoord]>,
+    base_location: Option<&UserLocation>,
 ) -> Result<Vec<Difference>, ReadError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
@@ -167,6 +170,8 @@ pub(crate) fn diff_many_words(
 
     let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
     let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
+    let coords_a = base_location.map(|loc| font_a.location_to_coords(loc));
+    let coords_b = base_location.map(|loc| font_b.location_to_coords(loc));
 
     let differences: Vec<Difference> = wordlist
         .par_iter()
@@ -186,7 +191,7 @@ pub(crate) fn diff_many_words(
 
             // Shape at the default location, then ask the static analysis
             // whether this word needs behavioural testing at all.
-            let buffer_a = renderer_a.borrow_mut().shape(word, base_location);
+            let buffer_a = renderer_a.borrow_mut().shape(word, coords_a.as_ref());
             let selection = select_buffer(
                 signature, &uncertain, &marks, font_a, font_b, word, &buffer_a,
             );
@@ -212,7 +217,7 @@ pub(crate) fn diff_many_words(
                 }
             }
 
-            let buffer_b = renderer_b.borrow_mut().shape(word, base_location);
+            let buffer_b = renderer_b.borrow_mut().shape(word, coords_b.as_ref());
 
             // Locations to test: the selected locations (default + the
             // designspace points where something changed), or -- when the
@@ -236,8 +241,8 @@ pub(crate) fn diff_many_words(
                 buffer_a,
                 buffer_b,
                 "default location",
-                &[],
-                &[],
+                coords_a.as_ref().unwrap_or(&vec![]),
+                coords_b.as_ref().unwrap_or(&vec![]),
             ) {
                 results.push(diff);
             }
@@ -255,8 +260,8 @@ pub(crate) fn diff_many_words(
                 if variation == NormalizedLocation::default() {
                     continue;
                 }
-                let coords_a = font_a.location_to_coords(&variation);
-                let coords_b = font_b.location_to_coords(&variation);
+                let coords_a = font_a.normalized_location_to_coords(&variation);
+                let coords_b = font_b.normalized_location_to_coords(&variation);
                 let buffer_a = renderer_a.borrow_mut().shape(word, Some(&coords_a));
                 let buffer_b = renderer_b.borrow_mut().shape(word, Some(&coords_b));
                 let user_space = font_a.location_to_user(&variation);
@@ -287,7 +292,7 @@ pub(crate) fn diff_many_words(
 
 // A slow and simple version (wasm; the parallel version above is used on
 // native targets)
-#[cfg(target_family = "wasm")]
+#[cfg(not(feature = "rayon"))]
 pub(crate) fn diff_many_words(
     font_a: &DFont,
     font_b: &DFont,
@@ -295,7 +300,7 @@ pub(crate) fn diff_many_words(
     wordlist: &WordList,
     signature: &DifferenceSignature,
     threshold: usize,
-    base_location: Option<NormalizedLocation>,
+    base_location: Option<&UserLocation>,
 ) -> Result<Vec<Difference>, ReadError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
@@ -315,6 +320,8 @@ pub(crate) fn diff_many_words(
 
     let mut renderer_a = make_renderer(font_a, font_size, direction, script, use_color);
     let mut renderer_b = make_renderer(font_b, font_size, direction, script, use_color);
+    let coords_a = base_location.map(|loc| font_a.location_to_coords(loc));
+    let coords_b = base_location.map(|loc| font_b.location_to_coords(loc));
 
     // No timings in wasm!
 
@@ -332,7 +339,7 @@ pub(crate) fn diff_many_words(
         // Shape at the default location to discover the buffer, then ask the
         // static analysis whether this word needs behavioural testing at all.
         // let shaping = std::time::Instant::now();
-        let buffer_a = renderer_a.shape(word, base_location);
+        let buffer_a = renderer_a.shape(word, coords_a.as_ref());
         let selection = select_buffer(
             signature, &uncertain, &marks, font_a, font_b, word, &buffer_a,
         );
@@ -341,7 +348,7 @@ pub(crate) fn diff_many_words(
             // signature, so skip it entirely (no second shape, no render).
             continue;
         }
-        let buffer_b = renderer_b.shape(word, base_location);
+        let buffer_b = renderer_b.shape(word, coords_b.as_ref());
         // first_shape_time += shaping.elapsed();
 
         // Locations to test: the selected locations (default + the designspace
@@ -367,8 +374,8 @@ pub(crate) fn diff_many_words(
             buffer_a,
             buffer_b,
             "default location",
-            &[],
-            &[],
+            coords_a.as_ref().unwrap_or(&vec![]),
+            coords_b.as_ref().unwrap_or(&vec![]),
         ) {
             differences.push(diff);
         }
@@ -388,12 +395,12 @@ pub(crate) fn diff_many_words(
                 continue;
             }
             // let shaping = std::time::Instant::now();
-            let coords_a = font_a.location_to_coords(&variation);
-            let coords_b = font_b.location_to_coords(&variation);
-            let buffer_a = renderer_a.shape(word, Some(coords_a.clone()));
-            let buffer_b = renderer_b.shape(word, Some(coords_b.clone()));
-            var_shape_time += shaping.elapsed();
-            let other = std::time::Instant::now();
+            let coords_a = font_a.normalized_location_to_coords(&variation);
+            let coords_b = font_b.normalized_location_to_coords(&variation);
+            let buffer_a = renderer_a.shape(word, Some(coords_a.as_ref()));
+            let buffer_b = renderer_b.shape(word, Some(coords_b.as_ref()));
+            // var_shape_time += shaping.elapsed();
+            // let other = std::time::Instant::now();
             let user_space = font_a.location_to_user(&variation);
             if let Some(diff) = process_word(
                 threshold,
@@ -450,8 +457,8 @@ fn process_word<'a>(
     buffer_a: shaper::DrawBuffer,
     buffer_b: shaper::DrawBuffer,
     location: &str,
-    coords_a: &[NormalizedCoord],
-    coords_b: &[NormalizedCoord],
+    coords_a: &Vec<NormalizedCoord>,
+    coords_b: &Vec<NormalizedCoord>,
 ) -> Option<Difference> {
     if buffer_a.iter().all(|glyph| seen_glyphs.contains(glyph)) {
         return None;
@@ -475,8 +482,8 @@ fn render_word<'a>(
     buffer_a: shaper::DrawBuffer,
     buffer_b: shaper::DrawBuffer,
     location: &str,
-    coords_a: &[NormalizedCoord],
-    coords_b: &[NormalizedCoord],
+    coords_a: &Vec<NormalizedCoord>,
+    coords_b: &Vec<NormalizedCoord>,
 ) -> Option<Difference> {
     let data_a = renderer_a.buffer_to_stage1_rendering(&buffer_a, Some(coords_a))?;
     let data_b = renderer_b.buffer_to_stage1_rendering(&buffer_b, Some(coords_b))?;

@@ -129,11 +129,22 @@ export type Difference = {
      */
     "location"?: string;
 };
-export type Report = {
-    "tables"?: JSONValue;
-    "kerns"?: JSONValue;
-    "cmap_diff"?: CmapDiff;
-    "languages"?: Record<string, LanguageDiff>;
+export type LocationResult = {
+
+    /**
+     * Name of the location in designspace (named instance, or stringified coordinates)
+     */
+    "location": string;
+
+    /**
+     * Coordinates of the location in designspace
+     */
+    "coords"?: Record<string, F32>;
+
+    /**
+     * An error message, if something went wrong
+     */
+    "error"?: string;
 
     /**
      * Differences between glyphs
@@ -144,4 +155,11 @@ export type Report = {
      * Differences between words
      */
     "words"?: Record<string, (Difference)[]>;
+};
+export type Report = {
+    "tables"?: JSONValue;
+    "kerns"?: JSONValue;
+    "cmap_diff"?: CmapDiff;
+    "languages"?: Record<string, LanguageDiff>;
+    "locations"?: (LocationResult)[];
 };

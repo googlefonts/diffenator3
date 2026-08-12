@@ -39,10 +39,10 @@ function buildLocation_statichtml(loc: LocationResult) {
 
   if (loc.glyphs) {
     loc.glyphs.sort((ga, gb) =>
-      new Intl.Collator().compare(ga.string, gb.string)
+      new Intl.Collator().compare(ga.string, gb.string),
     );
     $("#main").append(
-      "<h3 class='border-top pt-2 border-dark-subtle'>Modified Glyphs</h3>"
+      "<h3 class='border-top pt-2 border-dark-subtle'>Modified Glyphs</h3>",
     );
     let glyphs = $("<div>");
     for (let glyph of loc.glyphs) {
@@ -53,7 +53,7 @@ function buildLocation_statichtml(loc: LocationResult) {
 
   if (loc.words) {
     $("#main").append(
-      "<h3 class='border-top pt-2 border-dark-subtle'>Modified Words</h3>"
+      "<h3 class='border-top pt-2 border-dark-subtle'>Modified Words</h3>",
     );
     for (let [script, words] of Object.entries(loc.words)) {
       let scriptTitle = $(`<h6>${script}</h6>`);
@@ -96,9 +96,9 @@ $(function () {
     for (var [index, loc] of report["locations"].entries()) {
       var loc_nav = $(`<li class="nav-item">
 		<a class="nav-link text-secondary" href="#" data-index="${index}">${loc.location.replaceAll(
-        ",",
-        ",\u200b"
-      )}</a>
+      ",",
+      ",\u200b",
+    )}</a>
 	</li>`);
       $("#locationnav").append(loc_nav);
     }
@@ -112,11 +112,11 @@ $(function () {
 
   (document.styleSheets[0]!.cssRules[0]! as CSSStyleRule).style.setProperty(
     "src",
-    "url({{ old_filename }})"
+    "url({{ old_filename }})",
   );
   (document.styleSheets[0]!.cssRules[1]! as CSSStyleRule).style.setProperty(
     "src",
-    "url({{ new_filename }})"
+    "url({{ new_filename }})",
   );
   setupAnimation();
 });

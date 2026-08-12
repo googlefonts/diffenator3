@@ -24,7 +24,7 @@ typescript = ["dep:typescript-type-def", "diffenator3-lib/typescript"]
 
 [dependencies]
 diffenator3-lib = { path = "../diffenator3-lib", version = "1", features = [
-    "html",
+    "html", "rayon"
 ] }
 diff3proof = { version = "1", path = "../diff3proof" }
 ttj = { version = "1", path = "../ttj" }
@@ -41,6 +41,8 @@ env_logger = "0.11"
 
 log = { workspace = true }
 shaperglot = { workspace = true }
+fontdrasil = { workspace = true}
+
 tabled = "0.20.0"
 
 # Code for emitting TypeScript types

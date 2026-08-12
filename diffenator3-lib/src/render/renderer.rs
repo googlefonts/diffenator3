@@ -17,7 +17,7 @@ use crate::{
 };
 
 pub trait AnyRenderer {
-    fn shape(&mut self, string: &str, location: Option<&[NormalizedCoord]>) -> DrawBuffer;
+    fn shape(&mut self, string: &str, location: Option<&Vec<NormalizedCoord>>) -> DrawBuffer;
 
     /// Given a shaped string, return a an opaque handle
     /// to the renderer's intermediate data.
@@ -27,7 +27,7 @@ pub trait AnyRenderer {
     fn buffer_to_stage1_rendering(
         &mut self,
         draw_buffer: &DrawBuffer,
-        location: Option<&[NormalizedCoord]>,
+        location: Option<&Vec<NormalizedCoord>>,
     ) -> Option<Box<dyn Any>>;
 
     /// Cheap check for whether two intermediate renderings are equivalent, so that
@@ -89,7 +89,7 @@ impl<'a> Renderer<'a> {
 }
 
 impl AnyRenderer for Renderer<'_> {
-    fn shape(&mut self, string: &str, location: Option<&[NormalizedCoord]>) -> DrawBuffer {
+    fn shape(&mut self, string: &str, location: Option<&Vec<NormalizedCoord>>) -> DrawBuffer {
         self.cached_shaper.shape(string, location)
     }
 
@@ -99,7 +99,7 @@ impl AnyRenderer for Renderer<'_> {
     fn buffer_to_stage1_rendering(
         &mut self,
         draw_buffer: &DrawBuffer,
-        location: Option<&[NormalizedCoord]>,
+        location: Option<&Vec<NormalizedCoord>>,
     ) -> Option<Box<dyn Any>> {
         let time = std::time::Instant::now();
         if draw_buffer.is_empty() {
@@ -110,7 +110,7 @@ impl AnyRenderer for Renderer<'_> {
             pen.offset_x = glyph.x_pos;
             pen.offset_y = glyph.y_pos;
             self.outlines
-                .draw(glyph.glyph_id, location.unwrap_or(&[]), &mut pen);
+                .draw(glyph.glyph_id, location.unwrap_or(&vec![]), &mut pen);
         }
         self.stage1_time += time.elapsed();
         Some(Box::new(pen.buffer))
