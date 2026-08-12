@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use crate::reporters::LocationResult;
+
 use super::Report;
 
 use colored::Colorize;
@@ -84,26 +86,9 @@ pub fn report(result: Report, succinct: bool) {
             }
         }
     }
-
-    if !result.glyphs.is_empty() {
-        println!("\n## Glyphs");
-        for glyph in result.glyphs {
-            println!(" - {} ({:.3} pixels)", glyph.string, glyph.differing_pixels);
-        }
-    }
-
-    if !result.words.is_empty() {
-        println!("# Words");
-        for (script, script_diff) in result.words.iter() {
-            println!("\n## {}", script);
-            for difference in script_diff.iter() {
-                println!(
-                    "  - {} ({:.3}%) at {}",
-                    difference.word.as_str(),
-                    difference.differing_pixels,
-                    difference.location
-                );
-            }
+    for locationresult in result.locations {
+        if locationresult.is_some() {
+            report_location(locationresult);
         }
     }
 
@@ -117,6 +102,38 @@ pub fn report(result: Report, succinct: bool) {
     }
 }
 
+fn report_location(locationresult: LocationResult) {
+    print!("# Differences at location {} ", locationresult.location);
+    if !locationresult.coords.is_empty() {
+        print!("( ");
+        for (k, v) in locationresult.coords.iter() {
+            print!("{}: {}, ", k, v);
+        }
+        print!(")");
+    }
+    println!();
+
+    if !locationresult.glyphs.is_empty() {
+        println!("\n## Glyphs");
+        for glyph in locationresult.glyphs {
+            println!(" - {} ({:.3} pixels)", glyph.string, glyph.differing_pixels);
+        }
+    }
+
+    if !locationresult.words.is_empty() {
+        println!("# Words");
+        for (script, script_diff) in locationresult.words.iter() {
+            println!("\n## {}", script);
+            for difference in script_diff.iter() {
+                println!(
+                    "  - {} ({:.3}%)",
+                    difference.word.as_str(),
+                    difference.differing_pixels
+                );
+            }
+        }
+    }
+}
 #[derive(Tabled)]
 struct DetailsRow {
     #[tabled(rename = "Language")]

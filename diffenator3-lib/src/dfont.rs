@@ -1,5 +1,6 @@
 use fontdrasil::coords::{
-    CoordConverter, DesignCoord, NormalizedCoord, NormalizedLocation, UserCoord,
+    ConvertSpace, CoordConverter, DesignCoord, Location, NormalizedCoord, NormalizedLocation,
+    NormalizedSpace, UserCoord,
 };
 use read_fonts::{types::NameId, FontRef, ReadError, TableProvider};
 use skrifa::{GlyphId, MetadataProvider};
@@ -230,7 +231,21 @@ impl DFont {
             })
     }
 
-    pub fn location_to_coords(&self, location: &NormalizedLocation) -> Vec<NormalizedCoord> {
+    pub fn location_to_coords<T>(&self, location: &Location<T>) -> Vec<NormalizedCoord>
+    where
+        T: ConvertSpace<NormalizedSpace>,
+    {
+        let Some(axes) = self.fontdrasil_axes.as_ref() else {
+            return vec![];
+        };
+        let normalized_location = location.to_normalized(axes);
+        self.normalized_location_to_coords(&normalized_location)
+    }
+
+    pub fn normalized_location_to_coords(
+        &self,
+        location: &NormalizedLocation,
+    ) -> Vec<NormalizedCoord> {
         let axes = self.fontref().axes();
         axes.iter()
             .map(|axis| {

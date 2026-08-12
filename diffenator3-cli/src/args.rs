@@ -52,6 +52,10 @@ pub struct Cli {
     #[clap(long = "custom-wordlists", help_heading = Some("Tests to run"))]
     pub custom_wordlists: Vec<PathBuf>,
 
+    /// Test a particular font location, not all locations
+    #[clap(long = "location", help_heading = Some("Tests to run"))]
+    pub location: Option<String>,
+
     /// Show diffs as JSON
     #[clap(long = "json", help_heading = Some("Report format"))]
     pub json: bool,

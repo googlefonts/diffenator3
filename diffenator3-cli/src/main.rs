@@ -8,7 +8,10 @@
 mod args;
 mod languages;
 mod reporters;
-use crate::{args::Cli, reporters::Report};
+use crate::{
+    args::Cli,
+    reporters::{LocationResult, Report},
+};
 use clap::Parser;
 use diffenator3_lib::{
     dfont::DFont,
@@ -21,8 +24,28 @@ use diffenator3_lib::{
     WordList,
 };
 use env_logger::Env;
-use std::path::Path;
+use fontdrasil::coords::{UserCoord, UserLocation};
+use std::{collections::HashMap, path::Path, str::FromStr};
 use ttj::{jsondiff::Substantial, kern_diff, table_diff};
+
+pub fn parse_location(variations: &str) -> Result<UserLocation, String> {
+    let mut location = UserLocation::default();
+    for variation in variations.split(&[',', ' ']) {
+        if variation.is_empty() {
+            continue;
+        }
+        let mut parts = variation.split('=');
+        let axis = parts.next().ok_or("Couldn't parse axis".to_string())?;
+        let tag = skrifa::Tag::from_str(axis)
+            .map_err(|_| format!("Couldn't parse axis tag: {}", axis))?;
+        let value = parts.next().ok_or("Couldn't parse value".to_string())?;
+        let value = value
+            .parse::<f64>()
+            .map_err(|_| "Couldn't parse value".to_string())?;
+        location.insert(tag, UserCoord::new(value));
+    }
+    Ok(location)
+}
 
 fn main() {
     let cli = Cli::parse();
@@ -96,6 +119,11 @@ fn main() {
             result.kerns = Some(kern_diff);
         }
     }
+
+    let location = cli
+        .location
+        .as_ref()
+        .map(|s| parse_location(s).expect("Couldn't parse location"));
     if cli.glyphs {
         result.cmap_diff = Some(CmapDiff::new(&font_a, &font_b));
     }
@@ -104,12 +132,64 @@ fn main() {
         result.languages = Some(languages::diff_languages(&font_a, &font_b));
     }
 
+    let mut location_result_map: HashMap<String, LocationResult> = HashMap::new();
+
     if cli.glyphs {
-        result.glyphs =
-            modified_encoded_glyphs(&font_a, &font_b, &signature).expect("Error diffing glyphs");
+        let glyphs = modified_encoded_glyphs(&font_a, &font_b, location.as_ref(), &signature)
+            .expect("Error diffing glyphs");
+        // Break out by location and add to locationresults
+        for glyph in glyphs {
+            let location_key = glyph.location.clone();
+            let location_result = location_result_map
+                .entry(location_key.clone())
+                .or_insert_with(|| LocationResult {
+                    location: location_key,
+                    ..Default::default()
+                });
+            location_result.glyphs.push(glyph);
+        }
     }
     if cli.words {
-        result.words = test_font_words(&font_a, &font_b, &signature, &custom_wordlist_inputs);
+        let words = test_font_words(
+            &font_a,
+            &font_b,
+            &signature,
+            &custom_wordlist_inputs,
+            location.as_ref(),
+        );
+        // Insert into location map, don't break glyphs!
+        for (wordlist_name, word_diffs) in words.into_iter() {
+            for diff in word_diffs.into_iter() {
+                let location_key = diff.location.clone();
+                let location_result = location_result_map
+                    .entry(location_key.clone())
+                    .or_insert_with(|| LocationResult {
+                        location: location_key,
+                        ..Default::default()
+                    });
+                let result_diff = location_result
+                    .words
+                    .entry(wordlist_name.clone())
+                    .or_default();
+                result_diff.push(diff);
+            }
+        }
+    }
+    // Convert location map to vector for serialization
+    result.locations = location_result_map.into_values().collect();
+    // Set .coords field of each location result based on the font's designspace
+    for location_result in result.locations.iter_mut() {
+        location_result.coords = location_result
+            .location
+            .split(',')
+            .filter_map(|coord| {
+                let mut parts = coord.split('=');
+                let axis = parts.next()?;
+                let value = parts.next()?;
+                let value = value.parse::<f32>().ok()?;
+                Some((axis.to_string(), value))
+            })
+            .collect();
     }
     // Report back
     if cli.html {

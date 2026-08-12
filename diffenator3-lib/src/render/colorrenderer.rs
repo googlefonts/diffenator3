@@ -172,7 +172,7 @@ impl<'a> ColorRenderer<'a> {
 }
 
 impl AnyRenderer for ColorRenderer<'_> {
-    fn shape(&mut self, string: &str, location: Option<&[NormalizedCoord]>) -> DrawBuffer {
+    fn shape(&mut self, string: &str, location: Option<&Vec<NormalizedCoord>>) -> DrawBuffer {
         self.cached_shaper.shape(string, location)
     }
     fn fast_equivalence_check(&self, _data1: &dyn Any, _data2: &dyn Any) -> bool {
@@ -182,11 +182,11 @@ impl AnyRenderer for ColorRenderer<'_> {
     fn buffer_to_stage1_rendering(
         &mut self,
         buffer: &DrawBuffer,
-        location: Option<&[NormalizedCoord]>,
+        location: Option<&Vec<NormalizedCoord>>,
     ) -> Option<Box<dyn Any>> {
         // Ensure all glyphs for this word are cached
         for glyph in buffer.iter() {
-            self.ensure_cached(glyph.glyph_id.into(), location);
+            self.ensure_cached(glyph.glyph_id.into(), location.map(|v| v.as_slice()));
         }
         Some(Box::new(buffer.clone()))
     }

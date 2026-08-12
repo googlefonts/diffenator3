@@ -383,8 +383,8 @@ fn compare_glyphs(
     let mut advance_locations = LocationSet::new();
 
     for loc in &locations {
-        let coords_a = font_a.location_to_coords(loc);
-        let coords_b = font_b.location_to_coords(loc);
+        let coords_a = font_a.normalized_location_to_coords(loc);
+        let coords_b = font_b.normalized_location_to_coords(loc);
 
         match (
             outline_hash(&outlines_a, gid_a, &coords_a),
