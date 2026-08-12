@@ -6,7 +6,8 @@
 //! happens: for every glyph the fonts have in common it works out, cheaply, at
 //! which designspace locations the two fonts differ, and records those
 //! locations.
-use std::collections::{BTreeSet, HashMap, HashSet};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use std::collections::BTreeSet;
 
 use fontdrasil::coords::{NormalizedCoord, NormalizedLocation};
 use read_fonts::types::F2Dot14;
@@ -23,7 +24,7 @@ use crate::{dfont::DFont, gposdiff::compute_gpos_changes, render::utils::Recordi
 ///
 /// `NormalizedLocation` is a `BTreeMap<Tag, NormalizedCoord>`, which is
 /// `Ord + Hash`, so this works directly as a set type.
-pub type LocationSet = BTreeSet<NormalizedLocation>;
+pub type LocationSet = HashSet<NormalizedLocation>;
 
 /// Sample size used for outline and metric comparison.
 ///
@@ -197,7 +198,7 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
     let mut signature = DifferenceSignature::default();
 
     // Run the GPOS positioning pass, keyed by the cmap glyph matches.
-    let mut match_a2b: HashMap<GlyphId, GlyphId> = HashMap::new();
+    let mut match_a2b: HashMap<GlyphId, GlyphId> = HashMap::default();
     for cp in &shared {
         match_a2b.insert(cmap_a[cp], cmap_b[cp]);
     }
@@ -209,8 +210,8 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
     signature.positioning_unmodelled = gpos.unmodelled;
 
     // Glyph ids already matched through the cmap, per font.
-    let mut claimed_a: HashSet<GlyphId> = HashSet::new();
-    let mut claimed_b: HashSet<GlyphId> = HashSet::new();
+    let mut claimed_a: HashSet<GlyphId> = HashSet::default();
+    let mut claimed_b: HashSet<GlyphId> = HashSet::default();
 
     // 1. Compare every glyph reachable through a shared codepoint. This is the
     //    high-confidence part of the analysis.
@@ -275,7 +276,7 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
     let outlines_b = fontref_b.outline_glyphs();
 
     // Index font B's unclaimed glyphs by default outline hash.
-    let mut hash_index_b: HashMap<u64, Vec<GlyphId>> = HashMap::new();
+    let mut hash_index_b: HashMap<u64, Vec<GlyphId>> = HashMap::default();
     for (gid, _) in outlines_b.iter() {
         if claimed_b.contains(&gid) {
             continue;
@@ -356,7 +357,7 @@ fn compare_glyphs(
     let outlines_b = fontref_b.outline_glyphs();
 
     // Collect the locations to test: default + union of both fonts' peaks.
-    let mut locations = LocationSet::new();
+    let mut locations = LocationSet::default();
     locations.insert(NormalizedLocation::default());
     for loc in font_a.variations_for_glyph(&gid_a) {
         locations.insert(loc);
@@ -373,14 +374,14 @@ fn compare_glyphs(
         (true, false) | (false, true) => {
             return GlyphComparison::Changed {
                 outline_locations: locations,
-                advance_locations: LocationSet::new(),
+                advance_locations: LocationSet::default(),
             };
         }
         (true, true) => {}
     }
 
-    let mut outline_locations = LocationSet::new();
-    let mut advance_locations = LocationSet::new();
+    let mut outline_locations = LocationSet::default();
+    let mut advance_locations = LocationSet::default();
 
     for loc in &locations {
         let coords_a = font_a.normalized_location_to_coords(loc);

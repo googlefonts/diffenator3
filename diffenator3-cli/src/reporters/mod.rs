@@ -49,6 +49,7 @@ impl LocationResult {
         self.error.is_some() || !self.glyphs.is_empty() || !self.words.is_empty()
     }
 
+    #[allow(dead_code)]
     pub fn from_error(location: String, error: String) -> Self {
         LocationResult {
             location,

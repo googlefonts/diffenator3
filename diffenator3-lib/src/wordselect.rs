@@ -27,7 +27,7 @@
 //! analysis whether a particular lookup ignores marks, so we treat marks as
 //! transparent for every pair.
 
-use std::collections::HashSet;
+use rustc_hash::FxHashSet as HashSet;
 
 use fontdrasil::coords::NormalizedLocation;
 use skrifa::{GlyphId, MetadataProvider};

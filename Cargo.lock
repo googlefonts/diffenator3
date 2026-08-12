@@ -588,6 +588,7 @@ dependencies = [
  "diff3proof",
  "diffenator3-lib",
  "env_logger",
+ "fontdrasil 0.4.0",
  "indexmap 1.9.3",
  "itertools 0.13.0",
  "log",
