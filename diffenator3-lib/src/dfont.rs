@@ -3,8 +3,8 @@ use fontdrasil::coords::{
     NormalizedSpace, UserCoord,
 };
 use read_fonts::{types::NameId, FontRef, ReadError, TableProvider};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use skrifa::{GlyphId, MetadataProvider};
-use std::collections::{HashMap, HashSet};
 use ucd::Codepoint;
 
 use crate::render::shaper::DrawBuffer;
@@ -32,7 +32,7 @@ fn fontdrasil_axes(font: &FontRef) -> Result<Option<fontdrasil::types::Axes>, Re
                     min,
                     default,
                     max,
-                    localized_names: HashMap::new(), // Let's not
+                    localized_names: Default::default(), // Let's not
                 };
                 if let Some(map) = per_axis_maps.get(ix) {
                     let desired_mapping: Vec<(
@@ -71,7 +71,7 @@ pub struct DFont {
     /// The font binary data
     pub backing: Vec<u8>,
     /// The set of encoded codepoints in the font
-    pub codepoints: HashSet<u32>,
+    pub codepoints: std::collections::HashSet<u32>,
     /// Cached variation positions
     variation_positions: HashMap<GlyphId, Vec<NormalizedLocation>>,
     /// Fontdrasil axes, if the font has any. This is cached because building it is expensive.
@@ -85,8 +85,8 @@ impl DFont {
 
         let mut fnt = DFont {
             backing,
-            codepoints: HashSet::new(),
-            variation_positions: HashMap::new(),
+            codepoints: std::collections::HashSet::default(),
+            variation_positions: HashMap::default(),
             fontdrasil_axes: None,
         };
         fnt.fontdrasil_axes = fontdrasil_axes(&fnt.fontref()).unwrap_or_default();
@@ -142,7 +142,7 @@ impl DFont {
     /// character from that script.
     pub fn supported_scripts(&self) -> HashSet<String> {
         let cmap = self.fontref().charmap();
-        let mut strings = HashSet::new();
+        let mut strings = HashSet::default();
         for (codepoint, _glyphid) in cmap.mappings() {
             if let Some(script) = char::from_u32(codepoint).and_then(|c| c.script()) {
                 // Would you believe, no Display, no .to_string(), we just have to grub around with Debug.
@@ -220,7 +220,7 @@ impl DFont {
     pub fn variations_for_buffer(&self, buffer: &DrawBuffer) -> HashSet<NormalizedLocation> {
         buffer
             .iter()
-            .fold(HashSet::new(), |mut acc, positioned_glyph| {
+            .fold(HashSet::default(), |mut acc, positioned_glyph| {
                 // Borrow the cached per-glyph list directly instead of going
                 // through variations_for_glyph (which clones a Vec per glyph);
                 // this runs per (word, buffer) in the hot loops.

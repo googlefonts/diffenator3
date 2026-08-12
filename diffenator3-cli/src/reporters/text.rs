@@ -133,6 +133,7 @@ fn report_location(locationresult: LocationResult) {
             }
         }
     }
+    println!();
 }
 #[derive(Tabled)]
 struct DetailsRow {

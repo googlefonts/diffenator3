@@ -32,7 +32,8 @@
 //!   not resolved here; a hash of the device data is included in the
 //!   comparison so device differences are still detected.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use std::collections::BTreeMap;
 
 use fontdrasil::coords::{NormalizedCoord, NormalizedLocation};
 use read_fonts::{
@@ -40,7 +41,7 @@ use read_fonts::{
         gpos::{
             AnchorTable, CursivePosFormat1, DeviceOrVariationIndex, MarkBasePosFormat1,
             MarkLigPosFormat1, MarkMarkPosFormat1, PairPos, PositionSubtables, SinglePos,
-            ValueContext, ValueRecord,
+            ValueRecord,
         },
         layout::Device,
         variations::{DeltaSetIndex, ItemVariationStore},
@@ -201,15 +202,15 @@ where
     K: std::hash::Hash + Eq + Clone,
     T: Ord,
 {
-    let mut out: HashMap<K, LocationSet> = HashMap::new();
+    let mut out: HashMap<K, LocationSet> = HashMap::default();
 
     for (key_a, entries_a) in effects_a {
         let Some(key_b) = to_b(key_a) else {
             continue;
         };
         let entries_b = effects_b.get(&key_b);
-        let mut changed = LocationSet::new();
-        let mut locations: BTreeSet<&NormalizedLocation> = BTreeSet::new();
+        let mut changed: LocationSet = HashSet::default();
+        let mut locations: HashSet<&NormalizedLocation> = HashSet::default();
         for (loc, _) in entries_a {
             locations.insert(loc);
         }
@@ -253,7 +254,7 @@ where
         if effects_a.contains_key(&key_a) {
             continue;
         }
-        let mut changed = LocationSet::new();
+        let mut changed = LocationSet::default();
         for (loc, _) in entries_b {
             changed.insert(loc.clone());
         }
@@ -263,6 +264,81 @@ where
     }
 
     out
+}
+
+/// Precomputed per-location region scalars for the GDEF item variation store.
+///
+/// `ItemVariationStore::compute_delta` re-parses the variation region list and
+/// re-interpolates a scalar for every region on every call; for a many-axis
+/// font with many regions that dominates the GPOS analysis. Here the scalars
+/// are computed once per location up front, so resolving a delta set is a dot
+/// product over the precomputed values.
+struct RegionScalars {
+    /// `per_location[loc_idx][region_idx]` -- the region's scalar at that
+    /// location, as `Fixed::to_bits()` (16.16) widened to i64.
+    per_location: Vec<Vec<i64>>,
+}
+
+impl RegionScalars {
+    fn new(ivs: &ItemVariationStore, coords: &[Vec<F2Dot14>]) -> Result<Self, ReadError> {
+        let regions = ivs.variation_region_list()?.variation_regions();
+        let mut per_location = Vec::with_capacity(coords.len());
+        for coord_set in coords {
+            let mut scalars = Vec::with_capacity(regions.len());
+            for region in regions.iter().flatten() {
+                scalars.push(region.compute_scalar(coord_set).to_bits() as i64);
+            }
+            per_location.push(scalars);
+        }
+        Ok(Self { per_location })
+    }
+
+    /// Equivalent of `ItemVariationStore::compute_delta`, but using the
+    /// precomputed region scalars instead of re-interpolating per call.
+    fn delta(&self, ivs: &ItemVariationStore, loc_idx: usize, index: DeltaSetIndex) -> i32 {
+        let scalars = match self.per_location.get(loc_idx) {
+            Some(scalars) if !scalars.is_empty() => scalars,
+            _ => return 0,
+        };
+        let data = match ivs.item_variation_data().get(index.outer as usize) {
+            Some(Ok(data)) => data,
+            _ => return 0,
+        };
+        let region_indices = data.region_indexes();
+        // 64-bit accumulation, matching compute_delta.
+        let mut accum = 0i64;
+        for (i, region_delta) in data.delta_set(index.inner).enumerate() {
+            let Some(region_index) = region_indices.get(i) else {
+                break;
+            };
+            let ri = region_index.get() as usize;
+            if let Some(&scalar) = scalars.get(ri) {
+                accum += region_delta as i64 * scalar;
+            }
+        }
+        ((accum + 0x8000) >> 16) as i32
+    }
+}
+
+/// The item variation store plus precomputed region scalars, so delta
+/// resolution is fast and shared across every value record / anchor.
+struct DeltaResolver<'a> {
+    ivs: ItemVariationStore<'a>,
+    scalars: RegionScalars,
+}
+
+impl<'a> DeltaResolver<'a> {
+    fn new(ivs: ItemVariationStore<'a>, coords: &[Vec<F2Dot14>]) -> Option<Self> {
+        Some(Self {
+            scalars: RegionScalars::new(&ivs, coords).ok()?,
+            ivs,
+        })
+    }
+
+    #[inline]
+    fn delta(&self, loc_idx: usize, index: DeltaSetIndex) -> i32 {
+        self.scalars.delta(&self.ivs, loc_idx, index)
+    }
 }
 
 /// Walk every GPOS lookup in the font and accumulate its effects.
@@ -288,11 +364,14 @@ fn build_font_effects(font: &DFont) -> FontEffects {
                 .collect()
         })
         .collect();
+    // Region scalars precomputed once per location, shared across every value
+    // record and anchor (instead of re-parsing the IVS on every call).
+    let resolver = ivs.and_then(|ivs| DeltaResolver::new(ivs, &coords));
 
-    let mut single: Effects<GlyphId, PValue> = HashMap::new();
-    let mut pair: Effects<(GlyphId, GlyphId), (PValue, PValue)> = HashMap::new();
-    let mut mark: Effects<(GlyphId, GlyphId), (AnchorV, AnchorV)> = HashMap::new();
-    let mut cursive: Effects<GlyphId, (AnchorV, AnchorV)> = HashMap::new();
+    let mut single: Effects<GlyphId, PValue> = HashMap::default();
+    let mut pair: Effects<(GlyphId, GlyphId), (PValue, PValue)> = HashMap::default();
+    let mut mark: Effects<(GlyphId, GlyphId), (AnchorV, AnchorV)> = HashMap::default();
+    let mut cursive: Effects<GlyphId, (AnchorV, AnchorV)> = HashMap::default();
     let mut unmodelled = false;
     let mut pair_budget = PAIR_EXPANSION_BUDGET;
     let mut pair_capped = false;
@@ -311,13 +390,8 @@ fn build_font_effects(font: &DFont) -> FontEffects {
                 match subtables {
                     PositionSubtables::Single(st) => {
                         for sub in st.iter().flatten() {
-                            let _ = single_subtable(
-                                &sub,
-                                &locations,
-                                &coords,
-                                ivs.as_ref(),
-                                &mut single,
-                            );
+                            let _ =
+                                single_subtable(&sub, &locations, resolver.as_ref(), &mut single);
                         }
                     }
                     PositionSubtables::Pair(st) => {
@@ -326,8 +400,7 @@ fn build_font_effects(font: &DFont) -> FontEffects {
                                 &sub,
                                 font,
                                 &locations,
-                                &coords,
-                                ivs.as_ref(),
+                                resolver.as_ref(),
                                 &mut pair,
                                 &mut pair_budget,
                                 &mut pair_capped,
@@ -336,13 +409,8 @@ fn build_font_effects(font: &DFont) -> FontEffects {
                     }
                     PositionSubtables::Cursive(st) => {
                         for sub in st.iter().flatten() {
-                            let _ = cursive_subtable(
-                                &sub,
-                                &locations,
-                                &coords,
-                                ivs.as_ref(),
-                                &mut cursive,
-                            );
+                            let _ =
+                                cursive_subtable(&sub, &locations, resolver.as_ref(), &mut cursive);
                         }
                     }
                     PositionSubtables::MarkToBase(st) => {
@@ -350,8 +418,7 @@ fn build_font_effects(font: &DFont) -> FontEffects {
                             let _ = markbase_subtable(
                                 &sub,
                                 &locations,
-                                &coords,
-                                ivs.as_ref(),
+                                resolver.as_ref(),
                                 &mut mark,
                                 &mut mark_budget,
                                 &mut mark_capped,
@@ -363,8 +430,7 @@ fn build_font_effects(font: &DFont) -> FontEffects {
                             let _ = marklig_subtable(
                                 &sub,
                                 &locations,
-                                &coords,
-                                ivs.as_ref(),
+                                resolver.as_ref(),
                                 &mut mark,
                                 &mut mark_budget,
                                 &mut mark_capped,
@@ -376,8 +442,7 @@ fn build_font_effects(font: &DFont) -> FontEffects {
                             let _ = markmark_subtable(
                                 &sub,
                                 &locations,
-                                &coords,
-                                ivs.as_ref(),
+                                resolver.as_ref(),
                                 &mut mark,
                                 &mut mark_budget,
                                 &mut mark_capped,
@@ -406,7 +471,7 @@ fn build_font_effects(font: &DFont) -> FontEffects {
 /// Collect the locations to test for positioning: default plus the peaks of
 /// every region in the GDEF item variation store.
 fn collect_locations(font: &DFont, ivs: Option<&ItemVariationStore>) -> Vec<NormalizedLocation> {
-    let mut set = LocationSet::new();
+    let mut set = LocationSet::default();
     set.insert(NormalizedLocation::default());
     if let Some(ivs) = ivs {
         if let Ok(region_list) = ivs.variation_region_list() {
@@ -439,8 +504,7 @@ fn collect_locations(font: &DFont, ivs: Option<&ItemVariationStore>) -> Vec<Norm
 fn single_subtable(
     sub: &SinglePos,
     locations: &[NormalizedLocation],
-    coords: &[Vec<F2Dot14>],
-    ivs: Option<&ItemVariationStore>,
+    resolver: Option<&DeltaResolver>,
     out: &mut Effects<GlyphId, PValue>,
 ) -> Result<(), ReadError> {
     let offset_data = sub.offset_data();
@@ -468,8 +532,8 @@ fn single_subtable(
 
     for (gid, value) in records {
         let entry = out.entry(gid).or_default();
-        for (loc, coords) in locations.iter().zip(coords.iter()) {
-            let value = resolve_value(&value, offset_data, coords, ivs);
+        for (loc_idx, loc) in locations.iter().enumerate() {
+            let value = resolve_value(&value, offset_data, loc_idx, resolver);
             if value.is_zero() {
                 continue;
             }
@@ -485,8 +549,7 @@ fn pair_subtable(
     sub: &PairPos,
     font: &DFont,
     locations: &[NormalizedLocation],
-    coords: &[Vec<F2Dot14>],
-    ivs: Option<&ItemVariationStore>,
+    resolver: Option<&DeltaResolver>,
     out: &mut Effects<(GlyphId, GlyphId), (PValue, PValue)>,
     budget: &mut usize,
     capped: &mut bool,
@@ -513,7 +576,7 @@ fn pair_subtable(
                     ));
                 }
             }
-            emit_pair_records(records, offset_data, locations, coords, ivs, out);
+            emit_pair_records(records, offset_data, locations, resolver, out);
         }
         PairPos::Format2(format2) => {
             // Class-based pair positioning. Resolve the class matrix once
@@ -557,11 +620,19 @@ fn pair_subtable(
                         continue;
                     };
                     let mut per_location = Vec::new();
-                    for (loc, coords) in locations.iter().zip(coords.iter()) {
-                        let value1 =
-                            resolve_value(class2_record.value_record1(), offset_data, coords, ivs);
-                        let value2 =
-                            resolve_value(class2_record.value_record2(), offset_data, coords, ivs);
+                    for (loc_idx, loc) in locations.iter().enumerate() {
+                        let value1 = resolve_value(
+                            class2_record.value_record1(),
+                            offset_data,
+                            loc_idx,
+                            resolver,
+                        );
+                        let value2 = resolve_value(
+                            class2_record.value_record2(),
+                            offset_data,
+                            loc_idx,
+                            resolver,
+                        );
                         if !(value1.is_zero() && value2.is_zero()) {
                             per_location.push((loc.clone(), (value1, value2)));
                         }
@@ -602,15 +673,14 @@ fn emit_pair_records(
     records: Vec<((GlyphId, GlyphId), ValueRecord, ValueRecord)>,
     offset_data: FontData,
     locations: &[NormalizedLocation],
-    coords: &[Vec<F2Dot14>],
-    ivs: Option<&ItemVariationStore>,
+    resolver: Option<&DeltaResolver>,
     out: &mut Effects<(GlyphId, GlyphId), (PValue, PValue)>,
 ) {
     for (key, value1, value2) in records {
         let entry = out.entry(key).or_default();
-        for (loc, coords) in locations.iter().zip(coords.iter()) {
-            let value1 = resolve_value(&value1, offset_data, coords, ivs);
-            let value2 = resolve_value(&value2, offset_data, coords, ivs);
+        for (loc_idx, loc) in locations.iter().enumerate() {
+            let value1 = resolve_value(&value1, offset_data, loc_idx, resolver);
+            let value2 = resolve_value(&value2, offset_data, loc_idx, resolver);
             if value1.is_zero() && value2.is_zero() {
                 continue;
             }
@@ -623,8 +693,7 @@ fn emit_pair_records(
 fn cursive_subtable(
     sub: &CursivePosFormat1,
     locations: &[NormalizedLocation],
-    coords: &[Vec<F2Dot14>],
-    ivs: Option<&ItemVariationStore>,
+    resolver: Option<&DeltaResolver>,
     out: &mut Effects<GlyphId, (AnchorV, AnchorV)>,
 ) -> Result<(), ReadError> {
     let offset_data = sub.offset_data();
@@ -634,9 +703,9 @@ fn cursive_subtable(
         let entry_anchor = record.entry_anchor(offset_data);
         let exit_anchor = record.exit_anchor(offset_data);
         let entry = out.entry(gid).or_default();
-        for (loc, coords) in locations.iter().zip(coords.iter()) {
-            let entry_value = resolve_anchor(entry_anchor.clone(), coords, ivs);
-            let exit_value = resolve_anchor(exit_anchor.clone(), coords, ivs);
+        for (loc_idx, loc) in locations.iter().enumerate() {
+            let entry_value = resolve_anchor(entry_anchor.clone(), loc_idx, resolver);
+            let exit_value = resolve_anchor(exit_anchor.clone(), loc_idx, resolver);
             entry.push((loc.clone(), (entry_value, exit_value)));
         }
     }
@@ -647,8 +716,7 @@ fn cursive_subtable(
 fn markbase_subtable(
     sub: &MarkBasePosFormat1,
     locations: &[NormalizedLocation],
-    coords: &[Vec<F2Dot14>],
-    ivs: Option<&ItemVariationStore>,
+    resolver: Option<&DeltaResolver>,
     out: &mut Effects<(GlyphId, GlyphId), (AnchorV, AnchorV)>,
     budget: &mut usize,
     capped: &mut bool,
@@ -682,14 +750,14 @@ fn markbase_subtable(
                 continue;
             };
             let entry = out.entry((*mark_gid, to_gid(base_gid))).or_default();
-            for (loc, coords) in locations.iter().zip(coords.iter()) {
+            for (loc_idx, loc) in locations.iter().enumerate() {
                 if *budget == 0 {
                     *capped = true;
                     return Ok(());
                 }
                 *budget -= 1;
-                let mark_anchor = resolve_anchor(Some(Ok(mark_anchor.clone())), coords, ivs);
-                let base_anchor = resolve_anchor(Some(base_anchor.clone()), coords, ivs);
+                let mark_anchor = resolve_anchor(Some(Ok(mark_anchor.clone())), loc_idx, resolver);
+                let base_anchor = resolve_anchor(Some(base_anchor.clone()), loc_idx, resolver);
                 entry.push((loc.clone(), (mark_anchor, base_anchor)));
             }
         }
@@ -701,8 +769,7 @@ fn markbase_subtable(
 fn marklig_subtable(
     sub: &MarkLigPosFormat1,
     locations: &[NormalizedLocation],
-    coords: &[Vec<F2Dot14>],
-    ivs: Option<&ItemVariationStore>,
+    resolver: Option<&DeltaResolver>,
     out: &mut Effects<(GlyphId, GlyphId), (AnchorV, AnchorV)>,
     budget: &mut usize,
     capped: &mut bool,
@@ -742,15 +809,16 @@ fn marklig_subtable(
                     continue;
                 };
                 let entry = out.entry((*mark_gid, to_gid(lig_gid))).or_default();
-                for (loc, coords) in locations.iter().zip(coords.iter()) {
+                for (loc_idx, loc) in locations.iter().enumerate() {
                     if *budget == 0 {
                         *capped = true;
                         return Ok(());
                     }
                     *budget -= 1;
-                    let mark_anchor = resolve_anchor(Some(Ok(mark_anchor.clone())), coords, ivs);
+                    let mark_anchor =
+                        resolve_anchor(Some(Ok(mark_anchor.clone())), loc_idx, resolver);
                     let component_anchor =
-                        resolve_anchor(Some(component_anchor.clone()), coords, ivs);
+                        resolve_anchor(Some(component_anchor.clone()), loc_idx, resolver);
                     entry.push((loc.clone(), (mark_anchor, component_anchor)));
                 }
             }
@@ -763,8 +831,7 @@ fn marklig_subtable(
 fn markmark_subtable(
     sub: &MarkMarkPosFormat1,
     locations: &[NormalizedLocation],
-    coords: &[Vec<F2Dot14>],
-    ivs: Option<&ItemVariationStore>,
+    resolver: Option<&DeltaResolver>,
     out: &mut Effects<(GlyphId, GlyphId), (AnchorV, AnchorV)>,
     budget: &mut usize,
     capped: &mut bool,
@@ -800,14 +867,15 @@ fn markmark_subtable(
                 continue;
             };
             let entry = out.entry((*mark1_gid, to_gid(mark2_gid))).or_default();
-            for (loc, coords) in locations.iter().zip(coords.iter()) {
+            for (loc_idx, loc) in locations.iter().enumerate() {
                 if *budget == 0 {
                     *capped = true;
                     return Ok(());
                 }
                 *budget -= 1;
-                let mark1_anchor = resolve_anchor(Some(Ok(mark1_anchor.clone())), coords, ivs);
-                let mark2_anchor = resolve_anchor(Some(mark2_anchor.clone()), coords, ivs);
+                let mark1_anchor =
+                    resolve_anchor(Some(Ok(mark1_anchor.clone())), loc_idx, resolver);
+                let mark2_anchor = resolve_anchor(Some(mark2_anchor.clone()), loc_idx, resolver);
                 entry.push((loc.clone(), (mark1_anchor, mark2_anchor)));
             }
         }
@@ -815,43 +883,80 @@ fn markmark_subtable(
     Ok(())
 }
 
-/// Resolve a value record at a location, including item-variation deltas and
-/// static (ppem) `Device` table deltas at the rendering size.
+/// Resolve a value record at a location, including item-variation deltas
+/// (via precomputed region scalars) and static (ppem) `Device` table deltas at
+/// the rendering size.
 fn resolve_value(
     record: &ValueRecord,
     offset_data: FontData,
-    coords: &[F2Dot14],
-    ivs: Option<&ItemVariationStore>,
+    loc_idx: usize,
+    resolver: Option<&DeltaResolver>,
 ) -> PValue {
-    let context = ValueContext::new()
-        .with_coords(coords)
-        .with_var_store(ivs.cloned());
-    let value = record.value(offset_data, &context).unwrap_or_default();
+    // Base values straight from the already-parsed record.
     let mut result = PValue {
-        x_advance: value.x_advance as i32 + value.x_advance_delta,
-        y_advance: value.y_advance as i32 + value.y_advance_delta,
-        x_placement: value.x_placement as i32 + value.x_placement_delta,
-        y_placement: value.y_placement as i32 + value.y_placement_delta,
+        x_advance: record.x_advance.map(|v| v.get()).unwrap_or(0) as i32,
+        y_advance: record.y_advance.map(|v| v.get()).unwrap_or(0) as i32,
+        x_placement: record.x_placement.map(|v| v.get()).unwrap_or(0) as i32,
+        y_placement: record.y_placement.map(|v| v.get()).unwrap_or(0) as i32,
     };
-    // Apply static (ppem) Device table deltas at the size words are rendered
-    // at. Comparing the *effective* delta (rather than raw Device bytes)
-    // means re-encoded-but-equivalent Device tables compare equal, while real
-    // differences at the render size are still detected.
-    if let Some(Ok(DeviceOrVariationIndex::Device(device))) = record.x_advance_device(offset_data) {
-        result.x_advance += device_delta_at_size(&device);
-    }
-    if let Some(Ok(DeviceOrVariationIndex::Device(device))) = record.y_advance_device(offset_data) {
-        result.y_advance += device_delta_at_size(&device);
-    }
-    if let Some(Ok(DeviceOrVariationIndex::Device(device))) = record.x_placement_device(offset_data)
-    {
-        result.x_placement += device_delta_at_size(&device);
-    }
-    if let Some(Ok(DeviceOrVariationIndex::Device(device))) = record.y_placement_device(offset_data)
-    {
-        result.y_placement += device_delta_at_size(&device);
-    }
+    // Device / variation deltas: a `VariationIndex` resolves against the item
+    // variation store; a `Device` table is a static ppem delta at the render
+    // size (comparing the *effective* delta means re-encoded-but-equivalent
+    // Device tables compare equal).
+    apply_device_delta(
+        &mut result.x_advance,
+        record.x_advance_device(offset_data),
+        loc_idx,
+        resolver,
+    );
+    apply_device_delta(
+        &mut result.y_advance,
+        record.y_advance_device(offset_data),
+        loc_idx,
+        resolver,
+    );
+    apply_device_delta(
+        &mut result.x_placement,
+        record.x_placement_device(offset_data),
+        loc_idx,
+        resolver,
+    );
+    apply_device_delta(
+        &mut result.y_placement,
+        record.y_placement_device(offset_data),
+        loc_idx,
+        resolver,
+    );
     result
+}
+
+/// Add the resolved delta (variation or static device) of a value-record
+/// device field to `target`.
+#[inline]
+fn apply_device_delta(
+    target: &mut i32,
+    device: Option<Result<DeviceOrVariationIndex, ReadError>>,
+    loc_idx: usize,
+    resolver: Option<&DeltaResolver>,
+) {
+    match device {
+        Some(Ok(DeviceOrVariationIndex::VariationIndex(variation_index))) => {
+            let delta = resolver.map_or(0, |resolver| {
+                resolver.delta(
+                    loc_idx,
+                    DeltaSetIndex {
+                        outer: variation_index.delta_set_outer_index(),
+                        inner: variation_index.delta_set_inner_index(),
+                    },
+                )
+            });
+            *target += delta;
+        }
+        Some(Ok(DeviceOrVariationIndex::Device(device_table))) => {
+            *target += device_delta_at_size(&device_table);
+        }
+        _ => {}
+    }
 }
 
 /// The effective delta of a static `Device` table at the rendering size.
@@ -867,8 +972,8 @@ fn device_delta_at_size(device: &Device) -> i32 {
 /// deltas on the anchor coordinates.
 fn resolve_anchor(
     anchor: Option<Result<AnchorTable, ReadError>>,
-    coords: &[F2Dot14],
-    ivs: Option<&ItemVariationStore>,
+    loc_idx: usize,
+    resolver: Option<&DeltaResolver>,
 ) -> AnchorV {
     let Some(Ok(anchor)) = anchor else {
         return AnchorV::default();
@@ -885,10 +990,8 @@ fn resolve_anchor(
             Some(Ok(DeviceOrVariationIndex::VariationIndex(variation_index))) => {
                 let outer = variation_index.delta_set_outer_index();
                 let inner = variation_index.delta_set_inner_index();
-                if let Some(ivs) = ivs {
-                    if let Ok(delta) = ivs.compute_delta(DeltaSetIndex { outer, inner }, coords) {
-                        *coordinate += delta;
-                    }
+                if let Some(resolver) = resolver {
+                    *coordinate += resolver.delta(loc_idx, DeltaSetIndex { outer, inner });
                 }
             }
             Some(Ok(DeviceOrVariationIndex::Device(device_table))) => {

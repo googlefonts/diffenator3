@@ -20,11 +20,13 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [features]
+rayon = ["diffenator3-lib/rayon"]
 typescript = ["dep:typescript-type-def", "diffenator3-lib/typescript"]
+default = ["rayon"]
 
 [dependencies]
 diffenator3-lib = { path = "../diffenator3-lib", version = "1", features = [
-    "html", "rayon"
+    "html",
 ] }
 diff3proof = { version = "1", path = "../diff3proof" }
 ttj = { version = "1", path = "../ttj" }
