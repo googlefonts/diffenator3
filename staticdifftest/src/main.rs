@@ -10,7 +10,7 @@
 //! into `diffenator3` proper.
 
 use rustc_hash::FxHashMap;
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
 use diffenator3_lib::{

@@ -1,15 +1,11 @@
 /// Debug rendering differences between fonts
 use clap::Parser;
-use diffenator3_lib::{
-    render::{
-        renderer::Renderer,
-        utils::{count_differences, make_same_size},
-        wordlists, DEFAULT_GRAY_FUZZ,
-    },
-    setting::{parse_location, Setting},
+use diffenator3_lib::render::{
+    renderer::{AnyRenderer, Renderer},
+    utils::{count_differences, make_same_size},
+    DEFAULT_GRAY_FUZZ,
 };
 use image::{Pixel, Rgba, RgbaImage};
-use zeno::Command;
 
 #[derive(Parser)]
 struct Args {
@@ -39,36 +35,32 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let data_a = std::fs::read(&args.font1).expect("Can't read font file");
-    let mut dfont_a = diffenator3_lib::dfont::DFont::new(&data_a);
+    let dfont_a = diffenator3_lib::dfont::DFont::new(&data_a);
     let data_b = std::fs::read(&args.font2).expect("Can't read font file");
-    let mut dfont_b = diffenator3_lib::dfont::DFont::new(&data_b);
+    let dfont_b = diffenator3_lib::dfont::DFont::new(&data_b);
 
-    if let Some(location) = args.location {
-        let loc = parse_location(&location).expect("Couldn't parse location");
-        Setting::from_setting(loc)
-            .set_on_fonts(&mut dfont_a, &mut dfont_b)
-            .expect("Couldn't set location");
-    }
+    // if let Some(location) = args.location {
+    //     let loc = parse_location(&location).expect("Couldn't parse location");
+    //     Setting::from_setting(loc)
+    //         .set_on_fonts(&mut dfont_a, &mut dfont_b)
+    //         .expect("Couldn't set location");
+    // }
 
-    let script_tag = harfrust::Script::from(&args.script);
-    let direction = wordlists::get_script_direction(&args.script);
+    let mut renderer_a = Renderer::new(&dfont_a, args.size, None, None);
+    let mut renderer_b = Renderer::new(&dfont_b, args.size, None, None);
+    let buffer = renderer_a.shape(&args.text, None);
+    let data = renderer_a
+        .buffer_to_stage1_rendering(&buffer, None)
+        .unwrap();
+    let image_a = renderer_a.final_rendering(&data, None);
+    println!("Buffer A: {}", buffer.serialize());
 
-    let mut renderer_a = Renderer::new(&dfont_a, args.size, direction, script_tag);
-    let mut renderer_b = Renderer::new(&dfont_b, args.size, direction, script_tag);
-    let (serialized_buffer_a, commands) =
-        renderer_a.string_to_positioned_glyphs(&args.text).unwrap();
-    let image_a = renderer_a.render_positioned_glyphs(&commands);
-    if args.verbose {
-        println!("Commands A: {}", to_svg(commands));
-    }
-    println!("Buffer A: {}", serialized_buffer_a);
-
-    let (serialized_buffer_b, commands) =
-        renderer_b.string_to_positioned_glyphs(&args.text).unwrap();
-    let image_b = renderer_b.render_positioned_glyphs(&commands);
-    if args.verbose {
-        println!("Commands B: {}", to_svg(commands));
-    }
+    let buffer_b = renderer_b.shape(&args.text, None);
+    let serialized_buffer_b = buffer_b.serialize();
+    let data_b = renderer_b
+        .buffer_to_stage1_rendering(&buffer_b, None)
+        .unwrap();
+    let image_b = renderer_b.final_rendering(&data_b, None);
 
     println!("Buffer B: {}", serialized_buffer_b);
 
@@ -99,29 +91,29 @@ fn main() {
     println!("See output images: image_a.png, image_b.png, overlay.png");
 }
 
-fn to_svg(commands: Vec<Command>) -> String {
-    let mut svg = String::new();
-    for command in commands {
-        match command {
-            Command::MoveTo(p) => {
-                svg.push_str(&format!("M {} {} ", p.x, p.y));
-            }
-            Command::LineTo(p) => {
-                svg.push_str(&format!("L {} {} ", p.x, p.y));
-            }
-            Command::QuadTo(p1, p2) => {
-                svg.push_str(&format!("Q {} {} {} {} ", p1.x, p1.y, p2.x, p2.y));
-            }
-            Command::CurveTo(p1, p2, p3) => {
-                svg.push_str(&format!(
-                    "C {} {} {} {} {} {} ",
-                    p1.x, p1.y, p2.x, p2.y, p3.x, p3.y
-                ));
-            }
-            Command::Close => {
-                svg.push_str("Z  ");
-            }
-        }
-    }
-    svg
-}
+// fn to_svg(commands: Vec<Command>) -> String {
+//     let mut svg = String::new();
+//     for command in commands {
+//         match command {
+//             Command::MoveTo(p) => {
+//                 svg.push_str(&format!("M {} {} ", p.x, p.y));
+//             }
+//             Command::LineTo(p) => {
+//                 svg.push_str(&format!("L {} {} ", p.x, p.y));
+//             }
+//             Command::QuadTo(p1, p2) => {
+//                 svg.push_str(&format!("Q {} {} {} {} ", p1.x, p1.y, p2.x, p2.y));
+//             }
+//             Command::CurveTo(p1, p2, p3) => {
+//                 svg.push_str(&format!(
+//                     "C {} {} {} {} {} {} ",
+//                     p1.x, p1.y, p2.x, p2.y, p3.x, p3.y
+//                 ));
+//             }
+//             Command::Close => {
+//                 svg.push_str("Z  ");
+//             }
+//         }
+//     }
+//     svg
+// }
