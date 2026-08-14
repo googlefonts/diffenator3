@@ -32,11 +32,7 @@ $(function () {
   }
   cmapDiff(report.cmap_diff);
   $('[data-toggle="tooltip"]').tooltip();
-  if (
-    !report["locations"] &&
-    !report["cmap_diff"] &&
-    !report["tables"]
-  ) {
+  if (!report["locations"] && !report["cmap_diff"] && !report["tables"]) {
     $("#title").html("<h3>No differences found</h3>");
     return;
   }

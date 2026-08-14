@@ -604,7 +604,7 @@ export function renderLocationDiff(
  */
 export function diffSignatureSummary(
   summary: SignatureSummary | undefined,
-  where: JQuery<HTMLElement>
+  where: JQuery<HTMLElement>,
 ) {
   where.empty();
   if (!summary) return;

@@ -190,11 +190,41 @@ class Diffenator {
       let [axis_min, axis_def, axis_max] = limits;
       let axis = $(`<div class="axis">
         <span class="axis-tag">${tag}</span>
-        <input type="range" min="${axis_min}" max="${axis_max}" value="${axis_def}" class="slider" id="axis-${tag}">
+        <div class="axis-controls">
+          <input type="range" min="${axis_min}" max="${axis_max}" value="${axis_def}" class="slider" id="axis-${tag}">
+          <input type="number" min="${axis_min}" max="${axis_max}" step="any" value="${axis_def}" class="axis-value" id="axis-${tag}-value">
+        </div>
       </div>`);
       $("#axes").append(axis);
-      axis.on("input", this.onAxisInput.bind(this));
-      axis.on("change", this.onAxisChange.bind(this));
+
+      let slider = axis.find(`#axis-${tag}`);
+      let valueInput = axis.find(`#axis-${tag}-value`);
+
+      // Slider -> number input.
+      slider.on("input", () => {
+        valueInput.val(slider.val() as string);
+        this.onAxisInput();
+      });
+      slider.on("change", () => {
+        valueInput.val(slider.val() as string);
+        this.onAxisChange();
+      });
+
+      // Number input -> slider (clamped to the axis range).
+      valueInput.on("input", () => {
+        let val = parseFloat(valueInput.val() as string);
+        if (isNaN(val)) return;
+        val = Math.min(axis_max, Math.max(axis_min, val));
+        slider.val(String(val));
+        this.onAxisInput();
+      });
+      valueInput.on("change", () => {
+        let val = parseFloat(valueInput.val() as string);
+        if (isNaN(val)) return;
+        val = Math.min(axis_max, Math.max(axis_min, val));
+        slider.val(String(val));
+        this.onAxisChange();
+      });
     }
     if (message.instances.length > 0) {
       let select = $<HTMLSelectElement>(
@@ -253,10 +283,12 @@ class Diffenator {
       // "Default" pill: reset every slider to its axis default position.
       for (let [tag, limits] of Object.entries(this.axes.axes)) {
         $(`#axis-${tag}`).val(String(limits[1]));
+        $(`#axis-${tag}-value`).val(String(limits[1]));
       }
     } else {
       for (let [tag, value] of Object.entries(location)) {
         $(`#axis-${tag}`).val(String(value));
+        $(`#axis-${tag}-value`).val(String(value));
       }
     }
     this.applySliderVariation();
