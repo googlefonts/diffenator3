@@ -61,6 +61,19 @@
       </div>
       <div class="col-9 mt-3">
         <div id="title"></div>
+        {% if report.signature_summary %}
+        <div id="signaturesummary">
+          <h3 class="border-top pt-2 border-dark-subtle">Difference Summary</h3>
+          <p>{{ report.signature_summary.overview }}</p>
+          {% if report.signature_summary.points %}
+          <ul>
+            {% for point in report.signature_summary.points %}
+            <li>{{ point }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+        {% endif %}
         <div id="diffsignificanttables"></div>
         <div id="cmapdiff"></div>
         <div id="difflanguages">Modified Languages</div>
@@ -73,7 +86,6 @@
           <div style="clear: both"></div>
         </div>
         <div id="difffeatures"></div>
-        <div id="diffkerns"></div>
         <div id="difftable"></div>
       </div>
     </div>

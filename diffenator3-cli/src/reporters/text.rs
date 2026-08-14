@@ -48,6 +48,14 @@ pub fn show_map_diff(fields: &Map<String, serde_json::Value>, indent: usize, suc
 }
 
 pub fn report(result: Report, succinct: bool) {
+    if let Some(summary) = result.signature_summary {
+        println!("\n# Difference Summary");
+        println!("{}", summary.overview);
+        for point in summary.points {
+            println!("  - {}", point);
+        }
+    }
+
     if let Some(tables) = result.tables {
         for (table_name, diff) in tables.as_object().unwrap().iter() {
             if diff.is_something() {

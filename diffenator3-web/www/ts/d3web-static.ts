@@ -1,11 +1,11 @@
 import type { LocationResult, Report } from "./types";
 import {
   renderTableDiff,
-  addAGlyph,
-  addAWord,
+  renderLocationDiff,
+  setVariationStyle,
+  locationLabel,
   cmapDiff,
   diffTables,
-  diffKerns,
   diffFeatures,
   diffSignificantTables,
   setupAnimation,
@@ -15,56 +15,9 @@ import {
 declare var report: Report;
 
 function buildLocation_statichtml(loc: LocationResult) {
-  // Set font styles to appropriate axis locations
-  let rule = (document.styleSheets[0]!.cssRules[2] as CSSStyleRule).style;
-  let cssSetting = "";
-  let textLocation = "Default";
-  if (loc.coords) {
-    cssSetting = Object.entries(loc.coords)
-      .map(function ([axis, value]) {
-        return `"${axis}" ${value}`;
-      })
-      .join(", ");
-    textLocation = Object.entries(loc.coords)
-      .map(function ([axis, value]) {
-        return `${axis}=${value}`;
-      })
-      .join(" ");
-    rule.setProperty("font-variation-settings", cssSetting);
-  }
-
-  $("#main").empty();
-
-  $("#title").html(`<h2 class="mt-2">${textLocation}</h2>`);
-
-  if (loc.glyphs) {
-    loc.glyphs.sort((ga, gb) =>
-      new Intl.Collator().compare(ga.string, gb.string),
-    );
-    $("#main").append(
-      "<h3 class='border-top pt-2 border-dark-subtle'>Modified Glyphs</h3>",
-    );
-    let glyphs = $("<div>");
-    for (let glyph of loc.glyphs) {
-      addAGlyph(glyph, glyphs);
-    }
-    $("#main").append(glyphs);
-  }
-
-  if (loc.words) {
-    $("#main").append(
-      "<h3 class='border-top pt-2 border-dark-subtle'>Modified Words</h3>",
-    );
-    for (let [script, words] of Object.entries(loc.words)) {
-      let scriptTitle = $(`<h6>${script}</h6>`);
-      $("#main").append(scriptTitle);
-      let worddiv = $("<div>");
-      for (let word of words) {
-        addAWord(word, worddiv);
-      }
-      $("#main").append(worddiv);
-    }
-  }
+  setVariationStyle(loc.coords);
+  $("#title").html(`<h2 class="mt-2">${locationLabel(loc.coords)}</h2>`);
+  renderLocationDiff(loc, $("#main"));
   $('[data-toggle="tooltip"]').tooltip();
 }
 
@@ -74,9 +27,6 @@ $(function () {
     diffSignificantTables(report);
     diffFeatures(report);
   }
-  if (report["kerns"]) {
-    diffKerns(report);
-  }
   if (report["languages"]) {
     diffLanguages(report["languages"]);
   }
@@ -85,8 +35,7 @@ $(function () {
   if (
     !report["locations"] &&
     !report["cmap_diff"] &&
-    !report["tables"] &&
-    !report["kerns"]
+    !report["tables"]
   ) {
     $("#title").html("<h3>No differences found</h3>");
     return;

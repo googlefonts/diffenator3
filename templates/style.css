@@ -275,3 +275,61 @@ body {
     max-height: 500px;
     overflow-y: scroll;
   }
+
+  /* Layout for the WASM dynamic site: left location nav + floating
+     control panel on the right. */
+  #locationnav-col {
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+  #locationnav .nav-link {
+    cursor: pointer;
+  }
+  #content-col {
+    padding-right: 280px;
+  }
+  #controlpanel {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1050;
+    width: 260px;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #c8d2dc;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  #controlpanel .panel-title {
+    margin-bottom: 0.5rem;
+  }
+  #controlpanel .axis {
+    margin-bottom: 0.5rem;
+    font-size: 12pt;
+  }
+  #controlpanel .axis-tag {
+    font-weight: 600;
+  }
+  #controlpanel .slider {
+    width: 100%;
+  }
+  #controlpanel #instance-select {
+    width: 100%;
+    margin-top: 0.25rem;
+  }
+  #controlpanel .panel-hint {
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+    font-size: 9pt;
+    color: #6f7882;
+  }
+  #axes.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .diff-spinner {
+    padding: 1rem;
+  }
+  }

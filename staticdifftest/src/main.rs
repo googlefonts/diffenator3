@@ -9,6 +9,7 @@
 //! variety of fonts, before wiring the results into word selection and then
 //! into `diffenator3` proper.
 
+use rustc_hash::FxHashMap;
 use std::{collections::HashMap, path::PathBuf};
 
 use clap::Parser;
@@ -145,7 +146,7 @@ fn locations_json(font_a: &DFont, font_b: &DFont, locations: &LocationSet) -> Ve
 fn single_changes_json(
     font_a: &DFont,
     font_b: &DFont,
-    changes: &HashMap<GlyphId, LocationSet>,
+    changes: &FxHashMap<GlyphId, LocationSet>,
 ) -> Vec<Value> {
     let mut items: Vec<Value> = changes
         .iter()
@@ -165,7 +166,7 @@ fn single_changes_json(
 fn pair_changes_json(
     font_a: &DFont,
     font_b: &DFont,
-    changes: &HashMap<(GlyphId, GlyphId), LocationSet>,
+    changes: &FxHashMap<(GlyphId, GlyphId), LocationSet>,
 ) -> Vec<Value> {
     let mut items: Vec<Value> = changes
         .iter()

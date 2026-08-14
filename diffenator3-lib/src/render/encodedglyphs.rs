@@ -65,7 +65,7 @@ pub fn modified_encoded_glyphs(
     font_a: &DFont,
     font_b: &DFont,
     location: Option<&UserLocation>,
-    signature: &DifferenceSignature,
+    signature: Option<&DifferenceSignature>,
 ) -> Result<Vec<GlyphDiff>, ReadError> {
     let cmap_a = &font_a.codepoints;
     let cmap_b = &font_b.codepoints;

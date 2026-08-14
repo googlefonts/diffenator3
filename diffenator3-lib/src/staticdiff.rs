@@ -162,6 +162,32 @@ impl DifferenceSignature {
     pub fn uncertain_glyphs(&self) -> HashSet<GlyphId> {
         self.uncertain.iter().map(|report| report.gid).collect()
     }
+
+    /// The set of designspace locations at which anything changed: the
+    /// default location plus every location where a glyph outline/advance or
+    /// positioning difference was recorded. This is what "auto" mode uses to
+    /// decide which locations to report, instead of the font's static
+    /// instances.
+    pub fn changed_locations(&self) -> LocationSet {
+        let mut set = LocationSet::default();
+        set.insert(NormalizedLocation::default());
+        for change in self.glyph_changes.values() {
+            set.extend(change.changed_locations());
+        }
+        set.extend(
+            self.single_position_changes
+                .values()
+                .chain(self.cursive_position_changes.values())
+                .flat_map(|locs| locs.iter().cloned()),
+        );
+        set.extend(
+            self.pair_position_changes
+                .values()
+                .chain(self.mark_position_changes.values())
+                .flat_map(|locs| locs.iter().cloned()),
+        );
+        set
+    }
 }
 
 /// Compute the static difference signature between two fonts.

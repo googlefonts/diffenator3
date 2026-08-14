@@ -3,6 +3,83 @@
 export type JSONValue = (null | boolean | number | string | (JSONValue)[] | {
     [key:string]:JSONValue;
 });
+export type Usize = number;
+
+/**
+ * A plain-language summary of the static difference signature.
+ */
+export type SignatureSummary = {
+
+    /**
+     * Number of cmap-matched glyphs that differ in outline or advance width.
+     */
+    "changed_glyphs": Usize;
+
+    /**
+     * Number of cmap-matched glyphs that are identical everywhere.
+     */
+    "identical_glyphs": Usize;
+
+    /**
+     * Encoded glyphs present only in the "before" font's cmap.
+     */
+    "missing_glyphs": (string)[];
+
+    /**
+     * Encoded glyphs present only in the "after" font's cmap.
+     */
+    "new_glyphs": (string)[];
+
+    /**
+     * Number of glyphs whose correspondence could not be established.
+     */
+    "uncertain_glyphs": Usize;
+
+    /**
+     * Number of GPOS single-adjustment (lookup type 1) differences.
+     */
+    "single_adjustments": Usize;
+
+    /**
+     * Number of GPOS pair-adjustment (lookup type 2 / kerning) differences.
+     */
+    "pair_adjustments": Usize;
+
+    /**
+     * Number of GPOS mark-attachment (lookup types 4/5/6) differences.
+     */
+    "mark_adjustments": Usize;
+
+    /**
+     * Number of GPOS cursive-attachment (lookup type 3) differences.
+     */
+    "cursive_adjustments": Usize;
+
+    /**
+     * Whether either font has contextual GPOS that isn't modelled.
+     */
+    "positioning_unmodelled": boolean;
+
+    /**
+     * Whether the fonts share no cmap codepoints, making matching unreliable.
+     */
+    "mapping_failed": boolean;
+
+    /**
+     * Human-readable designspace locations where changes were recorded.
+     */
+    "changed_locations": (string)[];
+
+    /**
+     * A one-line plain-language overview.
+     */
+    "overview": string;
+
+    /**
+     * Plain-language bullet points describing the changes.
+     */
+    "points": (string)[];
+};
 export type EncodedGlyph = {
 
     /**
@@ -24,7 +101,6 @@ export type CmapDiff = {
     "new"?: (EncodedGlyph)[];
 };
 export type F32 = number;
-export type Usize = number;
 export type LanguageDiff = {
 
     /**
@@ -158,7 +234,7 @@ export type LocationResult = {
 };
 export type Report = {
     "tables"?: JSONValue;
-    "kerns"?: JSONValue;
+    "signature_summary"?: SignatureSummary;
     "cmap_diff"?: CmapDiff;
     "languages"?: Record<string, LanguageDiff>;
     "locations"?: (LocationResult)[];
