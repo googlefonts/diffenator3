@@ -10,8 +10,8 @@
 //! This is an *independent* test component for the `wordselect` module, in the
 //! same spirit as `staticdifftest` for the `staticdiff`/`gposdiff` modules.
 
+use rustc_hash::FxHashSet as HashSet;
 use std::{
-    collections::HashSet,
     path::PathBuf,
     str::FromStr,
     time::{Duration, Instant},
@@ -123,9 +123,9 @@ fn main() {
 
     // Coverage tracking: which changed glyphs/pairs/mark pairs the selected
     // words actually exercise.
-    let mut covered_glyphs: HashSet<GlyphId> = HashSet::new();
-    let mut covered_pairs: HashSet<(GlyphId, GlyphId)> = HashSet::new();
-    let mut covered_marks: HashSet<(GlyphId, GlyphId)> = HashSet::new();
+    let mut covered_glyphs: HashSet<GlyphId> = HashSet::default();
+    let mut covered_pairs: HashSet<(GlyphId, GlyphId)> = HashSet::default();
+    let mut covered_marks: HashSet<(GlyphId, GlyphId)> = HashSet::default();
 
     // Render-operation accounting.
     let mut selected_ops: usize = 0;
@@ -149,8 +149,9 @@ fn main() {
         t_shape += t1.elapsed();
 
         let t2 = Instant::now();
-        let selection =
-            select_buffer(&signature, &uncertain, &marks, &font_a, &font_b, word, &buffer_a);
+        let selection = select_buffer(
+            &signature, &uncertain, &marks, &font_a, &font_b, word, &buffer_a,
+        );
         t_select += t2.elapsed();
 
         let t3 = Instant::now();
@@ -217,7 +218,10 @@ fn main() {
 
     let total = start.elapsed();
     eprintln!("-- timing breakdown --");
-    eprintln!("  signature analysis : {:>8.3}s", analysis_time.as_secs_f64());
+    eprintln!(
+        "  signature analysis : {:>8.3}s",
+        analysis_time.as_secs_f64()
+    );
     eprintln!("  encoding filter    : {:>8.3}s", t_encoded.as_secs_f64());
     eprintln!("  shaping            : {:>8.3}s", t_shape.as_secs_f64());
     eprintln!("  select_buffer      : {:>8.3}s", t_select.as_secs_f64());

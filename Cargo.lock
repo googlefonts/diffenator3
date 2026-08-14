@@ -3081,6 +3081,7 @@ dependencies = [
  "fontdrasil 0.4.0",
  "harfrust",
  "log",
+ "rustc-hash",
  "serde_json",
  "skrifa",
  "static-lang-word-lists 0.3.1",

@@ -343,7 +343,7 @@ pub(crate) fn diff_many_words(
     // let mut var_shape_time = Duration::ZERO;
     // let mut first_other_time = Duration::ZERO;
     // let mut var_other_time = Duration::ZERO;
-    let mut variations_processed = 0;
+    // let mut variations_processed = 0;
 
     for word in wordlist.iter() {
         if !word_is_encoded(font_a, font_b, word) {
@@ -451,7 +451,7 @@ pub(crate) fn diff_many_words(
                 differences.push(diff);
             }
             // var_other_time += other.elapsed();
-            variations_processed += 1;
+            // variations_processed += 1;
         }
     }
 
