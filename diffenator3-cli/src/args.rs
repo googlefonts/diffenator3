@@ -16,14 +16,6 @@ pub struct Cli {
     #[clap(long = "tables", overrides_with = "tables", help_heading = Some("Tests to run"))]
     pub _no_tables: bool,
 
-    /// Don't show diffs in font kerning pairs
-    #[clap(long = "no-kerns", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
-    pub kerns: bool,
-
-    /// Show diffs in font kerning pairs [default]
-    #[clap(long = "kerns", overrides_with = "kerns", help_heading = Some("Tests to run"))]
-    pub _no_kerns: bool,
-
     /// Don't show diffs in glyph images
     #[clap(long = "no-glyphs", action = ArgAction::SetFalse, help_heading = Some("Tests to run"))]
     pub glyphs: bool,

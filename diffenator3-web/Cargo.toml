@@ -3,6 +3,9 @@ name = "diffenator3-web"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+debug = true
+
 [dependencies]
 wasm-bindgen = { version = "0.2" }
 serde-wasm-bindgen = "0.6"
@@ -13,6 +16,8 @@ ttj = { path = "../ttj" }
 serde_json = { workspace = true }
 skrifa = { workspace = true }
 shaperglot = { workspace = true }
+fontdrasil.workspace = true
+web-sys = {version = "0.3.104", features = ["console"] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -20,5 +25,8 @@ path = "src/lib.rs"
 
 [build-dependencies]
 diffenator3-lib = { path = "../diffenator3-lib", features = ["typescript"] }
-diffenator3 = { path = "../diffenator3-cli", features = ["typescript"] }
+# default-features=false: the CLI's default `rayon` feature would enable the
+# parallel (rayon) diff path in diffenator3-lib, which does not compile for
+# wasm. The wasm build uses the serial path.
+diffenator3 = { path = "../diffenator3-cli", default-features = false, features = ["typescript"] }
 typescript-type-def = "0.5.13"

@@ -6,8 +6,10 @@ import {
   type Diff,
   type Difference,
   type GlyphDiff,
+  type LocationResult,
   type ObjectDiff,
   type Report,
+  type SignatureSummary,
   type SimpleDiff,
   type Value,
   type ValueRecord,
@@ -17,13 +19,13 @@ import {
 function toTitleCase(str: string) {
   return str.replace(
     /\w\S*/g,
-    (text) => text.charAt(0).toUpperCase() + text.substring(1).toLowerCase()
+    (text) => text.charAt(0).toUpperCase() + text.substring(1).toLowerCase(),
   );
 }
 
 function renderTableDiff(
   node: Diff | Value | Record<string, Diff>,
-  toplevel: boolean
+  toplevel: boolean,
 ) {
   var wrapper = $("<div> </div>");
   if (!node) {
@@ -64,7 +66,7 @@ function renderTableDiff(
 
 function addAGlyph(
   glyph: GlyphDiff | EncodedGlyph,
-  where: JQuery<HTMLElement>
+  where: JQuery<HTMLElement>,
 ) {
   let title = "";
   if (glyph.name) {
@@ -104,7 +106,7 @@ function diffTables(report: Report) {
   $("#difftable").empty();
   $("#difftable").append(`<h4 class="mt-2 box-title">Table-level details</h4>`);
   $("#difftable").append(
-    renderTableDiff({ tables: report.tables as Diff }, true).children()
+    renderTableDiff({ tables: report.tables as Diff }, true).children(),
   );
   $("#difftable .node").on("click", function (e) {
     $(this).toggleClass("closed open");
@@ -133,32 +135,32 @@ function diffFeatures(report: Report) {
         }
         let lookupsNew = lookups as Record<number, SimpleDiff>;
         let left_lookups: Value[] = Object.values(lookupsNew).map(
-          (l: SimpleDiff) => l && l[0]
+          (l: SimpleDiff) => l && l[0],
         );
         let right_lookups: Value[] = Object.values(lookupsNew).map(
-          (l: SimpleDiff) => l && l[1]
+          (l: SimpleDiff) => l && l[1],
         );
         console.log(table, feature_name, left_lookups, right_lookups);
         let status = isAllNull(left_lookups)
           ? "added"
           : isAllNull(right_lookups)
-          ? "removed"
-          : left_lookups.length != right_lookups.length
-          ? `modified (${left_lookups.length} → ${right_lookups.length})`
-          : "modified";
+            ? "removed"
+            : left_lookups.length != right_lookups.length
+              ? `modified (${left_lookups.length} → ${right_lookups.length})`
+              : "modified";
         changes[`${table} ${feature_name}`] = status;
       }
     }
   }
   $("#difffeatures").append(
-    `<h3 class="border-top pt-2 border-dark-subtle">Modified Features</h3>`
+    `<h3 class="border-top pt-2 border-dark-subtle">Modified Features</h3>`,
   );
   if (Object.keys(changes).length == 0) {
     $("#difffeatures").append(`<p>No changes to features</p>`);
     return;
   }
   $("#difffeatures").append(
-    `<table class="table table-striped" id="difffeatures"><tr><th>Feature</th><th>Status</th></table>`
+    `<table class="table table-striped" id="difffeatures"><tr><th>Feature</th><th>Status</th></table>`,
   );
   for (let [feature, status] of Object.entries(changes)) {
     let row = $("<tr>");
@@ -171,18 +173,18 @@ function diffFeatures(report: Report) {
 function diffLanguages(report: Record<string, LanguageDiff>) {
   $("#difflanguages").empty();
   $("#difflanguages").append(
-    `<h3 class="border-top pt-2 border-dark-subtle">Modified Languages</h3>`
+    `<h3 class="border-top pt-2 border-dark-subtle">Modified Languages</h3>`,
   );
   let notSame = Object.entries(report).filter(
     ([name, diff]) =>
-      diff.score_a !== diff.score_b || diff.level_a !== diff.level_b
+      diff.score_a !== diff.score_b || diff.level_a !== diff.level_b,
   );
   if (notSame.length === 0) {
     $("#difflanguages").append(`<p>No changes to languages</p>`);
     return;
   }
   $("#difflanguages").append(
-    `<table class="table table-striped" id="difflanguages"><tr><th>Language</th><th>Before</th><th>After</th></tr></table>`
+    `<table class="table table-striped" id="difflanguages"><tr><th>Language</th><th>Before</th><th>After</th></tr></table>`,
   );
   for (let [name, diff] of notSame) {
     let row = $("<tr>");
@@ -254,8 +256,8 @@ function diffSignificantTables(report: Report) {
           let row = $("<tr/>");
           row.append(
             `<td>${table_name}.${toTitleCase(
-              field_name!.replaceAll("_", " ")
-            ).replaceAll(" ", "")}</td>`
+              field_name!.replaceAll("_", " "),
+            ).replaceAll(" ", "")}</td>`,
           );
           let before_td = $("<td/>").addClass("attr-before").text(before);
           let after_td = $("<td/>").addClass("attr-after").text(after);
@@ -274,13 +276,13 @@ function diffSignificantTables(report: Report) {
   if ("fvar" in tables) {
     result.append(`<tr><th colspan="3">fvar Table Changes</th></tr>`);
     result.append(
-      `<tr><td colspan="3">The fvar table has changed. See the full table diff below.</td></tr>`
+      `<tr><td colspan="3">The fvar table has changed. See the full table diff below.</td></tr>`,
     );
   }
   if ("avar" in tables) {
     result.append(`<tr><th colspan="3">avar Table Changes</th></tr>`);
     result.append(
-      `<tr><td colspan="3">The avar table has changed. See the full table diff below.</td></tr>`
+      `<tr><td colspan="3">The avar table has changed. See the full table diff below.</td></tr>`,
     );
   }
 
@@ -304,8 +306,8 @@ function diffSignificantTables(report: Report) {
           let row = $("<tr/>");
           row.append(
             `<td>${table_name}.${toTitleCase(
-              field_name!.replaceAll("_", " ")
-            ).replaceAll(" ", "")}</td>`
+              field_name!.replaceAll("_", " "),
+            ).replaceAll(" ", "")}</td>`,
           );
 
           if (field_name == "font_revision") {
@@ -335,28 +337,28 @@ function diffSignificantTables(report: Report) {
   }
   $("#diffsignificanttables").empty();
   $("#diffsignificanttables").append(
-    `<h3 class="border-top pt-2 border-dark-subtle">Significant Table Changes</h3>`
+    `<h3 class="border-top pt-2 border-dark-subtle">Significant Table Changes</h3>`,
   );
   if (result.children().length == 0) {
     $("#diffsignificanttables").append(
-      `<tr><th>No significant table changes</th></tr>`
+      `<tr><th>No significant table changes</th></tr>`,
     );
   } else {
     $("#diffsignificanttables").append(table);
   }
 }
 
-function diffKerns(report: Report) {
+function diffKerns(report: { kerns?: Record<string, Diff> }) {
   $("#diffkerns").empty();
   if (!report["kerns"] || Object.keys(report["kerns"]).length == 0) {
     $("#diffkerns").append(`<p>No changes to kerning</p>`);
     return;
   }
   $("#diffkerns").append(
-    `<h3 class="border-top pt-2 border-dark-subtle">Modified Kerns</h3>`
+    `<h3 class="border-top pt-2 border-dark-subtle">Modified Kerns</h3>`,
   );
   $("#diffkerns").append(
-    `<table class="table table-striped" id="diffkerns"><tr><th>Pair</th><th>Before</th><th>After</th></tr></table>`
+    `<table class="table table-striped" id="diffkerns"><tr><th>Pair</th><th>Before</th><th>After</th></tr></table>`,
   );
   for (let [pair, value] of Object.entries(report["kerns"])) {
     if (pair == "error") {
@@ -417,7 +419,7 @@ function serializeKern(kern: ValueRecord, index: number) {
 
 function serializeKernValue(
   kern: Value | Record<string, number>,
-  index: number
+  index: number,
 ) {
   if (typeof kern == "number") {
     return kern;
@@ -440,11 +442,13 @@ function serializeKernValue(
 function cmapDiff(cmap_diff: CmapDiff | undefined) {
   $("#cmapdiff").empty();
   $("#cmapdiff").append(
-    `<h3 class="border-top pt-2 border-dark-subtle">Added and Removed Encoded Glyphs</h3>`
+    `<h3 class="border-top pt-2 border-dark-subtle">Added and Removed Encoded Glyphs</h3>`,
   );
   if (cmap_diff && (cmap_diff.new || cmap_diff.missing)) {
     if (cmap_diff.new) {
-      $("#cmapdiff").append(`<h4>Added Glyphs</h4><p>Be sure to look at the 'after' because the 'before' will likely show tofu</p>`);
+      $("#cmapdiff").append(
+        `<h4>Added Glyphs</h4><p>Be sure to look at the 'after' because the 'before' will likely show tofu</p>`,
+      );
       let added = $("<div>");
       for (let glyph of cmap_diff.new) {
         addAGlyph(glyph, added);
@@ -492,6 +496,132 @@ function setupAnimation() {
   });
 }
 
+/**
+ * Human-readable label for a designspace location, e.g. "wght=400 wdth=100".
+ * Returns "Default" when there are no coordinates.
+ */
+export function locationLabel(
+  coords: Record<string, number> | null | undefined,
+) {
+  if (coords && Object.keys(coords).length > 0) {
+    return Object.entries(coords)
+      .map(([axis, value]) => `${axis}=${value}`)
+      .join(" ");
+  }
+  return "Default";
+}
+
+/**
+ * Set the `font-variation-settings` on the first @font-face rule pair, so the
+ * rendered glyph/word cells reflect the requested axis location.
+ */
+export function setVariationStyle(
+  coords: Record<string, number> | null | undefined,
+) {
+  let rule = (document.styleSheets[0]!.cssRules[2] as CSSStyleRule).style;
+  let cssSetting = coords
+    ? Object.entries(coords)
+        .map(([axis, value]) => `"${axis}" ${value}`)
+        .join(", ")
+    : "";
+  rule.setProperty("font-variation-settings", cssSetting);
+}
+
+/**
+ * Render a list of glyph diffs into `where`. Clears `where` first, so it can
+ * replace a loading placeholder. Shows "No changes" when the list is empty.
+ */
+export function renderGlyphs(
+  glyphs: GlyphDiff[] | undefined,
+  where: JQuery<HTMLElement>,
+) {
+  where.empty();
+  if (!glyphs || glyphs.length == 0) {
+    where.append(`<p>No changes to glyphs</p>`);
+    return;
+  }
+  where.append(
+    `<h3 class="border-top pt-2 border-dark-subtle">Modified Glyphs</h3>`,
+  );
+  let sorted = [...glyphs].sort((a, b) =>
+    new Intl.Collator().compare(a.string, b.string),
+  );
+  let place = $('<div class="glyphgrid"/>');
+  for (let glyph of sorted) {
+    addAGlyph(glyph, place);
+  }
+  where.append(place);
+}
+
+/**
+ * Render word diffs (grouped by script) into `where`. Clears `where` first.
+ * Shows "No changes" when there is nothing to show.
+ */
+export function renderWords(
+  words: Record<string, Difference[]> | undefined,
+  where: JQuery<HTMLElement>,
+) {
+  where.empty();
+  if (!words || Object.keys(words).length == 0) {
+    where.append(`<p>No changes to words</p>`);
+    return;
+  }
+  where.append(
+    `<h3 class="border-top pt-2 border-dark-subtle">Modified Words</h3>`,
+  );
+  for (let [script, diffs] of Object.entries(words)) {
+    where.append($(`<h6>${script}</h6>`));
+    let place = $('<div class="wordgrid"/>');
+    for (let diff of diffs) {
+      addAWord(diff, place);
+    }
+    where.append(place);
+  }
+}
+
+/**
+ * Render the per-location diff (glyphs + words) of a `LocationResult` into
+ * `where`, which is cleared first. Used by both the static report and the
+ * auto-mode view of the dynamic site.
+ */
+export function renderLocationDiff(
+  loc: LocationResult,
+  where: JQuery<HTMLElement>,
+) {
+  where.empty();
+  // renderGlyphs / renderWords both clear their target, so give each its own
+  // sub-container instead of writing into the same element.
+  let glyphsDiv = $('<div class="glyph-section"/>');
+  let wordsDiv = $('<div class="word-section"/>');
+  where.append(glyphsDiv);
+  where.append(wordsDiv);
+  renderGlyphs(loc.glyphs, glyphsDiv);
+  renderWords(loc.words, wordsDiv);
+}
+/**
+ * Render the human-readable difference signature summary into `where`.
+ * Clears `where` first; renders nothing if no summary was provided.
+ */
+export function diffSignatureSummary(
+  summary: SignatureSummary | undefined,
+  where: JQuery<HTMLElement>
+) {
+  where.empty();
+  if (!summary) return;
+  where.append(
+    `<h3 class="border-top pt-2 border-dark-subtle">Difference Summary</h3>`,
+  );
+  if (summary.overview) {
+    where.append(`<p class="signature-overview">${summary.overview}</p>`);
+  }
+  if (summary.points && summary.points.length > 0) {
+    let ul = $('<ul class="signature-points"/>');
+    for (let point of summary.points) {
+      ul.append(`<li>${point}</li>`);
+    }
+    where.append(ul);
+  }
+}
 export {
   renderTableDiff,
   addAGlyph,

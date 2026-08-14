@@ -53,7 +53,9 @@ pub struct Renderer<'a> {
     // instance: ShaperInstance,
     pub(crate) outlines: CachedOutlineGlyphCollection<'a>,
     cached_shaper: CachedShaper<'a>,
+    #[cfg(not(target_family = "wasm"))]
     pub stage1_time: Duration,
+    #[cfg(not(target_family = "wasm"))]
     pub render_time: Duration,
 }
 
@@ -82,7 +84,9 @@ impl<'a> Renderer<'a> {
             cached_shaper,
             // instance,
             outlines,
+            #[cfg(not(target_family = "wasm"))]
             stage1_time: Duration::ZERO,
+            #[cfg(not(target_family = "wasm"))]
             render_time: Duration::ZERO,
         }
     }
@@ -101,6 +105,7 @@ impl AnyRenderer for Renderer<'_> {
         draw_buffer: &DrawBuffer,
         location: Option<&Vec<NormalizedCoord>>,
     ) -> Option<Box<dyn Any>> {
+        #[cfg(not(target_family = "wasm"))]
         let time = std::time::Instant::now();
         if draw_buffer.is_empty() {
             return None;
@@ -112,7 +117,10 @@ impl AnyRenderer for Renderer<'_> {
             self.outlines
                 .draw(glyph.glyph_id, location.unwrap_or(&vec![]), &mut pen);
         }
-        self.stage1_time += time.elapsed();
+        #[cfg(not(target_family = "wasm"))]
+        {
+            self.stage1_time += time.elapsed();
+        }
         Some(Box::new(pen.buffer))
     }
 
@@ -137,7 +145,9 @@ impl AnyRenderer for Renderer<'_> {
         data: &dyn Any,
         _location: Option<&[NormalizedCoord]>,
     ) -> GrayImage {
+        #[cfg(not(target_family = "wasm"))]
         let time = std::time::Instant::now();
+
         let pen_buffer = data
             .downcast_ref::<Vec<Command>>()
             .expect("final_rendering: expected Vec<Command> from string_to_stage1_rendering");
@@ -190,12 +200,17 @@ impl AnyRenderer for Renderer<'_> {
         rasterizer.for_each_pixel_2d(|x, y, alpha| {
             image.put_pixel(x, y, Luma([(alpha * 255.0) as u8]));
         });
-        self.render_time += time.elapsed();
+
+        #[cfg(not(target_family = "wasm"))]
+        {
+            self.render_time += time.elapsed();
+        }
         image
     }
 
     fn log_stats(&self) {
         self.outlines.log_stats();
+        #[cfg(not(target_family = "wasm"))]
         log::debug!(
             "Renderer: stage1_time: {:?}, render_time: {:?}",
             self.stage1_time,

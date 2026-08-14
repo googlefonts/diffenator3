@@ -2,7 +2,10 @@ pub mod html;
 pub mod json;
 pub mod text;
 
-use diffenator3_lib::structs::{CmapDiff, Difference, GlyphDiff};
+use diffenator3_lib::{
+    structs::{CmapDiff, Difference, GlyphDiff},
+    summary::SignatureSummary,
+};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 
@@ -12,7 +15,7 @@ pub struct Report {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tables: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub kerns: Option<serde_json::Value>,
+    pub signature_summary: Option<SignatureSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cmap_diff: Option<CmapDiff>,
     #[serde(skip_serializing_if = "Option::is_none")]

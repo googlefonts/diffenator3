@@ -14,38 +14,19 @@ use crate::{
 };
 use clap::Parser;
 use diffenator3_lib::{
-    dfont::DFont,
+    dfont::{parse_location, DFont},
     html::template_engine,
     render::{
         encodedglyphs::{modified_encoded_glyphs, CmapDiff},
         test_font_words,
     },
     staticdiff::compute_signature,
+    summary::summarize,
     WordList,
 };
 use env_logger::Env;
-use fontdrasil::coords::{UserCoord, UserLocation};
-use std::{collections::HashMap, path::Path, str::FromStr};
-use ttj::{jsondiff::Substantial, kern_diff, table_diff};
-
-pub fn parse_location(variations: &str) -> Result<UserLocation, String> {
-    let mut location = UserLocation::default();
-    for variation in variations.split(&[',', ' ']) {
-        if variation.is_empty() {
-            continue;
-        }
-        let mut parts = variation.split('=');
-        let axis = parts.next().ok_or("Couldn't parse axis".to_string())?;
-        let tag = skrifa::Tag::from_str(axis)
-            .map_err(|_| format!("Couldn't parse axis tag: {}", axis))?;
-        let value = parts.next().ok_or("Couldn't parse value".to_string())?;
-        let value = value
-            .parse::<f64>()
-            .map_err(|_| "Couldn't parse value".to_string())?;
-        location.insert(tag, UserCoord::new(value));
-    }
-    Ok(location)
-}
+use std::{collections::HashMap, path::Path};
+use ttj::{jsondiff::Substantial, table_diff};
 
 fn main() {
     let cli = Cli::parse();
@@ -76,9 +57,10 @@ fn main() {
     let mut result = Report::default();
 
     // Static analysis of the two fonts, computed once up here. It drives word
-    // selection during the behavioural tests, and will later feed the
-    // human-readable summary of changes in the report.
+    // selection during the behavioural tests, and feeds the human-readable
+    // summary of changes in the report.
     let signature = compute_signature(&font_a, &font_b);
+    result.signature_summary = Some(summarize(&signature, &font_a));
 
     let custom_wordlist_inputs: Vec<WordList> = cli
         .custom_wordlists
@@ -107,18 +89,6 @@ fn main() {
             result.tables = Some(table_diff);
         }
     }
-    if cli.kerns {
-        log::info!("Diffing kerning");
-        let kern_diff = kern_diff(
-            &font_a.fontref(),
-            &font_b.fontref(),
-            cli.max_changes,
-            cli.no_match,
-        );
-        if kern_diff.is_something() {
-            result.kerns = Some(kern_diff);
-        }
-    }
 
     let location = cli
         .location
@@ -135,7 +105,7 @@ fn main() {
     let mut location_result_map: HashMap<String, LocationResult> = HashMap::new();
 
     if cli.glyphs {
-        let glyphs = modified_encoded_glyphs(&font_a, &font_b, location.as_ref(), &signature)
+        let glyphs = modified_encoded_glyphs(&font_a, &font_b, location.as_ref(), Some(&signature))
             .expect("Error diffing glyphs");
         // Break out by location and add to locationresults
         for glyph in glyphs {
@@ -153,7 +123,7 @@ fn main() {
         let words = test_font_words(
             &font_a,
             &font_b,
-            &signature,
+            Some(&signature),
             &custom_wordlist_inputs,
             location.as_ref(),
         );

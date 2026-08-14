@@ -115,36 +115,52 @@
       </div>
     </div>
 
-    <div class="container">
+    <div class="container-fluid">
       <div id="ui-nav">
         <div class="ui-nav-item" id="fonttoggle">Before</div>
         <div class="ui-nav-item" id="fontanimate">Animate!</div>
-        <div id="axes"></div>
       </div>
 
-      <div id="diffsignificanttables"></div>
-      <div id="cmapdiff"></div>
-      <div id="glyphdiff"></div>
-      <div id="difflanguages"></div>
-      <div id="worddiff">
-        <h3 class="border-top pt-2 border-dark-subtle">Modified Words</h3>
-        <div id="wordspinner">
-          <span class="sr-only">Loading...</span>
-          <div class="spinner-border" role="status"></div>
+      <div class="row">
+        <div class="col-2" id="locationnav-col">
+          <ul class="nav nav-pills" id="locationnav"></ul>
         </div>
-        <div id="worddiffinner"></div>
-        <div style="clear: both"></div>
-      </div>
-      <div id="userdefined">
-        <h4>User defined sample text</h4>
-        <div contenteditable="true" class="font-before cell-word">
-          You can type your own text here to see it previewed in the fonts.
+        <div class="col-10" id="content-col">
+          <div id="signaturesummary"></div>
+          <div id="diffsignificanttables"></div>
+          <div id="cmapdiff"></div>
+          <div id="difflanguages"></div>
+          <div id="main"></div>
+          <div id="userdefined">
+            <h4>User defined sample text</h4>
+            <div contenteditable="true" class="font-before cell-word">
+              You can type your own text here to see it previewed in the fonts.
+            </div>
+            <div style="clear: both"></div>
+          </div>
+          <div id="diffkerns"></div>
+          <div id="difffeatures"></div>
+          <div id="difftable"></div>
         </div>
-        <div style="clear: both"></div>
       </div>
-      <div id="diffkerns"></div>
-      <div id="difffeatures"></div>
-      <div id="difftable"></div>
+
+      <div id="controlpanel">
+        <h6 class="panel-title">Variation</h6>
+        <div id="axes"></div>
+        <div class="form-check form-switch mt-2">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="automode"
+            role="switch"
+          />
+          <label class="form-check-label" for="automode">Auto mode</label>
+        </div>
+        <p class="panel-hint">
+          Auto mode computes the static difference once and lists only the
+          locations that changed.
+        </p>
+      </div>
     </div>
   </body>
   <script src="./bootstrap.js"></script>

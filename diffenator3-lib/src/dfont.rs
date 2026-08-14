@@ -1,13 +1,35 @@
 use fontdrasil::coords::{
     ConvertSpace, CoordConverter, DesignCoord, Location, NormalizedCoord, NormalizedLocation,
-    NormalizedSpace, UserCoord,
+    NormalizedSpace, UserCoord, UserLocation,
 };
 use read_fonts::{types::NameId, FontRef, ReadError, TableProvider};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use skrifa::{GlyphId, MetadataProvider};
+use skrifa::{GlyphId, MetadataProvider, Tag};
+use std::str::FromStr;
 use ucd::Codepoint;
 
 use crate::render::shaper::DrawBuffer;
+
+/// Parse a designspace location string like `"wght=700,wdth=100"` into a
+/// [`UserLocation`]. Whitespace and empty segments are ignored; unknown axes
+/// are kept as-is (each font later maps only the axes it has).
+pub fn parse_location(variations: &str) -> Result<UserLocation, String> {
+    let mut location = UserLocation::default();
+    for variation in variations.split(&[',', ' ']) {
+        if variation.is_empty() {
+            continue;
+        }
+        let mut parts = variation.split('=');
+        let axis = parts.next().ok_or("Couldn't parse axis".to_string())?;
+        let tag = Tag::from_str(axis).map_err(|_| format!("Couldn't parse axis tag: {}", axis))?;
+        let value = parts.next().ok_or("Couldn't parse value".to_string())?;
+        let value = value
+            .parse::<f64>()
+            .map_err(|_| "Couldn't parse value".to_string())?;
+        location.insert(tag, UserCoord::new(value));
+    }
+    Ok(location)
+}
 
 fn fontdrasil_axes(font: &FontRef) -> Result<Option<fontdrasil::types::Axes>, ReadError> {
     let per_axis_maps = if let Ok(segments) = font.avar().map(|x| x.axis_segment_maps()) {
@@ -120,6 +142,10 @@ impl DFont {
             .localized_strings(NameId::SUBFAMILY_NAME)
             .english_or_first()
             .map_or_else(|| "Regular".to_string(), |s| s.chars().collect())
+    }
+
+    pub fn glyph_count(&self) -> u16 {
+        self.fontref().maxp().map(|x| x.num_glyphs()).unwrap_or(0)
     }
 
     /// The axes of the font

@@ -16,9 +16,15 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   diffFeatures: () => (/* binding */ diffFeatures),
 /* harmony export */   diffKerns: () => (/* binding */ diffKerns),
 /* harmony export */   diffLanguages: () => (/* binding */ diffLanguages),
+/* harmony export */   diffSignatureSummary: () => (/* binding */ diffSignatureSummary),
 /* harmony export */   diffSignificantTables: () => (/* binding */ diffSignificantTables),
 /* harmony export */   diffTables: () => (/* binding */ diffTables),
+/* harmony export */   locationLabel: () => (/* binding */ locationLabel),
+/* harmony export */   renderGlyphs: () => (/* binding */ renderGlyphs),
+/* harmony export */   renderLocationDiff: () => (/* binding */ renderLocationDiff),
 /* harmony export */   renderTableDiff: () => (/* binding */ renderTableDiff),
+/* harmony export */   renderWords: () => (/* binding */ renderWords),
+/* harmony export */   setVariationStyle: () => (/* binding */ setVariationStyle),
 /* harmony export */   setupAnimation: () => (/* binding */ setupAnimation)
 /* harmony export */ });
 /* harmony import */ var _types__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./types */ "./ts/types.ts");
@@ -435,6 +441,105 @@ function setupAnimation() {
         }
     });
 }
+/**
+ * Human-readable label for a designspace location, e.g. "wght=400 wdth=100".
+ * Returns "Default" when there are no coordinates.
+ */
+function locationLabel(coords) {
+    if (coords && Object.keys(coords).length > 0) {
+        return Object.entries(coords)
+            .map(([axis, value]) => `${axis}=${value}`)
+            .join(" ");
+    }
+    return "Default";
+}
+/**
+ * Set the `font-variation-settings` on the first @font-face rule pair, so the
+ * rendered glyph/word cells reflect the requested axis location.
+ */
+function setVariationStyle(coords) {
+    let rule = document.styleSheets[0].cssRules[2].style;
+    let cssSetting = coords
+        ? Object.entries(coords)
+            .map(([axis, value]) => `"${axis}" ${value}`)
+            .join(", ")
+        : "";
+    rule.setProperty("font-variation-settings", cssSetting);
+}
+/**
+ * Render a list of glyph diffs into `where`. Clears `where` first, so it can
+ * replace a loading placeholder. Shows "No changes" when the list is empty.
+ */
+function renderGlyphs(glyphs, where) {
+    where.empty();
+    if (!glyphs || glyphs.length == 0) {
+        where.append(`<p>No changes to glyphs</p>`);
+        return;
+    }
+    where.append(`<h3 class="border-top pt-2 border-dark-subtle">Modified Glyphs</h3>`);
+    let sorted = [...glyphs].sort((a, b) => new Intl.Collator().compare(a.string, b.string));
+    let place = $('<div class="glyphgrid"/>');
+    for (let glyph of sorted) {
+        addAGlyph(glyph, place);
+    }
+    where.append(place);
+}
+/**
+ * Render word diffs (grouped by script) into `where`. Clears `where` first.
+ * Shows "No changes" when there is nothing to show.
+ */
+function renderWords(words, where) {
+    where.empty();
+    if (!words || Object.keys(words).length == 0) {
+        where.append(`<p>No changes to words</p>`);
+        return;
+    }
+    where.append(`<h3 class="border-top pt-2 border-dark-subtle">Modified Words</h3>`);
+    for (let [script, diffs] of Object.entries(words)) {
+        where.append($(`<h6>${script}</h6>`));
+        let place = $('<div class="wordgrid"/>');
+        for (let diff of diffs) {
+            addAWord(diff, place);
+        }
+        where.append(place);
+    }
+}
+/**
+ * Render the per-location diff (glyphs + words) of a `LocationResult` into
+ * `where`, which is cleared first. Used by both the static report and the
+ * auto-mode view of the dynamic site.
+ */
+function renderLocationDiff(loc, where) {
+    where.empty();
+    // renderGlyphs / renderWords both clear their target, so give each its own
+    // sub-container instead of writing into the same element.
+    let glyphsDiv = $('<div class="glyph-section"/>');
+    let wordsDiv = $('<div class="word-section"/>');
+    where.append(glyphsDiv);
+    where.append(wordsDiv);
+    renderGlyphs(loc.glyphs, glyphsDiv);
+    renderWords(loc.words, wordsDiv);
+}
+/**
+ * Render the human-readable difference signature summary into `where`.
+ * Clears `where` first; renders nothing if no summary was provided.
+ */
+function diffSignatureSummary(summary, where) {
+    where.empty();
+    if (!summary)
+        return;
+    where.append(`<h3 class="border-top pt-2 border-dark-subtle">Difference Summary</h3>`);
+    if (summary.overview) {
+        where.append(`<p class="signature-overview">${summary.overview}</p>`);
+    }
+    if (summary.points && summary.points.length > 0) {
+        let ul = $('<ul class="signature-points"/>');
+        for (let point of summary.points) {
+            ul.append(`<li>${point}</li>`);
+        }
+        where.append(ul);
+    }
+}
 
 
 
@@ -532,46 +637,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _shared__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./shared */ "./ts/shared.ts");
 
 function buildLocation_statichtml(loc) {
-    // Set font styles to appropriate axis locations
-    let rule = document.styleSheets[0].cssRules[2].style;
-    let cssSetting = "";
-    let textLocation = "Default";
-    if (loc.coords) {
-        cssSetting = Object.entries(loc.coords)
-            .map(function ([axis, value]) {
-            return `"${axis}" ${value}`;
-        })
-            .join(", ");
-        textLocation = Object.entries(loc.coords)
-            .map(function ([axis, value]) {
-            return `${axis}=${value}`;
-        })
-            .join(" ");
-        rule.setProperty("font-variation-settings", cssSetting);
-    }
-    $("#main").empty();
-    $("#title").html(`<h2 class="mt-2">${textLocation}</h2>`);
-    if (loc.glyphs) {
-        loc.glyphs.sort((ga, gb) => new Intl.Collator().compare(ga.string, gb.string));
-        $("#main").append("<h3 class='border-top pt-2 border-dark-subtle'>Modified Glyphs</h3>");
-        let glyphs = $("<div>");
-        for (let glyph of loc.glyphs) {
-            (0,_shared__WEBPACK_IMPORTED_MODULE_0__.addAGlyph)(glyph, glyphs);
-        }
-        $("#main").append(glyphs);
-    }
-    if (loc.words) {
-        $("#main").append("<h3 class='border-top pt-2 border-dark-subtle'>Modified Words</h3>");
-        for (let [script, words] of Object.entries(loc.words)) {
-            let scriptTitle = $(`<h6>${script}</h6>`);
-            $("#main").append(scriptTitle);
-            let worddiv = $("<div>");
-            for (let word of words) {
-                (0,_shared__WEBPACK_IMPORTED_MODULE_0__.addAWord)(word, worddiv);
-            }
-            $("#main").append(worddiv);
-        }
-    }
+    (0,_shared__WEBPACK_IMPORTED_MODULE_0__.setVariationStyle)(loc.coords);
+    $("#title").html(`<h2 class="mt-2">${(0,_shared__WEBPACK_IMPORTED_MODULE_0__.locationLabel)(loc.coords)}</h2>`);
+    (0,_shared__WEBPACK_IMPORTED_MODULE_0__.renderLocationDiff)(loc, $("#main"));
     $('[data-toggle="tooltip"]').tooltip();
 }
 $(function () {
@@ -580,9 +648,6 @@ $(function () {
         (0,_shared__WEBPACK_IMPORTED_MODULE_0__.diffSignificantTables)(report);
         (0,_shared__WEBPACK_IMPORTED_MODULE_0__.diffFeatures)(report);
     }
-    if (report["kerns"]) {
-        (0,_shared__WEBPACK_IMPORTED_MODULE_0__.diffKerns)(report);
-    }
     if (report["languages"]) {
         (0,_shared__WEBPACK_IMPORTED_MODULE_0__.diffLanguages)(report["languages"]);
     }
@@ -590,8 +655,7 @@ $(function () {
     $('[data-toggle="tooltip"]').tooltip();
     if (!report["locations"] &&
         !report["cmap_diff"] &&
-        !report["tables"] &&
-        !report["kerns"]) {
+        !report["tables"]) {
         $("#title").html("<h3>No differences found</h3>");
         return;
     }
