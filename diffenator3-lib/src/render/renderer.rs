@@ -1,5 +1,5 @@
 /// Turn some words into images
-use std::{any::Any, time::Duration};
+use std::{any::Any};
 
 use fontdrasil::coords::NormalizedCoord;
 use harfrust::{Direction, Script};
@@ -54,9 +54,9 @@ pub struct Renderer<'a> {
     pub(crate) outlines: CachedOutlineGlyphCollection<'a>,
     cached_shaper: CachedShaper<'a>,
     #[cfg(not(target_family = "wasm"))]
-    pub stage1_time: Duration,
+    pub stage1_time: std::time::Duration,
     #[cfg(not(target_family = "wasm"))]
-    pub render_time: Duration,
+    pub render_time: std::time::Duration,
 }
 
 impl<'a> Renderer<'a> {
@@ -85,9 +85,9 @@ impl<'a> Renderer<'a> {
             // instance,
             outlines,
             #[cfg(not(target_family = "wasm"))]
-            stage1_time: Duration::ZERO,
+            stage1_time: std::time::Duration::ZERO,
             #[cfg(not(target_family = "wasm"))]
-            render_time: Duration::ZERO,
+            render_time: std::time::Duration::ZERO,
         }
     }
 }
