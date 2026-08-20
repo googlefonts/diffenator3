@@ -28,11 +28,13 @@ module.exports = {
   devtool: "source-map",
   experiments: { asyncWebAssembly: true },
   plugins: [
-    new CopyWebpackPlugin([
-      "index.html",
-      "AND-Regular.ttf",
-      "../../templates/style.css",
-    ]),
+    new CopyWebpackPlugin({
+      patterns: [
+          { "from": "index.html" },
+          { "from": "AND-Regular.ttf" },
+          { "from": "../../templates/style.css" },
+      ]
+    }),
   ],
   module: {
     rules: [
