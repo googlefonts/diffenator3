@@ -118,10 +118,7 @@ pub fn run(cli: &Cli) {
             SampleMode::Waterfall => {
                 let sample_text = cover_sample_texts(&shared_codepoints);
                 variables.insert("waterfall_sample".to_string(), json!(sample_text));
-                variables.insert(
-                    "waterfall_sizes".to_string(),
-                    json!(cli.waterfall_sizes),
-                );
+                variables.insert("waterfall_sizes".to_string(), json!(cli.waterfall_sizes));
             }
             SampleMode::Glyphs => {
                 let mut glyphs: Vec<char> = shared_codepoints
