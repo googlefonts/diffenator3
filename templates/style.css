@@ -44,6 +44,17 @@ h4 {
 
 .box-text {}
 
+.cell {
+    display: inline-block;
+    text-align: center;
+    padding: 5pt;
+    margin: 5pt;
+    width: 1.5em;
+    line-height: 1.5em;
+    background-color: #fcfcfc;
+    border: 1px solid #eee;
+}
+
 #ui-nav {
     position: fixed;
     right: 20px;
