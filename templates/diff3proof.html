@@ -98,6 +98,34 @@
               <p> {{ report.cover_sample }} </p>
             </div>
           {% endif %}
+          {% if report.waterfall_sample %}
+          <h4>Waterfall</h4>
+          {% for size in report.waterfall_sizes %}
+            <div class="box">
+              <div class="box-title">{{ size }}px</div>
+              <div class="font-before" style="font-size: {{ size }}px">{{ report.waterfall_sample }}</div>
+            </div>
+          {% endfor %}
+          {% endif %}
+          {% if report.glyphs %}
+          <h4>Glyphset ({{ report.glyphs | length }} glyphs)</h4>
+          <div class="font-before">
+            {% for glyph in report.glyphs %}
+              <div class="cell">{{ glyph }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if report.spacing_kerning %}
+          <h4>Spacing &amp; Kerning</h4>
+          {% for section in report.spacing_kerning %}
+            <div class="box">
+              <div class="box-title">{{ section[0] }}</div>
+              {% for string in section[1] %}
+                <p dir="auto" class="font-before">{{ string }}</p>
+              {% endfor %}
+            </div>
+          {% endfor %}
+          {% endif %}
         </div>
       </div>
     </div>
