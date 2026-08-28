@@ -22,6 +22,12 @@ pub enum SampleMode {
     Context,
     /// Sample text optimizes for codepoint coverage
     Cover,
+    /// A ladder of point sizes, to spot hinting/rasterization jumps
+    Waterfall,
+    /// Every encoded glyph in the font, laid out in a grid
+    Glyphs,
+    /// Curated strings that stress sidebearings and kerning pairs
+    Spacing,
 }
 
 #[derive(Parser, Debug)]
@@ -43,9 +49,17 @@ pub struct Cli {
     #[clap(long = "point-size", default_value = "25")]
     pub point_size: u32,
 
-    /// Choice of sample text
-    #[clap(long = "sample-mode", default_value = "context")]
-    pub sample_mode: SampleMode,
+    /// Choice of sample text. Repeatable: --sample-mode context,waterfall,glyphs,spacing
+    #[clap(long = "sample-mode", value_delimiter = ',', default_value = "context")]
+    pub sample_mode: Vec<SampleMode>,
+
+    /// Point sizes for the waterfall proof, in px
+    #[clap(
+        long = "waterfall-sizes",
+        value_delimiter = ',',
+        default_value = "7,10,11,12,14,16,18,21,27,32"
+    )]
+    pub waterfall_sizes: Vec<u32>,
 
     /// The first font file to compare
     pub font1: PathBuf,
@@ -91,14 +105,36 @@ pub fn run(cli: &Cli) {
 
     let mut variables = serde_json::Map::new();
     variables.insert("axes_instances".to_string(), axes_instances.into());
-    match cli.sample_mode {
-        SampleMode::Context => {
-            let sample_texts = language_sample_texts(&shared_codepoints);
-            variables.insert("language_samples".to_string(), json!(sample_texts));
-        }
-        SampleMode::Cover => {
-            let sample_text = cover_sample_texts(&shared_codepoints);
-            variables.insert("cover_sample".to_string(), json!(sample_text));
+    for mode in &cli.sample_mode {
+        match mode {
+            SampleMode::Context => {
+                let sample_texts = language_sample_texts(&shared_codepoints);
+                variables.insert("language_samples".to_string(), json!(sample_texts));
+            }
+            SampleMode::Cover => {
+                let sample_text = cover_sample_texts(&shared_codepoints);
+                variables.insert("cover_sample".to_string(), json!(sample_text));
+            }
+            SampleMode::Waterfall => {
+                let sample_text = cover_sample_texts(&shared_codepoints);
+                variables.insert("waterfall_sample".to_string(), json!(sample_text));
+                variables.insert(
+                    "waterfall_sizes".to_string(),
+                    json!(cli.waterfall_sizes),
+                );
+            }
+            SampleMode::Glyphs => {
+                let mut glyphs: Vec<char> = shared_codepoints
+                    .iter()
+                    .filter_map(|&cp| char::from_u32(cp))
+                    .collect();
+                glyphs.sort();
+                variables.insert("glyphs".to_string(), json!(glyphs));
+            }
+            SampleMode::Spacing => {
+                let sections = spacing_kerning_strings(&shared_codepoints);
+                variables.insert("spacing_kerning".to_string(), json!(sections));
+            }
         }
     }
 
@@ -112,6 +148,68 @@ pub fn run(cli: &Cli) {
         "diff3proof.html",
         cli.point_size,
     );
+}
+
+// Ported from GF_Latin_Core's "Spacing" and "Kerning" sections in
+// googlefonts/diffenator2's src/diffenator2/data/test_strings.json.
+// These strings specifically stress sidebearing consistency and kerning
+// pairs and, unlike language_sample_texts, don't need a second font to be
+// useful: they work standalone when onboarding a brand-new font.
+//
+// v1 is Latin-only, gated by codepoint coverage the same way
+// language_sample_texts already is. Other scripts' equivalents can be
+// added the same way as follow-up work.
+const LATIN_CORE_SPACING: &[&str] = &[
+    "HHOHHOOHOO HIHOIO",
+    "uuonouonoo ninoioolonlniuo",
+    "010 080 030 020 050 060 070",
+    "3+4=7 5>2 2x²−(8×7)÷9≈1",
+    "L·L l·l",
+];
+
+const LATIN_CORE_KERNING: &[&str] = &[
+    "HHAVAHH OXOWAFAPATAUAYAÞYLYTJLVÆAVAOYO HH",
+    "Ti Tí Tî Tï Tì Tī Vă Tä Tü Tõ Tŭ Tř",
+    "HHTan oTo yTy vAv oVo oWo eYe Ly Ky Ac Ay gj",
+    "nin non nvn ovo oxo ayn fl fi fj ft gj ko rento",
+    "ďá ďu gj ľk włw yły ółr fħ ílïlîl",
+    "H.Y-Y.T,F.P,V:Y„V-T-A*A’A“A’A-AL–L—L-",
+    "n.r.r,y.y,(o)(i)(d)(j)(f)[j]{f}",
+    "¿o,O? w@y «n•n» n*",
+    "080 076 474 973 94 7078 54 24 272 679",
+    "P4T47A .47,9.7-»4",
+    "42°21′29″N 71°03′49″W",
+    "d² m³ 15°C/26°F",
+    "0/0\\0",
+];
+
+/// Filter the bundled spacing/kerning wordlists down to the strings this
+/// font can actually render, grouped by section title (in the same shape
+/// diffenator2's "Proofer" template consumed: an ordered list of
+/// (section title, strings) pairs).
+fn spacing_kerning_strings(codepoints: &HashSet<u32>) -> Vec<(String, Vec<String>)> {
+    let sections: [(&str, &[&str]); 2] = [
+        ("Spacing", LATIN_CORE_SPACING),
+        ("Kerning", LATIN_CORE_KERNING),
+    ];
+    sections
+        .iter()
+        .filter_map(|(title, strings)| {
+            let filtered: Vec<String> = strings
+                .iter()
+                .filter(|s| {
+                    s.chars()
+                        .all(|c| c.is_whitespace() || codepoints.contains(&(c as u32)))
+                })
+                .map(|s| s.to_string())
+                .collect();
+            if filtered.is_empty() {
+                None
+            } else {
+                Some((title.to_string(), filtered))
+            }
+        })
+        .collect()
 }
 
 fn longest_sampletext(st: &SampleTextProto) -> &str {
