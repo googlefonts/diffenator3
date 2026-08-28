@@ -26,12 +26,32 @@ https://googlefonts.github.io/diffenator3
 ## diff3proof
 
 As well as `diffenator3`, there is another utility called `diff3proof` used
-to generate HTML proof files showing the difference between the fonts. This
-can be used in two modes: `--sample-mode context` (the default), which
-shows paragraphs of sample text for each language supported by the font, and
-`--sample-mode cover`, which shows a minimal text to cover all the shared
-codepoints in the font. These can be helpful for manually checking rendering
-differences in different browsers.
+to generate HTML proof files showing the difference between the fonts. It
+also works on a single font with no "before" version to diff against, which
+makes it useful when onboarding a brand-new font.
+
+`--sample-mode` controls what the proof shows, and can be repeated
+(comma-separated) to combine several sections on the same page:
+
+- `context` (the default) shows paragraphs of sample text for each language
+  supported by the font.
+- `cover` shows a minimal text that covers all the shared codepoints in the
+  font.
+- `waterfall` shows the cover text at a ladder of point sizes, to help spot
+  hinting/rasterization jumps. Sizes can be customized with
+  `--waterfall-sizes` (comma-separated, in px; default
+  `7,10,11,12,14,16,18,21,27,32`).
+- `glyphs` shows every encoded glyph in the font, laid out in a grid.
+- `spacing` shows curated strings that stress sidebearing consistency and
+  kerning pairs (Latin only for now).
+
+For example:
+
+diff3proof --sample-mode context,waterfall,glyphs,spacing font.ttf
+
+
+These can be helpful for manually checking rendering differences in
+different browsers.
 
 ## Additional utilities
 
