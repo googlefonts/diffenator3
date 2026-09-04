@@ -5,12 +5,12 @@ use super::{DEFAULT_GLYPHS_FONT_SIZE, DEFAULT_GLYPHS_THRESHOLD};
 pub use crate::structs::{CmapDiff, EncodedGlyph};
 use crate::{
     dfont::DFont,
+    error::DiffenatorError,
     render::{diff_many_words, GlyphDiff},
     staticdiff::DifferenceSignature,
 };
 use fontdrasil::coords::UserLocation;
 pub use harfrust::Direction;
-use read_fonts::ReadError;
 use static_lang_word_lists::WordList;
 
 impl From<char> for EncodedGlyph {
@@ -66,7 +66,7 @@ pub fn modified_encoded_glyphs(
     font_b: &DFont,
     location: Option<&UserLocation>,
     signature: Option<&DifferenceSignature>,
-) -> Result<Vec<GlyphDiff>, ReadError> {
+) -> Result<Vec<GlyphDiff>, DiffenatorError> {
     let cmap_a = &font_a.codepoints;
     let cmap_b = &font_b.codepoints;
     let same_glyphs = cmap_a.intersection(cmap_b);
@@ -83,6 +83,7 @@ pub fn modified_encoded_glyphs(
         signature,
         DEFAULT_GLYPHS_THRESHOLD,
         location,
+        None,
     )?
     .into_iter()
     .map(|x| x.into())

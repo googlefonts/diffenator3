@@ -1,5 +1,7 @@
 const diffWorker = new Worker(new URL("./webworker", import.meta.url));
 
+let bootTime = 0;
+
 import {
   cmapDiff,
   setupAnimation,
@@ -10,6 +12,7 @@ import {
   diffSignificantTables,
   renderGlyphs,
   renderWords,
+  initTooltips,
   setVariationStyle,
   locationLabel,
   diffSignatureSummary,
@@ -89,19 +92,31 @@ class Diffenator {
   autoMode = false;
 
   // Auto mode streams results from `diff_all`: the interesting locations come
-  // back first (seeding the nav), then the glyph diffs, then the word diffs.
-  // Glyphs/words are accumulated per location so the selected view can be
-  // re-rendered as each batch arrives.
+  // back first (seeding the nav), then the glyph diffs. Word diffs are NOT
+  // computed eagerly -- they are far too slow across every location -- so they
+  // are rendered per location on demand (when the user clicks a nav pill) and
+  // cached in `autoWords` once fetched. `autoWordsPending` tracks the
+  // locations whose word fetch is in flight, so we never request one twice.
   private autoLocations: LocationResult[] = [];
   private autoGlyphs = new Map<string, GlyphDiff[]>();
   private autoWords = new Map<string, Record<string, Difference[]>>();
   private autoGlyphsArrived = false;
-  private autoWordsArrived = false;
+  private autoWordsPending = new Set<string>();
   private selectedLocation: string | null = null;
 
   // Non-auto mode is on-demand: glyph/word responses carry a token that is
-  // bumped whenever the requested location changes, so responses for an old
-  // location are discarded.
+  // bumped whenever the requested location changes. Results are cached per
+  // location (keyed by the same `tag=value,...` string the request used), so
+  // re-selecting an instance renders instantly instead of recomputing the
+  // whole scan. Pending sets stop us requesting the same location twice, and
+  // the token->location maps let a response that arrives after the user has
+  // navigated elsewhere still be cached under the location it was for.
+  private glyphCache = new Map<string, GlyphDiff[]>();
+  private wordCache = new Map<string, Record<string, Difference[]>>();
+  private glyphPending = new Set<string>();
+  private wordPending = new Set<string>();
+  private glyphTokenLoc = new Map<number, string>();
+  private wordTokenLoc = new Map<number, string>();
   private diffToken = 0;
   private diffLocation: string | null = null;
   private lastSetupLocation: string | null = null;
@@ -348,11 +363,26 @@ class Diffenator {
   populateLocationNav(items: { label: string; location: string }[]) {
     $("#locationnav").empty();
     for (let item of items) {
+      let locAsRecord = instanceLocationFromString(item.location);
+      let locTable = $(`<table class="location-table"></table>`);
+      let headerRow = $(`<tr class="location-header"></tr>`);
+      let valueRow = $(`<tr class="location-values"></tr>`);
+      locTable.append(headerRow);
+      locTable.append(valueRow);
+      for (let [tag, value] of Object.entries(locAsRecord)) {
+        headerRow.append(`<th>${tag}</th>`);
+        valueRow.append(`<td>${value}</td>`);
+      }
       let pill = $(`<li class="nav-item">
         <a class="nav-link text-secondary" href="#" data-location="${encodeURIComponent(
           item.location,
-        )}">${item.label.replaceAll(",", ",\u200b")}</a>
+        )}"></a>
       </li>`);
+      if (item.label == item.location) {
+        pill.find("a").append(locTable);
+      } else {
+        pill.find("a").append(`<strong>${item.label}</strong>`);
+      }
       $("#locationnav").append(pill);
     }
     $("#locationnav li a").on("click", (e) => {
@@ -422,15 +452,34 @@ class Diffenator {
         <div class="diff-spinner"><div class="spinner-border" role="status"></div></div>`,
       );
     }
-    if (this.autoWordsArrived) {
-      renderWords(this.autoWords.get(loc), wordsDiv);
+    const words = this.autoWords.get(loc);
+    if (words !== undefined) {
+      renderWords(words, wordsDiv);
     } else {
+      // Word diffs are computed on demand for the location being viewed.
       wordsDiv.append(
         `<h3 class="border-top pt-2 border-dark-subtle">Modified Words</h3>
         <div class="diff-spinner"><div class="spinner-border" role="status"></div></div>`,
       );
+      this.ensureAutoWords(loc);
     }
-    $('[data-bs-toggle="tooltip"]').tooltip();
+    initTooltips();
+  }
+
+  /**
+   * Auto mode: request the word diffs for `loc` on demand. Word rendering is
+   * far too slow to do eagerly for every changed location, so it only happens
+   * once per location, when the user views it. No-op if the words for `loc`
+   * have already been fetched or are already being computed.
+   */
+  private ensureAutoWords(loc: string) {
+    if (this.autoWords.has(loc) || this.autoWordsPending.has(loc)) return;
+    this.autoWordsPending.add(loc);
+    console.log(`Posting auto_words for ${loc} at ${Date.now() - bootTime}ms`);
+    diffWorker.postMessage({
+      command: "auto_words",
+      location: loc,
+    } as SentMessage);
   }
 
   /** Re-render the selected auto location when a glyph/word batch arrives. */
@@ -453,38 +502,23 @@ class Diffenator {
     this.autoLocations = [];
     this.autoGlyphs.clear();
     this.autoWords.clear();
+    this.autoWordsPending.clear();
     this.autoGlyphsArrived = false;
-    this.autoWordsArrived = false;
     this.selectedLocation = null;
+    this.resetOnDemandState();
   }
 
-  /**
-   * Once both glyph and word diffs have arrived, prune the location nav down
-   * to the locations that actually rendered differently (the signature can
-   * flag locations whose changes don't manifest in the rendered output).
-   */
-  private filterAutoNav() {
-    if (!this.autoGlyphsArrived || !this.autoWordsArrived) return;
-    let keep = new Set<string>();
-    for (let [loc, glyphs] of this.autoGlyphs) {
-      if (glyphs.length > 0) keep.add(loc);
-    }
-    for (let [loc, words] of this.autoWords) {
-      if (Object.keys(words).length > 0) keep.add(loc);
-    }
-    let filtered = this.autoLocations.filter((l) => keep.has(l.location));
-    if (filtered.length === 0) return;
-    this.autoLocations = filtered;
-    this.populateLocationNav(
-      filtered.map((l) => ({ label: l.location, location: l.location })),
-    );
-    if (this.selectedLocation) {
-      if (filtered.some((l) => l.location === this.selectedLocation)) {
-        this.activateNavPill(this.selectedLocation);
-      } else {
-        this.selectLocation(filtered[0]!.location);
-      }
-    }
+  /** Drop the non-auto per-location caches (e.g. when new fonts are loaded). */
+  private resetOnDemandState() {
+    this.glyphCache.clear();
+    this.wordCache.clear();
+    this.glyphPending.clear();
+    this.wordPending.clear();
+    this.glyphTokenLoc.clear();
+    this.wordTokenLoc.clear();
+    this.diffToken = 0;
+    this.diffLocation = null;
+    this.lastSetupLocation = null;
   }
 
   // ---- On-demand (non-auto) diff ------------------------------------------
@@ -513,6 +547,15 @@ class Diffenator {
       $("#main").append(
         `<div id="mainwords"><div class="diff-spinner"><div class="spinner-border" role="status"></div></div></div>`,
       );
+      // Re-selecting an instance we have already computed: show the cached
+      // result instead of leaving the spinner up while we re-request it.
+      if (this.glyphCache.has(loc)) {
+        renderGlyphs(this.glyphCache.get(loc), $("#mainglyphs"));
+      }
+      if (this.wordCache.has(loc)) {
+        renderWords(this.wordCache.get(loc), $("#mainwords"));
+      }
+      initTooltips();
     }
     return token;
   }
@@ -520,6 +563,12 @@ class Diffenator {
   requestGlyphs() {
     const loc = this.variationLocation();
     const token = this.beginLocation(loc);
+    // Already have this location's glyph diff from an earlier visit, or a
+    // request for it is already in flight -- nothing to post.
+    if (this.glyphCache.has(loc) || this.glyphPending.has(loc)) return;
+    this.glyphPending.add(loc);
+    this.glyphTokenLoc.set(token, loc);
+    console.log(`Posting modified_glyphs at ${Date.now()}`);
     diffWorker.postMessage({
       command: "modified_glyphs",
       beforeFont: this.beforeFont,
@@ -532,6 +581,11 @@ class Diffenator {
   requestWords() {
     const loc = this.variationLocation();
     const token = this.beginLocation(loc);
+    // Already have this location's word diff, or a request is in flight.
+    if (this.wordCache.has(loc) || this.wordPending.has(loc)) return;
+    this.wordPending.add(loc);
+    this.wordTokenLoc.set(token, loc);
+    console.log(`Posting words at ${Date.now()}`);
     diffWorker.postMessage({
       command: "words",
       beforeFont: this.beforeFont,
@@ -550,6 +604,10 @@ class Diffenator {
   // ---- Message handling ---------------------------------------------------
 
   progress_callback(message: ReceivedMessage) {
+    console.log(
+      `Received message ${message.type} at ${Date.now() - bootTime}ms`,
+      message,
+    );
     if ("type" in message && message.type == "ready") {
       $("#bigLoadingModal").hide();
       $("#startModal").show();
@@ -578,20 +636,27 @@ class Diffenator {
         this.autoGlyphs.set(entry.location, entry.glyphs ?? []);
       }
       this.refreshAutoView();
-      if (this.autoWordsArrived) this.filterAutoNav();
-    } else if (message.type == "diff_words") {
-      this.autoWordsArrived = true;
-      for (let entry of message.locations) {
-        this.autoWords.set(entry.location, entry.words ?? {});
+    } else if (message.type == "auto_words") {
+      // On-demand word diffs for the requested location. Ignore results for a
+      // location that is no longer selected (the worker is serial, so this is
+      // only possible if the user navigated away while a request was running).
+      this.autoWordsPending.delete(message.location);
+      this.autoWords.set(message.location, message.words ?? {});
+      if (this.selectedLocation === message.location) {
+        this.refreshAutoView();
       }
-      this.refreshAutoView();
-      if (this.autoGlyphsArrived) this.filterAutoNav();
     } else if (message.type == "tables") {
       diffTables(message);
+      console.log(
+        `Finished painting binary diff at ${Date.now() - bootTime}ms`,
+      );
       diffFeatures(message);
+      console.log(`finished feature diff at ${Date.now() - bootTime}ms`);
       // @ts-ignore
       window["tables"] = message;
       diffSignificantTables(message);
+      // The table diff is done: retire the button that fired it.
+      $("#tablediff").remove();
     } else if (message.type == "kerns") {
       diffKerns(message);
     } else if (message.type == "cmap_diff") {
@@ -599,13 +664,25 @@ class Diffenator {
     } else if (message.type == "languages") {
       diffLanguages(message.languages);
     } else if (message.type == "modified_glyphs") {
-      if (message.token !== this.diffToken) return;
-      renderGlyphs(message.modified_glyphs, $("#mainglyphs"));
-      $('[data-bs-toggle="tooltip"]').tooltip();
+      const loc = this.glyphTokenLoc.get(message.token);
+      if (loc === undefined) return;
+      this.glyphTokenLoc.delete(message.token);
+      this.glyphPending.delete(loc);
+      this.glyphCache.set(loc, message.modified_glyphs);
+      if (loc === this.diffLocation) {
+        renderGlyphs(message.modified_glyphs, $("#mainglyphs"));
+        initTooltips();
+      }
     } else if (message.type == "words") {
-      if (message.token !== this.diffToken) return;
-      renderWords(message.words, $("#mainwords"));
-      $('[data-bs-toggle="tooltip"]').tooltip();
+      const loc = this.wordTokenLoc.get(message.token);
+      if (loc === undefined) return;
+      this.wordTokenLoc.delete(message.token);
+      this.wordPending.delete(loc);
+      this.wordCache.set(loc, message.words);
+      if (loc === this.diffLocation) {
+        renderWords(message.words, $("#mainwords"));
+        initTooltips();
+      }
     } else {
       console.log("Unknown message", message);
     }
@@ -614,7 +691,7 @@ class Diffenator {
   renderCmapDiff(cmap_diff: CmapDiff) {
     $("#cmapdiff").empty();
     cmapDiff(cmap_diff);
-    $('[data-bs-toggle="tooltip"]').tooltip();
+    initTooltips();
   }
 
   letsDoThis() {
@@ -622,21 +699,59 @@ class Diffenator {
     // No full-screen spinner: show the results page immediately with a small
     // loading indicator; the per-section spinners take over as data arrives.
     this.showMainLoading("Loading...");
-    for (let command of [
-      "axes",
-      "tables",
-      "kerns",
-      "cmap_diff",
-      "languages",
-      "auto_default",
-    ]) {
-      console.log("Sending command", command);
+    bootTime = Date.now();
+    // New fonts loaded: anything cached for the previous pair is stale.
+    this.resetOnDemandState();
+    // The binary table diff is slow and rarely what people need first, so it
+    // is *not* run here -- it runs on demand via the "Diff binary tables"
+    // button (see `requestTables`).
+    for (let command of ["axes", "cmap_diff", "auto_default", "languages"]) {
+      console.log(`Sending command ${command} at ${Date.now() - bootTime}ms`);
       diffWorker.postMessage({
         command,
         beforeFont: this.beforeFont!,
         afterFont: this.afterFont!,
       } as SentMessage);
     }
+    this.ensureTablesButton();
+  }
+
+  /**
+   * (Re)create the "Diff binary tables" button. It is removed once a table
+   * diff has been rendered, so it is re-added (and reset) each time new fonts
+   * are loaded. No-op if it is already present and enabled.
+   */
+  private ensureTablesButton() {
+    const existing = $("#tablediff");
+    if (existing.length > 0) {
+      existing.prop("disabled", false);
+      existing.text("Diff binary tables");
+      return;
+    }
+    const button = $(
+      '<button type="button" id="tablediff" class="btn btn-outline-secondary mt-3">Diff binary tables</button>',
+    );
+    if ($("#difftable").length > 0) {
+      $("#difftable").before(button);
+    } else {
+      $("#content-col").append(button);
+    }
+  }
+
+  /** Fire the on-demand binary table diff; the button shows a spinner. */
+  requestTables() {
+    const button = $("#tablediff");
+    if (button.length === 0 || button.prop("disabled")) return;
+    button.prop("disabled", true);
+    button.html(
+      `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Diffing tables...`,
+    );
+    console.log(`Posting tables at ${Date.now() - bootTime}ms`);
+    diffWorker.postMessage({
+      command: "tables",
+      beforeFont: this.beforeFont!,
+      afterFont: this.afterFont!,
+    } as SentMessage);
   }
 }
 
@@ -682,9 +797,11 @@ $(function () {
     diffenator.setAutoMode($(this).is(":checked"));
   });
 
-  setupAnimation();
-
-  $("body").tooltip({
-    selector: '[data-toggle="tooltip"]',
+  // The "Diff binary tables" button is created/removed dynamically, so use a
+  // delegated handler rather than binding to the element directly.
+  $(document).on("click", "#tablediff", function () {
+    diffenator.requestTables();
   });
+
+  setupAnimation();
 });

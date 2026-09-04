@@ -6,6 +6,11 @@
 //! happens: for every glyph the fonts have in common it works out, cheaply, at
 //! which designspace locations the two fonts differ, and records those
 //! locations.
+//!
+//! Unencoded glyphs (which only appear in a shaped buffer through a `GSUB`
+//! substitution) are traced through the fonts' substitution rules by
+//! [`crate::gsubdiff`], so that the ones the fonts produce identically can be
+//! pruned from word testing instead of forcing the exhaustive fallback.
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::BTreeSet;
 
@@ -43,6 +48,11 @@ pub enum MatchMethod {
     /// This is heuristic: the semantic correspondence is not guaranteed, so
     /// these glyphs are also reported in [`DifferenceSignature::uncertain`].
     DefaultOutline,
+    /// Unencoded glyphs matched by tracing `GSUB` substitution rules: the same
+    /// rule (same input and output glyphs under the cmap correspondence) exists
+    /// in both fonts. This is semantic, so the pair is high confidence (it is
+    /// *not* additionally reported as `uncertain`).
+    Gsub,
 }
 
 /// A lightweight, report-friendly description of a glyph in one of the fonts.
@@ -86,9 +96,11 @@ impl GlyphChange {
 /// The result of statically comparing two fonts.
 #[derive(Debug, Clone, Default)]
 pub struct DifferenceSignature {
-    /// Glyphs which differ, keyed by glyph id in font A. Includes both
-    /// high-confidence cmap-matched differences and (heuristic) unencoded
-    /// differences, distinguished by [`GlyphChange::matched_by`].
+    /// Glyphs which differ, keyed by glyph id in font A. Includes the
+    /// high-confidence cmap-matched differences, unencoded differences traced
+    /// through `GSUB` substitution rules ([`MatchMethod::Gsub`]), and the
+    /// (heuristic) default-outline matches, all distinguished by
+    /// [`GlyphChange::matched_by`].
     pub glyph_changes: HashMap<GlyphId, GlyphChange>,
     /// Number of high-confidence (cmap-matched) glyph pairs which were found
     /// identical everywhere.
@@ -97,10 +109,12 @@ pub struct DifferenceSignature {
     pub missing: Vec<GlyphReport>,
     /// Encoded glyphs present in font B but missing from font A's cmap.
     pub new: Vec<GlyphReport>,
-    /// Font A glyphs the analyzer could not confidently reason about: every
-    /// unencoded glyph (only reachable through `GSUB`), plus ambiguous or
-    /// undrawable glyphs. Word selection must fall back to exhaustive testing
-    /// for any word whose shaped buffer contains one of these.
+    /// Font A glyphs the analyzer could not confidently reason about:
+    /// undrawable glyphs, unencoded glyphs whose `GSUB` reachability could
+    /// not be matched between the fonts (see [`crate::gsubdiff`]), and the
+    /// heuristic outline-hash matches. Word selection must fall back to
+    /// exhaustive testing for any word whose shaped buffer contains one of
+    /// these.
     pub uncertain: Vec<GlyphReport>,
     /// Single adjustment (GPOS lookup type 1) positioning differences, keyed
     /// by font A glyph id.
@@ -117,6 +131,10 @@ pub struct DifferenceSignature {
     /// True if either font has contextual GPOS lookups that this analysis does
     /// not model, so positioning pruning must not be trusted.
     pub positioning_unmodelled: bool,
+    /// True if either font has contextual/chain-contextual GSUB lookups that
+    /// the unencoded-glyph trace does not model, so the `uncertain` set is
+    /// conservative in a way that is not fully accounted for.
+    pub gsub_unmodelled: bool,
     /// True when the fonts share no cmap codepoints, so matching is unreliable
     /// and the whole comparison must be treated as uncertain.
     pub mapping_failed: bool,
@@ -133,16 +151,16 @@ impl DifferenceSignature {
             || !self.mark_position_changes.is_empty()
             || !self.cursive_position_changes.is_empty()
             || self.positioning_unmodelled
+            || self.gsub_unmodelled
     }
 
     /// Whether the fonts appear identical at the outline/advance level for
     /// every glyph they can be matched on.
     ///
-    /// Note this is a *partial* statement only: kerning (pair positioning),
-    /// shaping (`GSUB`) and unencoded glyphs are not covered yet, so
-    /// `is_identical()` returning `true` does **not** mean the fonts are
-    /// behaviourally identical. It must not, on its own, be used to skip word
-    /// testing.
+    /// Note this is a *partial* statement only: kerning (pair positioning) and
+    /// shaping (`GSUB`) are not fully covered yet, so `is_identical()`
+    /// returning `true` does **not** mean the fonts are behaviourally
+    /// identical. It must not, on its own, be used to skip word testing.
     pub fn is_identical(&self) -> bool {
         self.glyph_changes.is_empty()
             && self.single_position_changes.is_empty()
@@ -150,6 +168,7 @@ impl DifferenceSignature {
             && self.mark_position_changes.is_empty()
             && self.cursive_position_changes.is_empty()
             && !self.positioning_unmodelled
+            && !self.gsub_unmodelled
             && self.missing.is_empty()
             && self.new.is_empty()
             && !self.mapping_failed
@@ -223,24 +242,22 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
 
     let mut signature = DifferenceSignature::default();
 
-    // Run the GPOS positioning pass, keyed by the cmap glyph matches.
-    let mut match_a2b: HashMap<GlyphId, GlyphId> = HashMap::default();
-    for cp in &shared {
-        match_a2b.insert(cmap_a[cp], cmap_b[cp]);
-    }
-    let gpos = compute_gpos_changes(font_a, font_b, &match_a2b);
-    signature.single_position_changes = gpos.single;
-    signature.pair_position_changes = gpos.pair;
-    signature.mark_position_changes = gpos.mark;
-    signature.cursive_position_changes = gpos.cursive;
-    signature.positioning_unmodelled = gpos.unmodelled;
-
     // Glyph ids already matched through the cmap, per font.
     let mut claimed_a: HashSet<GlyphId> = HashSet::default();
     let mut claimed_b: HashSet<GlyphId> = HashSet::default();
 
+    // The cmap correspondence: each codepoint shared by both fonts maps a font
+    // A glyph to its font B counterpart. This is the high-confidence seed for
+    // every later match (the GSUB trace and the GPOS pass both build on it).
+    let mut match_a2b: HashMap<GlyphId, GlyphId> = HashMap::default();
+    for cp in &shared {
+        match_a2b.insert(cmap_a[cp], cmap_b[cp]);
+    }
+    let match_b2a: HashMap<GlyphId, GlyphId> = match_a2b.iter().map(|(a, b)| (*b, *a)).collect();
+
     // 1. Compare every glyph reachable through a shared codepoint. This is the
     //    high-confidence part of the analysis.
+    log::debug!("Comparing glyphs reachable through shared codepoints");
     for cp in &shared {
         let gid_a = cmap_a[cp];
         let gid_b = cmap_b[cp];
@@ -272,7 +289,34 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
         }
     }
 
-    // 2. Report cmap-level differences (informational; the word rendering
+    // 2. Trace the unencoded glyphs through GSUB. Instead of reflexively
+    //    treating every unencoded glyph as uncertain (they can only appear in
+    //    a shaped buffer via a substitution), the trace matches each font's
+    //    substitution rules against the other font's and, where the same rule
+    //    exists in both, establishes the correspondence of the glyphs it
+    //    produces -- so, e.g., if `aacute` decomposes to `a` + `acutecomb` in
+    //    both fonts and `aacute`/`a` match through the cmap, `acutecomb` is
+    //    matched too even though it is not encoded. The trace returns the
+    //    unencoded glyphs it proved identical (`safe`), those it proved
+    //    changed (`changed`), and the extended correspondence.
+    log::debug!("Tracing unencoded glyphs through GSUB");
+    let gsub = crate::gsubdiff::analyze_gsub(font_a, font_b, &match_a2b, &match_b2a);
+    signature.gsub_unmodelled = gsub.unmodelled;
+
+    // Run the GPOS positioning pass, keyed by the cmap matches plus the
+    // GSUB-traced correspondence, so positioning differences for unencoded
+    // glyphs are also detected (and their words selected) rather than hidden
+    // behind the exhaustive fallback.
+    log::debug!("Computing GPOS differences");
+    match_a2b.extend(gsub.correspondence.iter().map(|(a, b)| (*a, *b)));
+    let gpos = compute_gpos_changes(font_a, font_b, &match_a2b);
+    signature.single_position_changes = gpos.single;
+    signature.pair_position_changes = gpos.pair;
+    signature.mark_position_changes = gpos.mark;
+    signature.cursive_position_changes = gpos.cursive;
+    signature.positioning_unmodelled = gpos.unmodelled;
+
+    // 3. Report cmap-level differences (informational; the word rendering
     //    already filters words to codepoints shared by both fonts).
     for (cp, gid) in &cmap_a {
         if !cmap_b.contains_key(cp) {
@@ -293,11 +337,11 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
         }
     }
 
-    // 3. Best-effort analysis of unencoded glyphs (ligatures, alternates,
-    //    components, ...), matched between the fonts by their default outline.
-    //    The match is heuristic, so the *report* includes any differences we
-    //    find, but every unencoded glyph is also added to `uncertain` to force
-    //    the exhaustive fallback during word selection.
+    // 4. Unencoded glyphs not resolved by the GSUB trace: best-effort analysis
+    //    of the remainder (ligatures, alternates, components, ...) matched
+    //    between the fonts by their default outline. This match is heuristic,
+    //    so differences are reported but the glyphs are still marked
+    //    `uncertain` to force the exhaustive fallback during word selection.
     let outlines_a = fontref_a.outline_glyphs();
     let outlines_b = fontref_b.outline_glyphs();
 
@@ -312,15 +356,46 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
         }
     }
 
+    log::debug!("Classifying unencoded glyphs");
+
     for (gid_a, _) in outlines_a.iter() {
         if claimed_a.contains(&gid_a) {
             continue;
         }
+        let name = name_for(&names_a, gid_a);
         let report = GlyphReport {
             gid: gid_a,
-            name: name_for(&names_a, gid_a),
+            name: name.clone(),
             codepoint: None,
         };
+
+        // Glyphs the GSUB trace matched semantically:
+        if gsub.correspondence.contains_key(&gid_a) {
+            if gsub.safe.contains(&gid_a) {
+                // Proven identical: neither changed nor uncertain.
+                continue;
+            }
+            if let Some((outline_locations, advance_locations)) = gsub.changed.get(&gid_a) {
+                signature.glyph_changes.insert(
+                    gid_a,
+                    GlyphChange {
+                        gid_b: gsub.correspondence[&gid_a],
+                        name,
+                        codepoint: None,
+                        matched_by: MatchMethod::Gsub,
+                        outline_locations: outline_locations.clone(),
+                        advance_locations: advance_locations.clone(),
+                    },
+                );
+                continue;
+            }
+            // Corresponded but undrawable on one or both sides: can't verify
+            // identity, keep it uncertain.
+            signature.uncertain.push(report);
+            continue;
+        }
+
+        // Not traced through GSUB: fall back to the outline-hash heuristic.
         let Some(hash) = outline_hash(&outlines_a, gid_a, &[]) else {
             signature.uncertain.push(report);
             continue;
@@ -337,7 +412,7 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
                     gid_a,
                     GlyphChange {
                         gid_b: *gid_b,
-                        name: name_for(&names_a, gid_a),
+                        name,
                         codepoint: None,
                         matched_by: MatchMethod::DefaultOutline,
                         outline_locations,
@@ -349,13 +424,14 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
         // Either way, the pairing is heuristic: mark it as needing fallback.
         signature.uncertain.push(report);
     }
+    log::debug!("Done computing signature");
 
     signature
 }
 
 /// The result of comparing a single matched pair of glyphs.
 #[derive(Debug, Clone, PartialEq)]
-enum GlyphComparison {
+pub(crate) enum GlyphComparison {
     /// Identical outlines and advances at every tested location.
     Same,
     /// Differs at the given locations.
@@ -371,7 +447,7 @@ enum GlyphComparison {
 ///
 /// The locations tested are the default location plus the union of both
 /// fonts' variation peaks (`gvar` tuple peaks) for the glyph.
-fn compare_glyphs(
+pub(crate) fn compare_glyphs(
     font_a: &DFont,
     font_b: &DFont,
     gid_a: GlyphId,
@@ -455,7 +531,7 @@ fn compare_glyphs(
 /// from the exact same `zeno::Command` stream the renderer produces in its
 /// stage-1 pass, so "same hash" means "same rendering" in the renderer's own
 /// terms.
-fn outline_hash(
+pub(crate) fn outline_hash(
     outlines: &OutlineGlyphCollection,
     gid: GlyphId,
     coords: &[NormalizedCoord],
@@ -547,28 +623,50 @@ mod tests {
     /// A font compared with itself must produce no changes.
     #[test]
     fn self_comparison_is_identical() {
-        let Some(font) = dfont("../../MavenPro-Regular.ttf") else {
+        let Some(font) = dfont("../test-fonts/MavenPro-Regular.ttf") else {
             eprintln!("skipping: test font not present");
             return;
         };
         let sig = compute_signature(&font, &font);
-        assert!(
-            sig.is_identical(),
-            "font should be identical to itself, got {sig:?}"
-        );
+        // No glyph changes, no positioning changes, and every unencoded glyph
+        // the GSUB trace can reach is proven safe (so only unencoded glyphs
+        // with no codepoint remain uncertain).
         assert!(sig.glyph_changes.is_empty());
+        assert!(sig.single_position_changes.is_empty());
+        assert!(sig.pair_position_changes.is_empty());
+        assert!(sig.mark_position_changes.is_empty());
+        assert!(sig.cursive_position_changes.is_empty());
+        assert!(!sig.positioning_unmodelled);
         assert!(sig.uncertain.iter().all(|r| r.codepoint.is_none()));
+        // MavenPro has contextual GSUB lookups which the trace does not model,
+        // so is_identical() is only false because of gsub_unmodelled: the font
+        // is identical at every level the static analysis does model.
+        assert_eq!(
+            sig.is_identical(),
+            !sig.gsub_unmodelled,
+            "self-comparison should be identical at every modelled level, got {sig:?}"
+        );
+        // The GSUB trace must prove most unencoded glyphs safe rather than
+        // dumping them all into `uncertain`: far fewer than the full set of
+        // unencoded glyphs should be left over.
+        let unencoded = font.glyph_count() as usize - font.codepoints.len();
+        assert!(
+            sig.uncertain.len() < unencoded,
+            "expected the GSUB trace to shrink `uncertain` below all {} unencoded glyphs, got {}",
+            unencoded,
+            sig.uncertain.len()
+        );
     }
 
     /// MavenPro-Modified is a hand-modified version of MavenPro-Regular used
     /// as the canonical diffenator test pair: some glyphs should differ.
     #[test]
     fn mavenpro_regular_vs_modified() {
-        let Some(font_a) = dfont("../../MavenPro-Regular.ttf") else {
+        let Some(font_a) = dfont("../test-fonts/MavenPro-Regular.ttf") else {
             eprintln!("skipping: test font not present");
             return;
         };
-        let Some(font_b) = dfont("../../MavenPro-Modified.ttf") else {
+        let Some(font_b) = dfont("../test-fonts/MavenPro-Modified.ttf") else {
             eprintln!("skipping: test font not present");
             return;
         };
@@ -577,10 +675,13 @@ mod tests {
             sig.needs_testing(),
             "the modified MavenPro should differ from the regular one"
         );
-        // All high-confidence changes should be cmap-matched.
+        // High-confidence changes are cmap-matched (both fonts encode the
+        // glyph) or GSUB-traced (unencoded glyphs produced by a substitution
+        // rule that exists in both fonts) -- never the heuristic outline-hash
+        // match.
         assert!(sig
             .glyph_changes
             .values()
-            .all(|change| matches!(change.matched_by, MatchMethod::Cmap(_))));
+            .all(|change| matches!(change.matched_by, MatchMethod::Cmap(_) | MatchMethod::Gsub)));
     }
 }

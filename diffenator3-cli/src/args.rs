@@ -48,6 +48,13 @@ pub struct Cli {
     #[clap(long = "location", help_heading = Some("Tests to run"))]
     pub location: Option<String>,
 
+    /// Skip the static difference signature and render every glyph/word at the
+    /// requested location. Mirrors the web app's on-demand per-location diff
+    /// (diff_words), which computes no signature; useful for reproducing
+    /// per-location timing. Requires --location.
+    #[clap(long = "no-signature", requires = "location", help_heading = Some("Tests to run"))]
+    pub no_signature: bool,
+
     /// Show diffs as JSON
     #[clap(long = "json", help_heading = Some("Report format"))]
     pub json: bool,

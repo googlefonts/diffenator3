@@ -10,6 +10,7 @@ pub mod renderer;
 pub mod shaper;
 pub mod utils;
 pub mod wordlists;
+use crate::error::DiffenatorError;
 pub use crate::structs::{Difference, GlyphDiff};
 use crate::{
     dfont::DFont,
@@ -20,7 +21,6 @@ use crate::{
 use colorrenderer::ColorRenderer;
 use fontdrasil::coords::{NormalizedCoord, NormalizedLocation, UserLocation};
 use harfrust::{Direction, Script};
-use read_fonts::ReadError;
 use renderer::{AnyRenderer, Renderer};
 use rustc_hash::FxHashSet;
 use skrifa::{raw::TableProvider, GlyphId};
@@ -66,6 +66,7 @@ pub fn test_font_words(
     signature: Option<&DifferenceSignature>,
     custom_inputs: &[WordList],
     location: Option<&UserLocation>,
+    max_items: Option<usize>,
 ) -> BTreeMap<String, Vec<Difference>> {
     let mut map: BTreeMap<String, Vec<Difference>> = BTreeMap::new();
     let mut jobs: Vec<&WordList> = vec![];
@@ -90,6 +91,7 @@ pub fn test_font_words(
             signature,
             DEFAULT_WORDS_THRESHOLD,
             location,
+            max_items,
         )
         .unwrap_or_default();
         if !results.is_empty() {
@@ -152,7 +154,8 @@ pub(crate) fn diff_many_words(
     signature: Option<&DifferenceSignature>,
     threshold: usize,
     base_location: Option<&UserLocation>,
-) -> Result<Vec<Difference>, ReadError> {
+    max_items: Option<usize>,
+) -> Result<Vec<Difference>, DiffenatorError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
@@ -169,8 +172,12 @@ pub(crate) fn diff_many_words(
 
     let tl_a: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
     let tl_b: ThreadLocal<RefCell<Box<dyn AnyRenderer + Send + '_>>> = ThreadLocal::new();
-    let coords_a = base_location.map(|loc| font_a.location_to_coords(loc));
-    let coords_b = base_location.map(|loc| font_b.location_to_coords(loc));
+    let coords_a = base_location
+        .map(|loc| font_a.location_to_coords(loc))
+        .transpose()?;
+    let coords_b = base_location
+        .map(|loc| font_b.location_to_coords(loc))
+        .transpose()?;
 
     let differences: Vec<Difference> = wordlist
         .par_iter()
@@ -227,18 +234,27 @@ pub(crate) fn diff_many_words(
             // Locations to test: the selected locations (default + the
             // designspace points where something changed), or -- when the
             // fallback is exhaustive -- every variation peak of either font.
-            // With no signature, fall back to every variation peak.
-            let locations: Vec<NormalizedLocation> = match &selection {
-                Some(sel) if sel.exhaustive => {
-                    let mut locs = font_a.variations_for_buffer(&buffer_a);
-                    locs.extend(font_b.variations_for_buffer(&buffer_b));
-                    locs.into_iter().collect()
-                }
-                Some(sel) => sel.locations.iter().cloned().collect(),
-                None => {
-                    let mut locs = font_a.variations_for_buffer(&buffer_a);
-                    locs.extend(font_b.variations_for_buffer(&buffer_b));
-                    locs.into_iter().collect()
+            // With no signature, fall back to every variation peak. When the
+            // caller passed an explicit `base_location`, only that single
+            // location is rendered (we return right after the default render
+            // below), so don't build the set at all -- even a selected word's
+            // location list (and, for the exhaustive fallback, the per-glyph
+            // peak union) would be thrown away unused.
+            let locations: Vec<NormalizedLocation> = if base_location.is_some() {
+                Vec::new()
+            } else {
+                match &selection {
+                    Some(sel) if sel.exhaustive => {
+                        let mut locs = font_a.variations_for_buffer(&buffer_a);
+                        locs.extend(font_b.variations_for_buffer(&buffer_b));
+                        locs.into_iter().collect()
+                    }
+                    Some(sel) => sel.locations.iter().cloned().collect(),
+                    None => {
+                        let mut locs = font_a.variations_for_buffer(&buffer_a);
+                        locs.extend(font_b.variations_for_buffer(&buffer_b));
+                        locs.into_iter().collect()
+                    }
                 }
             };
 
@@ -294,6 +310,7 @@ pub(crate) fn diff_many_words(
 
             results
         })
+        .take_any(max_items.unwrap_or(usize::MAX))
         .collect();
 
     let mut diffs = differences;
@@ -313,7 +330,8 @@ pub(crate) fn diff_many_words(
     signature: Option<&DifferenceSignature>,
     threshold: usize,
     base_location: Option<&UserLocation>,
-) -> Result<Vec<Difference>, ReadError> {
+    max_items: Option<usize>,
+) -> Result<Vec<Difference>, DiffenatorError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
     let use_color = font_has_colr(font_a) || font_has_colr(font_b);
@@ -333,8 +351,12 @@ pub(crate) fn diff_many_words(
 
     let mut renderer_a = make_renderer(font_a, font_size, direction, script, use_color);
     let mut renderer_b = make_renderer(font_b, font_size, direction, script, use_color);
-    let coords_a = base_location.map(|loc| font_a.location_to_coords(loc));
-    let coords_b = base_location.map(|loc| font_b.location_to_coords(loc));
+    let coords_a = base_location
+        .map(|loc| font_a.location_to_coords(loc))
+        .transpose()?;
+    let coords_b = base_location
+        .map(|loc| font_b.location_to_coords(loc))
+        .transpose()?;
 
     // No timings in wasm!
 
@@ -348,6 +370,11 @@ pub(crate) fn diff_many_words(
     for word in wordlist.iter() {
         if !word_is_encoded(font_a, font_b, word) {
             continue;
+        }
+        if let Some(limit) = max_items {
+            if differences.len() >= limit {
+                break;
+            }
         }
         // Shape at the default location to discover the buffer, then ask the
         // static analysis whether this word needs behavioural testing at all
@@ -367,39 +394,51 @@ pub(crate) fn diff_many_words(
             }
             _ => None,
         };
-        let buffer_b = renderer_b.shape(word, coords_b.as_ref());
-
-        // Locations to test: the selected locations (default + the designspace
-        // points where something changed), or -- when the fallback is
-        // exhaustive -- every variation peak of either font. Computed before
-        // the default render below moves the buffers. With no signature, fall
-        // back to every variation peak.
-        let locations: Vec<NormalizedLocation> = match &selection {
-            Some(sel) if sel.exhaustive => {
-                let mut locs = font_a.variations_for_buffer(&buffer_a);
-                locs.extend(font_b.variations_for_buffer(&buffer_b));
-                locs.into_iter().collect()
-            }
-            Some(sel) => sel.locations.iter().cloned().collect(),
-            None => {
-                let mut locs = font_a.variations_for_buffer(&buffer_a);
-                locs.extend(font_b.variations_for_buffer(&buffer_b));
-                locs.into_iter().collect()
-            }
-        };
-
         // Deduplicate once per word, mirroring the parallel path: if every
         // glyph in A's default buffer was already rendered by an earlier
-        // word, skip this word entirely. Deliberately NOT applied per
-        // variation render -- PositionedGlyph carries no location, so a glyph
-        // whose outline changes only at a non-default location (e.g. wght=700)
-        // would be deduped away and its variation diff missed.
+        // word, skip this word entirely. This only needs `buffer_a`, so it is
+        // done *before* shaping B or building the location set below --
+        // otherwise duplicate words (common on large wordlists) would waste a
+        // shape and a potentially-exhaustive location-set build. Deliberately
+        // NOT applied per variation render -- PositionedGlyph carries no
+        // location, so a glyph whose outline changes only at a non-default
+        // location (e.g. wght=700) would be deduped away and its variation
+        // diff missed.
         if buffer_a.iter().all(|glyph| seen_glyphs.contains(glyph)) {
             continue;
         }
         for glyph in buffer_a.iter() {
             seen_glyphs.insert(*glyph);
         }
+
+        let buffer_b = renderer_b.shape(word, coords_b.as_ref());
+
+        // Locations to test: the selected locations (default + the designspace
+        // points where something changed), or -- when the fallback is
+        // exhaustive -- every variation peak of either font. Computed before
+        // the default render below moves the buffers. When `base_location` is
+        // set, only that single location is rendered (we `continue` right
+        // after the default render), so don't build the set at all -- even a
+        // selected word's location list (and, for the exhaustive fallback, the
+        // per-glyph peak union) would be thrown away unused. With no signature
+        // fall back to every variation peak.
+        let locations: Vec<NormalizedLocation> = if base_location.is_some() {
+            Vec::new()
+        } else {
+            match &selection {
+                Some(sel) if sel.exhaustive => {
+                    let mut locs = font_a.variations_for_buffer(&buffer_a);
+                    locs.extend(font_b.variations_for_buffer(&buffer_b));
+                    locs.into_iter().collect()
+                }
+                Some(sel) => sel.locations.iter().cloned().collect(),
+                None => {
+                    let mut locs = font_a.variations_for_buffer(&buffer_a);
+                    locs.extend(font_b.variations_for_buffer(&buffer_b));
+                    locs.into_iter().collect()
+                }
+            }
+        };
 
         if let Some(diff) = render_word(
             threshold,
@@ -550,7 +589,7 @@ mod tests {
         // Threshold 0: any differing pixel counts, so the assertions are
         // purely about which words are reported (and where).
         let signature = compute_signature(&font_a, &font_b);
-        let diffs = diff_many_words(&font_a, &font_b, 16.0, &wl, Some(&signature), 0, None)
+        let diffs = diff_many_words(&font_a, &font_b, 16.0, &wl, Some(&signature), 0, None, None)
             .expect("diff_many_words failed");
 
         let reported: Vec<&str> = diffs.iter().map(|d| d.word.as_str()).collect();
@@ -587,5 +626,52 @@ mod tests {
         // default shaping), so they are correctly *not* reported as pixel
         // diffs. The selection is conservative (renders them) and sound (no
         // false positives).
+    }
+
+    /// GSF-old/new differ only in variable GPOS pair kerning of A/V. The pair
+    /// is flagged by the static analysis at non-default locations (it is
+    /// identical at the default location), and the shaper must *apply* the
+    /// variation coordinates so the rendered difference shows up as a word
+    /// diff. This is a regression test: an old harfrust silently shaped at the
+    /// default location regardless of the requested coords, so no word diff
+    /// was ever reported.
+    #[test]
+    fn gsf_av_kern_change_is_reported_at_flagged_locations() {
+        let Some(font_a) = dfont("../test-fonts/GSF-old-small.ttf") else {
+            eprintln!("skipping: test font not present");
+            return;
+        };
+        let Some(font_b) = dfont("../test-fonts/GSF-new-small.ttf") else {
+            eprintln!("skipping: test font not present");
+            return;
+        };
+        let wl = WordList::define("kern", ["AV"].iter().cloned());
+        let signature = compute_signature(&font_a, &font_b);
+        // Sanity: the pair change exists but not at the default location.
+        let av_changes = signature
+            .pair_position_changes
+            .get(&(GlyphId::new(1), GlyphId::new(2)));
+        assert!(
+            av_changes.is_some(),
+            "A/V should be flagged as a changed pair"
+        );
+        let av_locations = av_changes.unwrap();
+        assert!(!av_locations.contains(&NormalizedLocation::default()));
+        assert!(!av_locations.is_empty());
+
+        let diffs = diff_many_words(&font_a, &font_b, 16.0, &wl, Some(&signature), 0, None, None)
+            .expect("diff_many_words failed");
+        assert!(
+            diffs.iter().any(|d| d.word == "AV"),
+            "expected AV to be reported as a word diff, got {diffs:#?}"
+        );
+        // The kern difference is at the wght=1 / wide / slanted corners; make
+        // sure at least one reported AV diff is at such a location.
+        assert!(
+            diffs.iter().any(|d| {
+                d.word == "AV" && d.location.contains("wght=1") && d.location.contains("wdth=151")
+            }),
+            "expected an AV diff at a wght=1, wdth=151 location, got {diffs:#?}"
+        );
     }
 }

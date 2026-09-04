@@ -449,7 +449,9 @@ fn build_font_effects(font: &DFont) -> FontEffects {
                             );
                         }
                     }
-                    PositionSubtables::Contextual(_) | PositionSubtables::ChainContextual(_) => {
+                    PositionSubtables::Contextual(_)
+                    | PositionSubtables::ChainContextual(_)
+                    | PositionSubtables::EmptyExtension => {
                         unmodelled = true;
                     }
                 }

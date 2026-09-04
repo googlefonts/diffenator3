@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
 use fontdrasil::coords::NormalizedCoord;
-use harfrust::{ShapePlan, ShaperData, ShaperInstance, UnicodeBuffer};
+use harfrust::{ShapeOptions, ShapePlan, ShaperData, ShaperInstance, UnicodeBuffer};
 use read_fonts::TableProvider;
 use skrifa::GlyphId;
 
@@ -96,6 +96,8 @@ impl<'a> CachedShaper<'a> {
             .instance(instance.as_ref())
             .build();
 
+        let mut options = ShapeOptions::default().features(&[]);
+
         let output = if let Some(plan) = &self.plan {
             // If we have a shaping plan, we can use it to shape the string
             if let Some(script) = plan.script() {
@@ -105,11 +107,12 @@ impl<'a> CachedShaper<'a> {
             if let Some(lang) = plan.language() {
                 buffer.set_language(lang.clone());
             }
-            shaper.shape_with_plan(plan, buffer, &[])
+            options = options.plan(Some(plan));
+            shaper.shape(buffer, options)
         } else {
             // Otherwise, we guess segment properties
             buffer.guess_segment_properties();
-            shaper.shape(buffer, &[])
+            shaper.shape(buffer, options)
         };
         let upem = self.font.head().unwrap().units_per_em();
         let factor = self.scale / upem as f32;

@@ -1,12 +1,12 @@
 use diffenator3_lib::{
     dfont::{parse_location, shared_axes, DFont},
     render::{encodedglyphs, encodedglyphs::CmapDiff, test_font_words},
-    staticdiff::compute_signature,
-    structs::{Difference, GlyphDiff},
+    staticdiff::{compute_signature, DifferenceSignature},
+    structs::GlyphDiff,
     summary::summarize,
     WordList,
 };
-use fontdrasil::coords::NormalizedLocation;
+use fontdrasil::coords::{NormalizedLocation, UserLocation};
 use serde_json::json;
 use ttj::{font_to_json as underlying_font_to_json, kern_diff, table_diff};
 use wasm_bindgen::JsValue;
@@ -14,10 +14,26 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, HashMap},
     panic,
 };
 use web_sys::console;
+
+/// State persisted by the most recent `diff_all`, so a later on-demand word
+/// request can reuse the computed static difference signature (and the fonts)
+/// instead of recomputing them. Word diffs are expensive, so auto mode only
+/// renders them for a single location when the user asks.
+struct AutoDiffState {
+    font_a: DFont,
+    font_b: DFont,
+    signature: DifferenceSignature,
+    custom_wordlists: Vec<WordList>,
+}
+
+thread_local! {
+    static AUTO_STATE: RefCell<Option<AutoDiffState>> = const { RefCell::new(None) };
+}
 
 use shaperglot::{Checker, Languages, SupportLevel};
 
@@ -160,7 +176,7 @@ pub fn diff_words(
     // location.
     let location = parse_location_opt(location);
     let val = json!({
-        "words": test_font_words(&f_a, &f_b, None, &custom_word_diff, location.as_ref())
+        "words": test_font_words(&f_a, &f_b, None, &custom_word_diff, location.as_ref(), Some(1000))
     });
     f.call1(
         &JsValue::NULL,
@@ -179,10 +195,10 @@ fn parse_location_opt(location: &str) -> Option<fontdrasil::coords::UserLocation
 }
 
 /// Auto mode: compute the static difference signature once, then render the
-/// glyph/word diffs across every location the signature says has changed, and
-/// return a per-location report. This lists only the locations with actual
-/// changes (instead of the font's static instances), which may include
-/// non-instance locations where differences occur.
+/// glyph diffs across every location the signature says has changed, and
+/// return a per-location report. Word diffs are intentionally *not* computed
+/// here (that is prohibitively slow across many locations); they are rendered
+/// per-location on demand via [`auto_words`] when the user clicks a location.
 #[wasm_bindgen]
 pub fn diff_all(font_a: &[u8], font_b: &[u8], custom_words: Vec<String>, f: &js_sys::Function) {
     let f_a = DFont::new(font_a);
@@ -197,8 +213,8 @@ pub fn diff_all(font_a: &[u8], font_b: &[u8], custom_words: Vec<String>, f: &js_
 
     // Push a progressive payload to the JS callback: the interesting locations
     // first (so the location nav can be built immediately), then the glyph
-    // diffs, then the word diffs -- each as soon as it is ready, so the page
-    // can render incrementally instead of waiting for the whole auto diff.
+    // diffs -- each as soon as it is ready, so the page can render
+    // incrementally instead of waiting for the whole auto diff.
     let emit = |payload: &serde_json::Value| {
         let _ = f.call1(
             &JsValue::NULL,
@@ -272,34 +288,60 @@ pub fn diff_all(font_a: &[u8], font_b: &[u8], custom_words: Vec<String>, f: &js_
         }).collect::<Vec<_>>(),
     }));
 
-    // Render word diffs and send them back grouped by location.
-    let words = test_font_words(&f_a, &f_b, Some(&signature), &custom_word_diff, None);
-    console::log_1(&format!("We've found {} modified wordlists", words.len()).into());
-    let mut words_by_loc: HashMap<String, BTreeMap<String, Vec<Difference>>> = HashMap::new();
-    for (wordlist_name, diffs) in words {
-        for diff in diffs {
-            words_by_loc
-                .entry(diff.location.clone())
-                .or_default()
-                .entry(wordlist_name.clone())
-                .or_default()
-                .push(diff);
-        }
+    // Word diffs are *not* computed eagerly: rendering them across every
+    // changed location is far too slow for large fonts. Instead the fonts,
+    // signature and wordlists are stashed here so a later `auto_words` request
+    // (when the user clicks on a location) can render just that one location.
+    AUTO_STATE.with(|cell| {
+        *cell.borrow_mut() = Some(AutoDiffState {
+            font_a: f_a,
+            font_b: f_b,
+            signature,
+            custom_wordlists: custom_word_diff,
+        });
+    });
+}
+
+/// The user-space string for a location as stored by `diff_all`, turned back
+/// into a `UserLocation`. The default location is represented by the literal
+/// string "default location" (or empty); it must map to an *explicit* default
+/// `UserLocation` so `diff_many_words` renders one location rather than
+/// falling through to every variation peak.
+fn parse_auto_location(location: &str) -> Option<UserLocation> {
+    if location.is_empty() || location == "default location" {
+        Some(UserLocation::default())
+    } else {
+        parse_location(location).ok()
     }
-    emit(&json!({
-        "kind": "words",
-        "locations": locations.iter().filter_map(|(loc_str, _)| {
-            let words = words_by_loc.remove(loc_str).unwrap_or_default();
-            if words.is_empty() {
-                return None;
-            }
-            Some(json!({
-                "location": loc_str,
-                "coords": parse_coords(loc_str),
-                "words": words,
-            }))
-        }).collect::<Vec<_>>(),
-    }));
+}
+
+/// On-demand word diffs for a single location, using the fonts and static
+/// difference signature stashed by the most recent `diff_all` call.
+///
+/// This is what auto mode calls when the user clicks on a location in the nav:
+/// it renders only the words that intersect the signature, at that one
+/// location, rather than the (prohibitively slow) whole-font word sweep.
+#[wasm_bindgen]
+pub fn auto_words(location: &str, f: &js_sys::Function) {
+    let user_location = parse_auto_location(location);
+    let words = AUTO_STATE.with(|cell| {
+        let mut guard = cell.borrow_mut();
+        let Some(state) = guard.as_mut() else {
+            return BTreeMap::new();
+        };
+        test_font_words(
+            &state.font_a,
+            &state.font_b,
+            Some(&state.signature),
+            &state.custom_wordlists,
+            user_location.as_ref(),
+            Some(1000),
+        )
+    });
+    let val = json!({ "words": words });
+    let payload = serde_json::to_string(&val).unwrap_or_else(|_| "{\"words\":{}}".to_string());
+    console::log_1(&format!("Computed words for location '{}'", location).into());
+    let _ = f.call1(&JsValue::NULL, &JsValue::from_str(&payload));
 }
 
 /// Parse a location string like `"wght=700,wdth=100"` into a coords map.
@@ -321,11 +363,11 @@ pub fn use_auto_by_default(font_a: &[u8], font_b: &[u8], f: &js_sys::Function) {
     let f_a = DFont::new(font_a);
     let f_b = DFont::new(font_b);
     // Let's think about how hard it is going to be to compute the static
-    // difference. This is a function of font axes x number of glyphs.
+    // difference. This is a function of number of masters x number of glyphs.
     // Picking a number out of the air, if that is more than 10,000 for either font,
     // we won't use auto, and instead will require the user to pick a location.
-    let complexity_a = f_a.glyph_count() as usize * f_a.axis_info().len().min(1);
-    let complexity_b = f_b.glyph_count() as usize * f_b.axis_info().len().min(1);
+    let complexity_a = f_a.glyph_count() as usize * f_a.masters().map(|m| m.len()).unwrap_or(1);
+    let complexity_b = f_b.glyph_count() as usize * f_b.masters().map(|m| m.len()).unwrap_or(1);
     if complexity_a > 10_000 || complexity_b > 10_000 {
         f.call1(&JsValue::NULL, &JsValue::from_bool(false)).unwrap();
     } else {

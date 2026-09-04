@@ -89,17 +89,86 @@ function addAGlyph(
     `);
 }
 
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Initialise Bootstrap tooltips within `scope` (default: the whole document).
+ *
+ * The web app runs Bootstrap 5, whose bundle ships no jQuery plugin methods,
+ * so the old `$(...).tooltip()` calls (Bootstrap 4 API) silently throw and no
+ * tooltip ever appears. This helper drives whichever Bootstrap is actually
+ * loaded:
+ *  - Bootstrap 5: `window.bootstrap.Tooltip` for elements flagged with
+ *    `data-bs-toggle="tooltip"`. Tooltip HTML can contain raw `<pre>` buffers,
+ *    so sanitisation is disabled and HTML enabled.
+ *  - Bootstrap 4 fallback: the jQuery `.tooltip()` plugin for elements using
+ *    `data-toggle="tooltip"` (the static report pages still load Bootstrap 4).
+ * Elements are only initialised once.
+ */
+export function initTooltips(scope?: JQuery | ParentNode | null) {
+  const isJquery = scope != null && typeof (scope as any).jquery === "string";
+  const node: ParentNode | null = isJquery
+    ? ((scope as JQuery).get(0) ?? null)
+    : ((scope as ParentNode | null) ?? document);
+  if (!node) return;
+
+  const bootstrapTooltip = (window as any).bootstrap?.Tooltip;
+  if (typeof bootstrapTooltip === "function") {
+    const targets =
+      node === document
+        ? document.querySelectorAll('[data-bs-toggle="tooltip"]')
+        : node.querySelectorAll('[data-bs-toggle="tooltip"]');
+    targets.forEach((el: Element) => {
+      // Bootstrap 5 stores the original title here once a tooltip is created,
+      // so we use it to avoid re-initialising an element on later renders.
+      if (!el.hasAttribute("data-bs-original-title")) {
+        new bootstrapTooltip(el, { html: true, sanitize: false });
+      }
+    });
+    return;
+  }
+
+  // Bootstrap 4 (jQuery plugin) fallback for the static report pages.
+  const jq = (window as any).jQuery;
+  if (jq && typeof jq.fn?.tooltip === "function") {
+    jq(node)
+      .find('[data-toggle="tooltip"]')
+      .filter(function (this: HTMLElement) {
+        return !this.hasAttribute("data-original-title");
+      })
+      .tooltip();
+  }
+}
+
 function addAWord(diff: Difference, where: JQuery<HTMLElement>) {
   if (!diff.buffer_b) {
     diff.buffer_b = diff.buffer_a;
   }
-  where.append(`
-		<div class="cell-word font-before">
-		<span data-toggle="tooltip" data-html="true" data-title="Before: <pre>${diff.buffer_a}</pre>After: <pre>${diff.buffer_b}</pre><br>difference: ${diff.differing_pixels} pixels">
-		${diff.word}
-		</span>
-		</div>
-	`);
+  // The before/after shaped buffers and the pixel delta, shown on hover. The
+  // buffer strings can contain characters that would break an HTML attribute,
+  // so they are HTML-escaped before being embedded in the `title`.
+  const title =
+    "Before:<pre>" +
+    escapeHtml(diff.buffer_a) +
+    "</pre>After:<pre>" +
+    escapeHtml(diff.buffer_b) +
+    "</pre>" +
+    `difference: ${diff.differing_pixels} pixels`;
+  const word = $("<span></span>")
+    .text(diff.word)
+    .attr("data-bs-toggle", "tooltip") // Bootstrap 5
+    .attr("data-toggle", "tooltip") // Bootstrap 4 (static report pages)
+    .attr("data-bs-html", "true")
+    .attr("data-html", "true")
+    .attr("title", title);
+  where.append($(`<div class="cell-word font-before"></div>`).append(word));
 }
 
 function diffTables(report: Report) {

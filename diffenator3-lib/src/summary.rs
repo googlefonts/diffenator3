@@ -35,6 +35,9 @@ pub struct SignatureSummary {
     pub cursive_adjustments: usize,
     /// Whether either font has contextual GPOS that isn't modelled.
     pub positioning_unmodelled: bool,
+    /// Whether either font has contextual GSUB that isn't modelled by the
+    /// unencoded-glyph trace.
+    pub gsub_unmodelled: bool,
     /// Whether the fonts share no cmap codepoints, making matching unreliable.
     pub mapping_failed: bool,
     /// Human-readable designspace locations where changes were recorded.
@@ -194,6 +197,12 @@ pub fn summarize(signature: &DifferenceSignature, font_a: &DFont) -> SignatureSu
                 .to_string(),
         );
     }
+    if signature.gsub_unmodelled {
+        points.push(
+            "Both fonts contain contextual GSUB lookups, so unencoded glyphs reached through them could not be traced."
+                .to_string(),
+        );
+    }
     if signature.mapping_failed {
         points.push(
             "The fonts share no common codepoints, so the comparison is unreliable.".to_string(),
@@ -238,6 +247,7 @@ pub fn summarize(signature: &DifferenceSignature, font_a: &DFont) -> SignatureSu
         mark_adjustments: signature.mark_position_changes.len(),
         cursive_adjustments: signature.cursive_position_changes.len(),
         positioning_unmodelled: signature.positioning_unmodelled,
+        gsub_unmodelled: signature.gsub_unmodelled,
         mapping_failed: signature.mapping_failed,
         changed_locations: locations,
         overview,
@@ -290,11 +300,11 @@ mod tests {
 
     #[test]
     fn mavenpro_summary_is_populated() {
-        let Some(font_a) = dfont("../../MavenPro-Regular.ttf") else {
+        let Some(font_a) = dfont("../test-fonts/MavenPro-Regular.ttf") else {
             eprintln!("skipping: test font not present");
             return;
         };
-        let Some(font_b) = dfont("../../MavenPro-Modified.ttf") else {
+        let Some(font_b) = dfont("../test-fonts/MavenPro-Modified.ttf") else {
             eprintln!("skipping: test font not present");
             return;
         };
@@ -318,7 +328,7 @@ mod tests {
 
     #[test]
     fn self_comparison_summary_is_empty() {
-        let Some(font) = dfont("../../MavenPro-Regular.ttf") else {
+        let Some(font) = dfont("../test-fonts/MavenPro-Regular.ttf") else {
             eprintln!("skipping: test font not present");
             return;
         };

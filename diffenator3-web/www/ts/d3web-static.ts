@@ -2,6 +2,7 @@ import type { LocationResult, Report } from "./types";
 import {
   renderTableDiff,
   renderLocationDiff,
+  initTooltips,
   setVariationStyle,
   locationLabel,
   cmapDiff,
@@ -18,7 +19,7 @@ function buildLocation_statichtml(loc: LocationResult) {
   setVariationStyle(loc.coords);
   $("#title").html(`<h2 class="mt-2">${locationLabel(loc.coords)}</h2>`);
   renderLocationDiff(loc, $("#main"));
-  $('[data-toggle="tooltip"]').tooltip();
+  initTooltips();
 }
 
 $(function () {
@@ -31,7 +32,7 @@ $(function () {
     diffLanguages(report["languages"]);
   }
   cmapDiff(report.cmap_diff);
-  $('[data-toggle="tooltip"]').tooltip();
+  initTooltips();
   if (!report["locations"] && !report["cmap_diff"] && !report["tables"]) {
     $("#title").html("<h3>No differences found</h3>");
     return;

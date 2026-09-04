@@ -33,7 +33,7 @@ fn fontdrasil_axes(font: &FontRef) -> Result<Option<fontdrasil::types::Axes>, Re
                 let mut fd_axis = fontdrasil::types::Axis {
                     converter: CoordConverter::default_normalization(min, default, max),
                     hidden: axis.is_hidden(),
-                    tag: axis.tag(),
+                    tag: fontdrasil::types::Tag::new(&axis.tag().into_bytes()),
                     name: axis.tag().to_string(),
                     min,
                     default,
@@ -64,6 +64,10 @@ fn fontdrasil_axes(font: &FontRef) -> Result<Option<fontdrasil::types::Axes>, Re
                         .position(|(_, to)| to.to_f64() == 0.0)
                         .unwrap_or(0);
                     fd_axis.converter = CoordConverter::new(desired_mapping, default_idx)
+                        .unwrap_or_else(|_| {
+                            // If we can't make a converter, just use the default normalization
+                            CoordConverter::default_normalization(min, default, max)
+                        });
                 }
                 fd_axis
             })
@@ -99,15 +103,29 @@ impl<'a> SerializationContext<'a> {
                     let normalized_location = axes
                         .iter()
                         .zip(coords_norm.iter())
-                        .map(|(tag, coord)| (*tag, NormalizedCoord::new(*coord as f64)))
+                        .map(|(tag, coord)| {
+                            (
+                                fontdrasil::types::Tag::new(&tag.into_bytes()),
+                                NormalizedCoord::new(*coord as f64),
+                            )
+                        })
                         .collect::<NormalizedLocation>();
-                    let user_location = normalized_location.to_user(&fontdrasil_axes);
-                    let mut loc_str: Vec<String> = user_location
-                        .iter()
-                        .map(|(tag, coord)| format!("{}={}", tag, coord.to_f64()))
-                        .collect();
-                    loc_str.sort();
-                    loc_str.join(",")
+                    if let Ok(user_location) = normalized_location.to_user(&fontdrasil_axes) {
+                        let mut loc_str: Vec<String> = user_location
+                            .iter()
+                            .map(|(tag, coord)| format!("{}={}", tag, coord.to_f64()))
+                            .collect();
+                        loc_str.sort();
+                        loc_str.join(",")
+                    } else {
+                        // If we can't convert to user space, just return the normalized location
+                        let mut loc_str: Vec<String> = normalized_location
+                            .iter()
+                            .map(|(tag, coord)| format!("{}={}n", tag, coord.to_f64()))
+                            .collect();
+                        loc_str.sort();
+                        loc_str.join(",")
+                    }
                 })
                 .collect();
             (all_tuples, locations)

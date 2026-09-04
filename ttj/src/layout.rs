@@ -140,10 +140,13 @@ fn serialize_langsys(langsys: &read_fonts::tables::layout::LangSys) -> Map<Strin
     map
 }
 
-fn serialize_lookup_list<'a, T: FontRead<'a> + SerializeLookup>(
+fn serialize_lookup_list<'a, T>(
     lookup_list: layout::LookupList<'a, T>,
     context: &SerializationContext,
-) -> serde_json::Value {
+) -> serde_json::Value
+where
+    T: FontRead<'a, Args = ()> + SerializeLookup,
+{
     // I know it's an array, but when you're looking through it you want to know what index you're looking at.
     let mut arr = Map::new();
     for (ix, lookuprec) in lookup_list.lookups().iter().enumerate() {
@@ -184,6 +187,9 @@ impl SerializeLookup for PositionLookup<'_> {
                     serialize_it!(st, context)
                 }
                 PositionSubtables::Contextual(st) => serialize_it!(st, context),
+                PositionSubtables::EmptyExtension => {
+                    return Value::Array(vec![]);
+                }
             };
             return Value::Array(
                 serialized_tables
@@ -209,6 +215,9 @@ impl SerializeLookup for SubstitutionLookup<'_> {
                     serialize_it!(st, context)
                 }
                 SubstitutionSubtables::Contextual(st) => serialize_it!(st, context),
+                SubstitutionSubtables::EmptyExtension => {
+                    return Value::Array(vec![]);
+                }
             };
             return Value::Array(
                 serialized_tables

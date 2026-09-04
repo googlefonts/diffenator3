@@ -122,6 +122,7 @@ fn matched_by_str(matched_by: &MatchMethod) -> &'static str {
     match matched_by {
         MatchMethod::Cmap(_) => "cmap",
         MatchMethod::DefaultOutline => "outline",
+        MatchMethod::Gsub => "gsub",
     }
 }
 

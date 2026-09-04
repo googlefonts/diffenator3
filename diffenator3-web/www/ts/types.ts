@@ -77,9 +77,12 @@ export type DiffGlyphsMessage = {
   type: "diff_glyphs";
   locations: LocationResult[];
 };
-export type DiffWordsMessage = {
-  type: "diff_words";
-  locations: LocationResult[];
+/** Auto mode: on-demand word diffs for one location, requested when the user
+ * clicks that location in the nav (words are too slow to compute eagerly). */
+export type AutoWordsMessage = {
+  type: "auto_words";
+  location: string;
+  words: WordDiffs;
 };
 /** Auto mode: the human-readable difference summary, posted back first. */
 export type DiffSummaryMessage = {
@@ -100,7 +103,7 @@ export type ReceivedMessage =
   | DiffSummaryMessage
   | DiffLocationsMessage
   | DiffGlyphsMessage
-  | DiffWordsMessage;
+  | AutoWordsMessage;
 
 export interface ValueRecord {
   x?: number | Record<string, number>;
@@ -137,4 +140,8 @@ export type SentMessage =
       beforeFont: Uint8Array<ArrayBufferLike>;
       afterFont: Uint8Array<ArrayBufferLike>;
       customWords: string[];
+    }
+  | {
+      command: "auto_words";
+      location: string;
     };

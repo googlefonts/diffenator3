@@ -165,41 +165,41 @@ fn main() {
         // actually select, so keep it out of the hot path for the ~99% that
         // are rejected.
         if selection.selected {
-            let glyphs: Vec<GlyphId> = buffer_a.iter().map(|g| g.glyph_id).collect();
-            let demarked: Vec<GlyphId> = glyphs
-                .iter()
-                .copied()
-                .filter(|gid| !marks.contains(gid))
-                .collect();
+            // let glyphs: Vec<GlyphId> = buffer_a.iter().map(|g| g.glyph_id).collect();
+            // let demarked: Vec<GlyphId> = glyphs
+            //     .iter()
+            //     .copied()
+            //     .filter(|gid| !marks.contains(gid))
+            //     .collect();
 
-            for gid in &glyphs {
-                if signature.glyph_changes.contains_key(gid) {
-                    covered_glyphs.insert(*gid);
-                }
-            }
-            for pair in demarked.windows(2) {
-                if signature
-                    .pair_position_changes
-                    .contains_key(&(pair[0], pair[1]))
-                {
-                    covered_pairs.insert((pair[0], pair[1]));
-                }
-            }
-            for i in 1..glyphs.len() {
-                if marks.contains(&glyphs[i]) {
-                    for j in 0..i {
-                        if signature
-                            .mark_position_changes
-                            .contains_key(&(glyphs[i], glyphs[j]))
-                        {
-                            covered_marks.insert((glyphs[i], glyphs[j]));
-                        }
-                    }
-                }
-            }
-            if selection.exhaustive {
-                exhaustive_count += 1;
-            }
+            // for gid in &glyphs {
+            //     if signature.glyph_changes.contains_key(gid) {
+            //         covered_glyphs.insert(*gid);
+            //     }
+            // }
+            // for pair in demarked.windows(2) {
+            //     if signature
+            //         .pair_position_changes
+            //         .contains_key(&(pair[0], pair[1]))
+            //     {
+            //         covered_pairs.insert((pair[0], pair[1]));
+            //     }
+            // }
+            // for i in 1..glyphs.len() {
+            //     if marks.contains(&glyphs[i]) {
+            //         for j in 0..i {
+            //             if signature
+            //                 .mark_position_changes
+            //                 .contains_key(&(glyphs[i], glyphs[j]))
+            //             {
+            //                 covered_marks.insert((glyphs[i], glyphs[j]));
+            //             }
+            //         }
+            //     }
+            // }
+            // if selection.exhaustive {
+            //     exhaustive_count += 1;
+            // }
             selected_ops += selection.locations.len();
             let locs: Vec<String> = selection
                 .locations

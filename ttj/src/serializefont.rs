@@ -32,6 +32,8 @@ impl<'a> ToValue for FieldType<'a> {
             Self::Fixed(arg0) => Value::Number(Number::from_f64(arg0.to_f32() as f64).unwrap()),
             Self::LongDateTime(arg0) => Value::Number(arg0.as_secs().into()),
             Self::GlyphId16(arg0) => Value::String(format!("g{}", arg0.to_u16())),
+            Self::GlyphId24(glyph_id24) => Value::String(format!("g{}", glyph_id24.to_u32())),
+
             Self::NameId(arg0) => Value::String(arg0.to_string()),
             Self::StringOffset(string) => match &string.target {
                 Ok(arg0) => Value::String(arg0.as_ref().iter_chars().collect()),

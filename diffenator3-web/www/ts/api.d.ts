@@ -61,6 +61,12 @@ export type SignatureSummary = {
     "positioning_unmodelled": boolean;
 
     /**
+     * Whether either font has contextual GSUB that isn't modelled by the
+     * unencoded-glyph trace.
+     */
+    "gsub_unmodelled": boolean;
+
+    /**
      * Whether the fonts share no cmap codepoints, making matching unreliable.
      */
     "mapping_failed": boolean;

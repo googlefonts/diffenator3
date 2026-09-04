@@ -165,6 +165,18 @@ pub fn select_buffer(
         // Always render the default location: the shaped buffer itself may
         // differ between the fonts even when no per-location value does.
         selection.locations.insert(NormalizedLocation::default());
+        log::trace!(
+            "select_buffer: word '{}' glyphs {:?} selected because {:?}",
+            word,
+            glyphs,
+            selection.reasons
+        );
+    } else {
+        log::trace!(
+            "select_buffer: word '{}' glyphs {:?} not selected",
+            word,
+            glyphs
+        );
     }
     selection
 }

@@ -51,6 +51,7 @@ fn main() {
         .html
         .then(|| template_engine(cli.templates.as_ref(), cli.update_templates));
 
+    log::info!("Loading fonts");
     let font_a = DFont::new(&font_binary_a);
     let font_b = DFont::new(&font_binary_b);
 
@@ -58,9 +59,16 @@ fn main() {
 
     // Static analysis of the two fonts, computed once up here. It drives word
     // selection during the behavioural tests, and feeds the human-readable
-    // summary of changes in the report.
-    let signature = compute_signature(&font_a, &font_b);
-    result.signature_summary = Some(summarize(&signature, &font_a));
+    // summary of changes in the report. Skipped with --no-signature, which
+    // mirrors the web app's per-location diff (no selection: every glyph/word
+    // is rendered at the requested location).
+    let signature = if cli.no_signature {
+        None
+    } else {
+        log::info!("Computing signature of the two fonts");
+        Some(compute_signature(&font_a, &font_b))
+    };
+    result.signature_summary = signature.as_ref().map(|sig| summarize(sig, &font_a));
 
     let custom_wordlist_inputs: Vec<WordList> = cli
         .custom_wordlists
@@ -105,7 +113,7 @@ fn main() {
     let mut location_result_map: HashMap<String, LocationResult> = HashMap::new();
 
     if cli.glyphs {
-        let glyphs = modified_encoded_glyphs(&font_a, &font_b, location.as_ref(), Some(&signature))
+        let glyphs = modified_encoded_glyphs(&font_a, &font_b, location.as_ref(), signature.as_ref())
             .expect("Error diffing glyphs");
         // Break out by location and add to locationresults
         for glyph in glyphs {
@@ -123,9 +131,10 @@ fn main() {
         let words = test_font_words(
             &font_a,
             &font_b,
-            Some(&signature),
+            signature.as_ref(),
             &custom_wordlist_inputs,
             location.as_ref(),
+            Some(cli.max_changes),
         );
         // Insert into location map, don't break glyphs!
         for (wordlist_name, word_diffs) in words.into_iter() {

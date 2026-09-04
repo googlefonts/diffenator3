@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" dir="auto">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -25,7 +25,9 @@
 
       .font-before,
       .font-after {
-        font-variation-settings: "wght" 400, "wdth" 100;
+        font-variation-settings:
+          "wght" 400,
+          "wdth" 100;
       }
 
       .font-before {
@@ -135,6 +137,13 @@
           </div>
           <div id="diffkerns"></div>
           <div id="difffeatures"></div>
+          <button
+            type="button"
+            id="tablediff"
+            class="btn btn-outline-secondary mt-3"
+          >
+            Diff binary tables
+          </button>
           <div id="difftable"></div>
         </div>
       </div>

@@ -2,11 +2,11 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
-/***/ "./ts/types.ts":
+/***/ "./ts/types.ts"
 /*!*********************!*\
   !*** ./ts/types.ts ***!
   \*********************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -26,28 +26,34 @@ function isArrayDiff(node) {
 }
 
 
-/***/ })
+/***/ }
 
 /******/ 	});
 /************************************************************************/
 /******/ 	// The module cache
-/******/ 	var __webpack_module_cache__ = {};
+/******/ 	const __webpack_module_cache__ = {};
 /******/ 	
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
 /******/ 		// Check if module is in cache
-/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		const cachedModule = __webpack_module_cache__[moduleId];
 /******/ 		if (cachedModule !== undefined) {
 /******/ 			return cachedModule.exports;
 /******/ 		}
 /******/ 		// Create a new module (and put it into the cache)
-/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 		const module = __webpack_module_cache__[moduleId] = {
 /******/ 			// no module.id needed
 /******/ 			// no module.loaded needed
 /******/ 			exports: {}
 /******/ 		};
 /******/ 	
 /******/ 		// Execute the module function
+/******/ 		if (!(moduleId in __webpack_modules__)) {
+/******/ 			delete __webpack_module_cache__[moduleId];
+/******/ 			const e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
+/******/ 		}
 /******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
 /******/ 	
 /******/ 		// Return the exports of the module
@@ -57,11 +63,26 @@ function isArrayDiff(node) {
 /************************************************************************/
 /******/ 	/* webpack/runtime/define property getters */
 /******/ 	(() => {
-/******/ 		// define getter functions for harmony exports
+/******/ 		// define getter/value functions for harmony exports
 /******/ 		__webpack_require__.d = (exports, definition) => {
-/******/ 			for(var key in definition) {
-/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
-/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 			if(Array.isArray(definition)) {
+/******/ 				var i = 0;
+/******/ 				while(i < definition.length) {
+/******/ 					var key = definition[i++];
+/******/ 					var binding = definition[i++];
+/******/ 					if(!__webpack_require__.o(exports, key)) {
+/******/ 						if(binding === 0) {
+/******/ 							Object.defineProperty(exports, key, { enumerable: true, value: definition[i++] });
+/******/ 						} else {
+/******/ 							Object.defineProperty(exports, key, { enumerable: true, get: binding });
+/******/ 						}
+/******/ 					} else if(binding === 0) { i++; }
+/******/ 				}
+/******/ 			} else {
+/******/ 				for(var key in definition) {
+/******/ 					if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 						Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 					}
 /******/ 				}
 /******/ 			}
 /******/ 		};
@@ -76,7 +97,7 @@ function isArrayDiff(node) {
 /******/ 	(() => {
 /******/ 		// define __esModule on exports
 /******/ 		__webpack_require__.r = (exports) => {
-/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 			if(Symbol.toStringTag) {
 /******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
 /******/ 			}
 /******/ 			Object.defineProperty(exports, '__esModule', { value: true });
@@ -84,7 +105,7 @@ function isArrayDiff(node) {
 /******/ 	})();
 /******/ 	
 /************************************************************************/
-var __webpack_exports__ = {};
+let __webpack_exports__ = {};
 // This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
 (() => {
 /*!**********************!*\
@@ -101,6 +122,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   diffSignatureSummary: () => (/* binding */ diffSignatureSummary),
 /* harmony export */   diffSignificantTables: () => (/* binding */ diffSignificantTables),
 /* harmony export */   diffTables: () => (/* binding */ diffTables),
+/* harmony export */   initTooltips: () => (/* binding */ initTooltips),
 /* harmony export */   locationLabel: () => (/* binding */ locationLabel),
 /* harmony export */   renderGlyphs: () => (/* binding */ renderGlyphs),
 /* harmony export */   renderLocationDiff: () => (/* binding */ renderLocationDiff),
@@ -171,17 +193,81 @@ function addAGlyph(glyph, where) {
         </div>
     `);
 }
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+/**
+ * Initialise Bootstrap tooltips within `scope` (default: the whole document).
+ *
+ * The web app runs Bootstrap 5, whose bundle ships no jQuery plugin methods,
+ * so the old `$(...).tooltip()` calls (Bootstrap 4 API) silently throw and no
+ * tooltip ever appears. This helper drives whichever Bootstrap is actually
+ * loaded:
+ *  - Bootstrap 5: `window.bootstrap.Tooltip` for elements flagged with
+ *    `data-bs-toggle="tooltip"`. Tooltip HTML can contain raw `<pre>` buffers,
+ *    so sanitisation is disabled and HTML enabled.
+ *  - Bootstrap 4 fallback: the jQuery `.tooltip()` plugin for elements using
+ *    `data-toggle="tooltip"` (the static report pages still load Bootstrap 4).
+ * Elements are only initialised once.
+ */
+function initTooltips(scope) {
+    const isJquery = scope != null && typeof scope.jquery === "string";
+    const node = isJquery
+        ? (scope.get(0) ?? null)
+        : (scope ?? document);
+    if (!node)
+        return;
+    const bootstrapTooltip = window.bootstrap?.Tooltip;
+    if (typeof bootstrapTooltip === "function") {
+        const targets = node === document
+            ? document.querySelectorAll('[data-bs-toggle="tooltip"]')
+            : node.querySelectorAll('[data-bs-toggle="tooltip"]');
+        targets.forEach((el) => {
+            // Bootstrap 5 stores the original title here once a tooltip is created,
+            // so we use it to avoid re-initialising an element on later renders.
+            if (!el.hasAttribute("data-bs-original-title")) {
+                new bootstrapTooltip(el, { html: true, sanitize: false });
+            }
+        });
+        return;
+    }
+    // Bootstrap 4 (jQuery plugin) fallback for the static report pages.
+    const jq = window.jQuery;
+    if (jq && typeof jq.fn?.tooltip === "function") {
+        jq(node)
+            .find('[data-toggle="tooltip"]')
+            .filter(function () {
+            return !this.hasAttribute("data-original-title");
+        })
+            .tooltip();
+    }
+}
 function addAWord(diff, where) {
     if (!diff.buffer_b) {
         diff.buffer_b = diff.buffer_a;
     }
-    where.append(`
-		<div class="cell-word font-before">
-		<span data-toggle="tooltip" data-html="true" data-title="Before: <pre>${diff.buffer_a}</pre>After: <pre>${diff.buffer_b}</pre><br>difference: ${diff.differing_pixels} pixels">
-		${diff.word}
-		</span>
-		</div>
-	`);
+    // The before/after shaped buffers and the pixel delta, shown on hover. The
+    // buffer strings can contain characters that would break an HTML attribute,
+    // so they are HTML-escaped before being embedded in the `title`.
+    const title = "Before:<pre>" +
+        escapeHtml(diff.buffer_a) +
+        "</pre>After:<pre>" +
+        escapeHtml(diff.buffer_b) +
+        "</pre>" +
+        `difference: ${diff.differing_pixels} pixels`;
+    const word = $("<span></span>")
+        .text(diff.word)
+        .attr("data-bs-toggle", "tooltip") // Bootstrap 5
+        .attr("data-toggle", "tooltip") // Bootstrap 4 (static report pages)
+        .attr("data-bs-html", "true")
+        .attr("data-html", "true")
+        .attr("title", title);
+    where.append($(`<div class="cell-word font-before"></div>`).append(word));
 }
 function diffTables(report) {
     $("#difftable").empty();

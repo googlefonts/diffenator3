@@ -49,7 +49,7 @@ fn fontdrasil_axes(font: &FontRef) -> Result<Option<fontdrasil::types::Axes>, Re
                 let mut fd_axis = fontdrasil::types::Axis {
                     converter: CoordConverter::default_normalization(min, default, max),
                     hidden: axis.is_hidden(),
-                    tag: axis.tag(),
+                    tag: fontdrasil::types::Tag::new(&axis.tag().into_bytes()),
                     name: axis.tag().to_string(),
                     min,
                     default,
@@ -80,6 +80,9 @@ fn fontdrasil_axes(font: &FontRef) -> Result<Option<fontdrasil::types::Axes>, Re
                         .position(|(_, to)| to.to_f64() == 0.0)
                         .unwrap_or(0);
                     fd_axis.converter = CoordConverter::new(desired_mapping, default_idx)
+                        .unwrap_or_else(|_| {
+                            CoordConverter::default_normalization(min, default, max)
+                        })
                 }
                 fd_axis
             })
@@ -198,7 +201,12 @@ impl DFont {
                 let normalized_location: NormalizedLocation = axes
                     .iter()
                     .zip(coords.iter())
-                    .map(|(axis, coord)| (axis.tag(), NormalizedCoord::new(*coord as f64)))
+                    .map(|(axis, coord)| {
+                        (
+                            fontdrasil::types::Tag::new(&axis.tag().into_bytes()),
+                            NormalizedCoord::new(*coord as f64),
+                        )
+                    })
                     .collect();
                 normalized_location
             })
@@ -244,28 +252,32 @@ impl DFont {
     }
 
     pub fn variations_for_buffer(&self, buffer: &DrawBuffer) -> HashSet<NormalizedLocation> {
-        buffer
+        let peaks = buffer
             .iter()
             .fold(HashSet::default(), |mut acc, positioned_glyph| {
                 // Borrow the cached per-glyph list directly instead of going
                 // through variations_for_glyph (which clones a Vec per glyph);
                 // this runs per (word, buffer) in the hot loops.
                 if let Some(variations) = self.variation_positions.get(&positioned_glyph.glyph_id) {
-                    acc.extend(variations.iter().cloned());
+                    acc.extend(variations.iter());
                 }
                 acc
-            })
+            });
+        peaks.into_iter().cloned().collect()
     }
 
-    pub fn location_to_coords<T>(&self, location: &Location<T>) -> Vec<NormalizedCoord>
+    pub fn location_to_coords<T>(
+        &self,
+        location: &Location<T>,
+    ) -> Result<Vec<NormalizedCoord>, fontdrasil::error::Error>
     where
         T: ConvertSpace<NormalizedSpace>,
     {
         let Some(axes) = self.fontdrasil_axes.as_ref() else {
-            return vec![];
+            return Ok(vec![]);
         };
-        let normalized_location = location.to_normalized(axes);
-        self.normalized_location_to_coords(&normalized_location)
+        let normalized_location = location.to_normalized(axes)?;
+        Ok(self.normalized_location_to_coords(&normalized_location))
     }
 
     pub fn normalized_location_to_coords(
@@ -297,10 +309,14 @@ impl DFont {
                 .collect();
             location.fit_to_axes(&tags);
             let user_location = location.to_user(fontdrasil_axes);
-            let mut loc_str: Vec<String> = user_location
-                .iter()
-                .map(|(tag, coord)| format!("{}={}", tag, coord.to_f64()))
-                .collect();
+            let mut loc_str: Vec<String> = if let Ok(user_location) = user_location {
+                user_location
+                    .iter()
+                    .map(|(tag, coord)| format!("{}={}", tag, coord.to_f64()))
+                    .collect()
+            } else {
+                vec![]
+            };
             loc_str.sort();
             loc_str.join(",")
         } else {

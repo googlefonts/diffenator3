@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 diffenator3-lib = { path = "../diffenator3-lib" }
-fontdrasil = "0.4.0"
+fontdrasil = "1.0.0"
 skrifa = { workspace = true }
 static-lang-word-lists = { version = "0.3.0", features = ["rayon"] }
 harfrust = { workspace = true }

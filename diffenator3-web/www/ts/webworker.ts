@@ -47,6 +47,7 @@ interface WasmApi {
     custom_words: string[],
     f: (all: string) => void,
   ): void;
+  auto_words(location: string, f: (words: string) => void): void;
   use_auto_by_default(
     font_a: Uint8Array,
     font_b: Uint8Array,
@@ -144,12 +145,18 @@ async function init() {
             type: "diff_glyphs",
             locations: obj["locations"] as LocationResult[],
           });
-        } else if (obj["kind"] == "words") {
-          self.postMessage({
-            type: "diff_words",
-            locations: obj["locations"] as LocationResult[],
-          });
         }
+      });
+    } else if (command == "auto_words") {
+      // On-demand word diff for a single location, using the signature and
+      // fonts stashed by the most recent diff_all call.
+      wasm.auto_words(location, (payload: string) => {
+        let obj = JSON.parse(payload);
+        self.postMessage({
+          type: "auto_words",
+          location,
+          words: obj["words"],
+        });
       });
     }
   };

@@ -1,5 +1,7 @@
 pub mod dfont;
+pub mod error;
 pub mod gposdiff;
+pub mod gsubdiff;
 pub mod staticdiff;
 pub mod structs;
 pub mod summary;
