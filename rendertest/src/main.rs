@@ -52,17 +52,19 @@ fn main() {
     let data = renderer_a
         .buffer_to_stage1_rendering(&buffer, None)
         .unwrap();
-    let image_a = renderer_a.final_rendering(&data, None);
+    let (image_a, a_has_overlaps) = renderer_a.final_rendering(&data, None);
     println!("Buffer A: {}", buffer.serialize());
+    println!("A has overlaps: {}", a_has_overlaps);
 
     let buffer_b = renderer_b.shape(&args.text, None);
     let serialized_buffer_b = buffer_b.serialize();
     let data_b = renderer_b
         .buffer_to_stage1_rendering(&buffer_b, None)
         .unwrap();
-    let image_b = renderer_b.final_rendering(&data_b, None);
+    let (image_b, b_has_overlaps) = renderer_b.final_rendering(&data_b, None);
 
     println!("Buffer B: {}", serialized_buffer_b);
+    println!("B has overlaps: {}", b_has_overlaps);
 
     let (mut image_a, mut image_b) = make_same_size(image_a, image_b);
     image::imageops::flip_vertical_in_place(&mut image_a);

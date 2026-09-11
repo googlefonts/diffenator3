@@ -163,6 +163,11 @@ export type GlyphDiff = {
      * The font variation location applied to the glyph, if any
      */
     "location"?: string;
+
+    /**
+     * Whether the rendered images differ in their overlapping contours
+     */
+    "has_overlap_difference": boolean;
 };
 
 /**
@@ -204,6 +209,11 @@ export type Difference = {
      * The font variation location applied to the text, if any
      */
     "location"?: string;
+
+    /**
+     * Whether the rendered images differ in their overlapping contours
+     */
+    "has_overlap_difference": boolean;
 };
 export type LocationResult = {
 

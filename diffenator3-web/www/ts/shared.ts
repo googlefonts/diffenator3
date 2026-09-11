@@ -79,6 +79,12 @@ function addAGlyph(
   if ("differing_pixels" in glyph) {
     pixeldiff_title = `${glyph.differing_pixels} pixels`;
   }
+  if ("has_overlap_difference" in glyph && glyph.has_overlap_difference) {
+    if ("differing_pixels" in glyph) {
+      pixeldiff_title += "; ";
+    }
+    pixeldiff_title += "Overlaps differ";
+  }
   where.append(`
         <div class="cell-glyph font-before">
         <div data-bs-toggle="tooltip" data-bs-html="true" title="${pixeldiff_title}"> ${glyph.string}

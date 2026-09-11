@@ -83,6 +83,7 @@ pub fn modified_encoded_glyphs(
         signature,
         DEFAULT_GLYPHS_THRESHOLD,
         location,
+        true, // We care about overlaps
     )?
     .into_iter()
     .map(|x| x.into())

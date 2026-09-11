@@ -1,5 +1,5 @@
 /// Turn some words into images
-use std::{any::Any};
+use std::any::Any;
 
 use fontdrasil::coords::NormalizedCoord;
 use harfrust::{Direction, Script};
@@ -38,12 +38,13 @@ pub trait AnyRenderer {
     /// downcast them to their concrete intermediate type.
     fn fast_equivalence_check(&self, data1: &dyn Any, data2: &dyn Any) -> bool;
 
-    /// Rasterize intermediate data into a grayscale image.
+    /// Rasterize intermediate data into a grayscale image and an indicator of
+    /// whether any overlaps were found.
     fn final_rendering(
         &mut self,
         data: &dyn Any,
         location: Option<&[NormalizedCoord]>,
-    ) -> GrayImage;
+    ) -> (GrayImage, bool);
 
     /// Log statistics
     fn log_stats(&self) {}
@@ -144,10 +145,11 @@ impl AnyRenderer for Renderer<'_> {
         &mut self,
         data: &dyn Any,
         _location: Option<&[NormalizedCoord]>,
-    ) -> GrayImage {
+    ) -> (GrayImage, bool) {
         #[cfg(not(target_family = "wasm"))]
         let time = std::time::Instant::now();
 
+        let mut found_overlap = false;
         let pen_buffer = data
             .downcast_ref::<Vec<Command>>()
             .expect("final_rendering: expected Vec<Command> from string_to_stage1_rendering");
@@ -198,6 +200,9 @@ impl AnyRenderer for Renderer<'_> {
         }
         let mut image = DynamicImage::new_luma8(x_size as u32, y_size as u32).into_luma8();
         rasterizer.for_each_pixel_2d(|x, y, alpha| {
+            if alpha > 1.0 {
+                found_overlap = true;
+            }
             image.put_pixel(x, y, Luma([(alpha * 255.0) as u8]));
         });
 
@@ -205,7 +210,7 @@ impl AnyRenderer for Renderer<'_> {
         {
             self.render_time += time.elapsed();
         }
-        image
+        (image, found_overlap)
     }
 
     fn log_stats(&self) {
@@ -227,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_zeno_path() {
-        let path = "NotoSansArabic-NewRegular.ttf";
+        let path = "test-fonts/NotoSansArabic-NewRegular.ttf";
         let data = std::fs::read(path).unwrap();
         let font = DFont::new(&data);
         let mut renderer = Renderer::new(
@@ -240,7 +245,8 @@ mod tests {
         let commands = renderer
             .buffer_to_stage1_rendering(&draw_buffer, None)
             .unwrap();
-        let image = renderer.final_rendering(&*commands, None);
+        let (image, has_overlap) = renderer.final_rendering(&*commands, None);
+        println!("Has overlap: {}", has_overlap);
         image.save("test.png").unwrap();
     }
 }

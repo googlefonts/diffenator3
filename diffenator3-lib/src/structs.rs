@@ -22,6 +22,8 @@ pub struct Difference {
     /// The font variation location applied to the text, if any
     #[serde(skip_serializing_if = "String::is_empty")]
     pub location: String,
+    /// Whether the rendered images differ in their overlapping contours
+    pub has_overlap_difference: bool,
 }
 
 #[derive(Serialize)]
@@ -58,6 +60,8 @@ pub struct GlyphDiff {
     /// The font variation location applied to the glyph, if any
     #[serde(skip_serializing_if = "String::is_empty")]
     pub location: String,
+    /// Whether the rendered images differ in their overlapping contours
+    pub has_overlap_difference: bool,
 }
 
 #[cfg(feature = "typescript")]

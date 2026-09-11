@@ -90,6 +90,7 @@ pub fn test_font_words(
             signature,
             DEFAULT_WORDS_THRESHOLD,
             location,
+            false,
         )
         .unwrap_or_default();
         if !results.is_empty() {
@@ -110,6 +111,7 @@ impl From<Difference> for GlyphDiff {
                 unicode: format!("U+{:04X}", c as i32),
                 differing_pixels: diff.differing_pixels,
                 location: diff.location,
+                has_overlap_difference: diff.has_overlap_difference,
             }
         } else {
             GlyphDiff {
@@ -118,6 +120,7 @@ impl From<Difference> for GlyphDiff {
                 unicode: "".to_string(),
                 differing_pixels: 0,
                 location: "".to_string(),
+                has_overlap_difference: false,
             }
         }
     }
@@ -152,6 +155,7 @@ pub(crate) fn diff_many_words(
     signature: Option<&DifferenceSignature>,
     threshold: usize,
     base_location: Option<&UserLocation>,
+    care_about_overlaps: bool,
 ) -> Result<Vec<Difference>, ReadError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
@@ -255,6 +259,7 @@ pub(crate) fn diff_many_words(
                 "default location",
                 coords_a.as_ref().unwrap_or(&vec![]),
                 coords_b.as_ref().unwrap_or(&vec![]),
+                care_about_overlaps,
             ) {
                 results.push(diff);
             }
@@ -287,6 +292,7 @@ pub(crate) fn diff_many_words(
                     &user_space,
                     &coords_a,
                     &coords_b,
+                    care_about_overlaps,
                 ) {
                     results.push(diff);
                 }
@@ -313,6 +319,7 @@ pub(crate) fn diff_many_words(
     signature: Option<&DifferenceSignature>,
     threshold: usize,
     base_location: Option<&UserLocation>,
+    care_about_overlaps: bool,
 ) -> Result<Vec<Difference>, ReadError> {
     let script = wordlist.script().and_then(|x| Script::from_str(x).ok());
     let direction = script.and_then(direction_from_script);
@@ -411,6 +418,7 @@ pub(crate) fn diff_many_words(
             "default location",
             coords_a.as_ref().unwrap_or(&vec![]),
             coords_b.as_ref().unwrap_or(&vec![]),
+            care_about_overlaps,
         ) {
             differences.push(diff);
         }
@@ -447,6 +455,7 @@ pub(crate) fn diff_many_words(
                 &user_space,
                 &coords_a,
                 &coords_b,
+                care_about_overlaps,
             ) {
                 differences.push(diff);
             }
@@ -492,6 +501,7 @@ fn render_word<'a>(
     location: &str,
     coords_a: &Vec<NormalizedCoord>,
     coords_b: &Vec<NormalizedCoord>,
+    care_about_overlaps: bool,
 ) -> Option<Difference> {
     let data_a = renderer_a.buffer_to_stage1_rendering(&buffer_a, Some(coords_a))?;
     let data_b = renderer_b.buffer_to_stage1_rendering(&buffer_b, Some(coords_b))?;
@@ -499,11 +509,11 @@ fn render_word<'a>(
         return None;
     }
     let buffers_same = buffer_a == buffer_b;
-    let img_a = renderer_a.final_rendering(&*data_a, Some(coords_a));
-    let img_b = renderer_b.final_rendering(&*data_b, Some(coords_b));
+    let (img_a, a_has_overlap) = renderer_a.final_rendering(&*data_a, Some(coords_a));
+    let (img_b, b_has_overlap) = renderer_b.final_rendering(&*data_b, Some(coords_b));
     let differing_pixels = count_differences(img_a, img_b, DEFAULT_GRAY_FUZZ);
 
-    if differing_pixels > threshold {
+    if differing_pixels > threshold || (care_about_overlaps && a_has_overlap != b_has_overlap) {
         return Some(Difference {
             word: word.to_string(),
             buffer_a: buffer_a.serialize(),
@@ -516,6 +526,7 @@ fn render_word<'a>(
             lang: "".to_string(),
             differing_pixels,
             location: location.to_string(),
+            has_overlap_difference: a_has_overlap != b_has_overlap,
         });
     }
     None
@@ -550,8 +561,17 @@ mod tests {
         // Threshold 0: any differing pixel counts, so the assertions are
         // purely about which words are reported (and where).
         let signature = compute_signature(&font_a, &font_b);
-        let diffs = diff_many_words(&font_a, &font_b, 16.0, &wl, Some(&signature), 0, None)
-            .expect("diff_many_words failed");
+        let diffs = diff_many_words(
+            &font_a,
+            &font_b,
+            16.0,
+            &wl,
+            Some(&signature),
+            0,
+            None,
+            false,
+        )
+        .expect("diff_many_words failed");
 
         let reported: Vec<&str> = diffs.iter().map(|d| d.word.as_str()).collect();
 

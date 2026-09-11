@@ -198,7 +198,7 @@ impl AnyRenderer for ColorRenderer<'_> {
         &mut self,
         data: &dyn Any,
         location: Option<&[NormalizedCoord]>,
-    ) -> GrayImage {
+    ) -> (GrayImage, bool) {
         let buffer = data
             .downcast_ref::<DrawBuffer>()
             .expect("final_rendering: expected DrawBuffer from string_to_stage1_rendering");
@@ -249,7 +249,7 @@ impl AnyRenderer for ColorRenderer<'_> {
             img.put_pixel(x, y, Luma([gray.round().min(255.0) as u8]));
         }
 
-        img
+        (img, false) // We don't know about overlaps
     }
 
     fn log_stats(&self) {}
@@ -296,7 +296,7 @@ mod tests {
         let data = renderer
             .buffer_to_stage1_rendering(&buffer, None)
             .expect("buffer_to_stage1_rendering returned None");
-        let img = renderer.final_rendering(&*data, None);
+        let (img, _) = renderer.final_rendering(&*data, None);
 
         assert!(
             !buffer.serialize().is_empty(),
@@ -362,12 +362,12 @@ mod tests {
         let data_a = renderer_a
             .buffer_to_stage1_rendering(&buffer_a, None)
             .unwrap();
-        let img_a = renderer_a.final_rendering(&*data_a, None);
+        let (img_a, _) = renderer_a.final_rendering(&*data_a, None);
         let buffer_b = renderer_b.shape("world", None);
         let data_b = renderer_b
             .buffer_to_stage1_rendering(&buffer_b, None)
             .unwrap();
-        let img_b = renderer_b.final_rendering(&*data_b, None);
+        let (img_b, _) = renderer_b.final_rendering(&*data_b, None);
 
         let diff = crate::render::utils::count_differences(img_a, img_b, 0);
         assert_eq!(diff, 0, "same font should produce identical images");
