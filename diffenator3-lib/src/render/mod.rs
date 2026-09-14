@@ -66,6 +66,7 @@ pub fn test_font_words(
     signature: Option<&DifferenceSignature>,
     custom_inputs: &[WordList],
     location: Option<&UserLocation>,
+    threshold: Option<usize>,
 ) -> BTreeMap<String, Vec<Difference>> {
     let mut map: BTreeMap<String, Vec<Difference>> = BTreeMap::new();
     let mut jobs: Vec<&WordList> = vec![];
@@ -88,7 +89,7 @@ pub fn test_font_words(
             DEFAULT_WORDS_FONT_SIZE,
             job,
             signature,
-            DEFAULT_WORDS_THRESHOLD,
+            threshold.unwrap_or(DEFAULT_WORDS_THRESHOLD),
             location,
             false,
         )

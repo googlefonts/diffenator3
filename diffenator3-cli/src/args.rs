@@ -90,6 +90,13 @@ pub struct Cli {
     #[clap(long = "quiet")]
     pub quiet: bool,
 
+    /// Threshold for showing glyph differences
+    #[clap(long = "glyphs-threshold", help_heading = Some("Tolerances"))]
+    pub glyphs_threshold: Option<usize>,
+    /// Threshold for showing word differences
+    #[clap(long = "words-threshold", help_heading = Some("Tolerances"))]
+    pub words_threshold: Option<usize>,
+
     /// The first font file to compare
     pub font1: PathBuf,
     /// The second font file to compare

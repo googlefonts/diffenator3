@@ -115,6 +115,7 @@ pub fn modified_glyphs(font_a: &[u8], font_b: &[u8], location: &str, f: &js_sys:
             &f_b,
             location.as_ref(),
             None,
+            None,
         ).unwrap_or_default()
     });
     f.call1(
@@ -160,7 +161,7 @@ pub fn diff_words(
     // location.
     let location = parse_location_opt(location);
     let val = json!({
-        "words": test_font_words(&f_a, &f_b, None, &custom_word_diff, location.as_ref())
+        "words": test_font_words(&f_a, &f_b, None, &custom_word_diff, location.as_ref(), None)
     });
     f.call1(
         &JsValue::NULL,
@@ -247,7 +248,7 @@ pub fn diff_all(font_a: &[u8], font_b: &[u8], custom_words: Vec<String>, f: &js_
 
     // Render glyph diffs across all the changed locations and send them back
     // grouped by location, as soon as they are available.
-    let glyphs = encodedglyphs::modified_encoded_glyphs(&f_a, &f_b, None, Some(&signature))
+    let glyphs = encodedglyphs::modified_encoded_glyphs(&f_a, &f_b, None, Some(&signature), None)
         .unwrap_or_default();
     console::log_1(&format!("We've found {} modified glyphs", glyphs.len()).into());
     let mut glyphs_by_loc: HashMap<String, Vec<GlyphDiff>> = HashMap::new();
@@ -273,7 +274,7 @@ pub fn diff_all(font_a: &[u8], font_b: &[u8], custom_words: Vec<String>, f: &js_
     }));
 
     // Render word diffs and send them back grouped by location.
-    let words = test_font_words(&f_a, &f_b, Some(&signature), &custom_word_diff, None);
+    let words = test_font_words(&f_a, &f_b, Some(&signature), &custom_word_diff, None, None);
     console::log_1(&format!("We've found {} modified wordlists", words.len()).into());
     let mut words_by_loc: HashMap<String, BTreeMap<String, Vec<Difference>>> = HashMap::new();
     for (wordlist_name, diffs) in words {

@@ -105,8 +105,14 @@ fn main() {
     let mut location_result_map: HashMap<String, LocationResult> = HashMap::new();
 
     if cli.glyphs {
-        let glyphs = modified_encoded_glyphs(&font_a, &font_b, location.as_ref(), Some(&signature))
-            .expect("Error diffing glyphs");
+        let glyphs = modified_encoded_glyphs(
+            &font_a,
+            &font_b,
+            location.as_ref(),
+            Some(&signature),
+            cli.glyphs_threshold,
+        )
+        .expect("Error diffing glyphs");
         // Break out by location and add to locationresults
         for glyph in glyphs {
             let location_key = glyph.location.clone();
@@ -126,6 +132,7 @@ fn main() {
             Some(&signature),
             &custom_wordlist_inputs,
             location.as_ref(),
+            cli.words_threshold,
         );
         // Insert into location map, don't break glyphs!
         for (wordlist_name, word_diffs) in words.into_iter() {

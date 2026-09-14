@@ -66,6 +66,7 @@ pub fn modified_encoded_glyphs(
     font_b: &DFont,
     location: Option<&UserLocation>,
     signature: Option<&DifferenceSignature>,
+    threshold: Option<usize>,
 ) -> Result<Vec<GlyphDiff>, ReadError> {
     let cmap_a = &font_a.codepoints;
     let cmap_b = &font_b.codepoints;
@@ -81,7 +82,7 @@ pub fn modified_encoded_glyphs(
         DEFAULT_GLYPHS_FONT_SIZE,
         &wl,
         signature,
-        DEFAULT_GLYPHS_THRESHOLD,
+        threshold.unwrap_or(DEFAULT_GLYPHS_THRESHOLD),
         location,
         true, // We care about overlaps
     )?
