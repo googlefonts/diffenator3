@@ -77,7 +77,8 @@ versions can be obtained via the latest GitHub Action. The `diffenator3` and
 wordlists within them - so you can copy them to anywhere in your path.
 
 Alternatively you can install from source with
-`cargo install --git https://github.com/googlefonts/diffenator3`.
+
+    cargo install --git https://github.com/googlefonts/diffenator3 diffenator3
 
 ## License
 
