@@ -93,6 +93,8 @@ pub struct DifferenceSignature {
     /// Number of high-confidence (cmap-matched) glyph pairs which were found
     /// identical everywhere.
     pub unchanged_count: usize,
+    /// High-confidence cmap-matched glyph pairs found identical everywhere.
+    pub unchanged: Vec<GlyphReport>,
     /// Encoded glyphs present in font A but missing from font B's cmap.
     pub missing: Vec<GlyphReport>,
     /// Encoded glyphs present in font B but missing from font A's cmap.
@@ -247,7 +249,14 @@ pub fn compute_signature(font_a: &DFont, font_b: &DFont) -> DifferenceSignature 
         claimed_a.insert(gid_a);
         claimed_b.insert(gid_b);
         match compare_glyphs(font_a, font_b, gid_a, gid_b) {
-            GlyphComparison::Same => signature.unchanged_count += 1,
+            GlyphComparison::Same => {
+                signature.unchanged_count += 1;
+                signature.unchanged.push(GlyphReport {
+                    gid: gid_a,
+                    name: name_for(&names_a, gid_a),
+                    codepoint: Some(*cp),
+                });
+            }
             GlyphComparison::Changed {
                 outline_locations,
                 advance_locations,

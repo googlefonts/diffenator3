@@ -82,9 +82,17 @@ pub fn summarize(signature: &DifferenceSignature, font_a: &DFont) -> SignatureSu
     }
 
     if signature.unchanged_count > 0 {
+        let mut unchanged_glyphs: Vec<String> = signature
+            .unchanged
+            .iter()
+            .map(|glyph| identical_glyph_label(&names, glyph))
+            .collect();
+        unchanged_glyphs.sort();
+        unchanged_glyphs.dedup();
         points.push(format!(
-            "{} glyphs are identical everywhere.",
-            signature.unchanged_count
+            "{} glyphs are identical everywhere: {}.",
+            signature.unchanged_count,
+            join_glyph_labels(&unchanged_glyphs, MAX_EXAMPLES)
         ));
     }
 
@@ -253,6 +261,31 @@ fn glyph_name(names: &skrifa::GlyphNames, gid: GlyphId) -> String {
         .unwrap_or_else(|| format!("gid{}", gid.to_u32()))
 }
 
+fn identical_glyph_label(names: &skrifa::GlyphNames, glyph: &crate::staticdiff::GlyphReport) -> String {
+    let name = names.get(glyph.gid).map(|name| name.to_string());
+    let character = glyph
+        .codepoint
+        .and_then(char::from_u32)
+        .map(|character| character.to_string());
+
+    match (name, character) {
+        (Some(name), Some(character)) if name != character => {
+            format!("{name} ({character})")
+        }
+        (Some(name), _) => name,
+        (None, Some(character)) => character,
+        (None, None) => format!("gid{}", glyph.gid.to_u32()),
+    }
+}
+
+fn join_glyph_labels(items: &[String], max: usize) -> String {
+    if items.len() <= max {
+        items.join(" ")
+    } else {
+        format!("{} (and {} more)", items[..max].join(" "), items.len() - max)
+    }
+}
+
 fn plural(count: usize) -> &'static str {
     if count == 1 {
         ""
@@ -332,5 +365,33 @@ mod tests {
             "expected a no-difference overview, got {}",
             summary.overview
         );
+    }
+
+    #[test]
+    fn identical_glyph_summary_includes_name_and_distinct_character() {
+        let font = dfont("test-data/Martel-Original.ttf").expect("test font should be present");
+        let fontref = font.fontref();
+        let (codepoint, gid) = fontref
+            .charmap()
+            .mappings()
+            .find(|(codepoint, _)| *codepoint == u32::from('.'))
+            .expect("test font should encode period");
+        let names = fontref.glyph_names();
+        assert_eq!(names.get(gid).map(|name| name.to_string()).as_deref(), Some("period"));
+
+        let signature = crate::staticdiff::DifferenceSignature {
+            unchanged_count: 1,
+            unchanged: vec![crate::staticdiff::GlyphReport {
+                gid,
+                name: "period".to_string(),
+                codepoint: Some(codepoint),
+            }],
+            ..Default::default()
+        };
+        let summary = summarize(&signature, &font);
+
+        assert!(summary.points.iter().any(|point| {
+            point == "1 glyphs are identical everywhere: period (.)."
+        }));
     }
 }
